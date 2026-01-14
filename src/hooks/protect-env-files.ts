@@ -64,7 +64,7 @@ const protectionRules: ToolProtectionRule[] = [
     },
     shouldBlock: isProtectedEnvFile,
     blockMessage: (target) =>
-      `Accessing ${target} is not allowed. Environment files containing secrets are protected. Only .env.example, .env.sample, or .env.test files can be accessed.`,
+      `Accessing ${target} is not allowed. Environment files containing secrets are protected. Explain to the user why you want to access this .env file, and if changes are needed ask the user to make them. Only .env.example, .env.sample, or .env.test files can be accessed.`,
   },
   {
     // Bash needs to parse command string for .env references
@@ -88,7 +88,7 @@ const protectionRules: ToolProtectionRule[] = [
     },
     shouldBlock: isProtectedEnvFile,
     blockMessage: (target) =>
-      `Command references protected file ${target}. Environment files containing secrets are protected. Only .env.example, .env.sample, or .env.test files can be accessed.`,
+      `Command references protected file ${target}. Environment files containing secrets are protected. Explain to the user why you want to access this .env file, and if changes are needed ask the user to make them. Only .env.example, .env.sample, or .env.test files can be accessed.`,
   },
 ];
 
