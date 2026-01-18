@@ -40,5 +40,6 @@ export function setupPermissionGateHook(pi: ExtensionAPI) {
         break;
       }
     }
+    return;
   });
 }

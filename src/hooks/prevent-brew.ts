@@ -32,5 +32,6 @@ export function setupPreventBrewHook(pi: ExtensionAPI) {
         };
       }
     }
+    return;
   });
 }

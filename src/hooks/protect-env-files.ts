@@ -123,5 +123,6 @@ export function setupProtectEnvFilesHook(pi: ExtensionAPI) {
         };
       }
     }
+    return;
   });
 }
