@@ -1,4 +1,13 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import {
+  Container,
+  Key,
+  matchesKey,
+  Spacer,
+  Text,
+  wrapTextWithAnsi,
+} from "@mariozechner/pi-tui";
 
 /**
  * Permission gate that prompts user confirmation for dangerous commands.
@@ -26,12 +35,89 @@ export function setupPermissionGateHook(pi: ExtensionAPI) {
 
     for (const { pattern, description } of DANGEROUS_PATTERNS) {
       if (pattern.test(command)) {
-        const truncatedCmd =
-          command.length > 60 ? `${command.substring(0, 60)}...` : command;
+        const proceed = await ctx.ui.custom<boolean>(
+          (_tui, theme, _kb, done) => {
+            const container = new Container();
 
-        const proceed = await ctx.ui.confirm(
-          "Dangerous Command Detected",
-          `This command contains ${description}:\n\n${truncatedCmd}\n\nAllow execution?`,
+            // Red border styling
+            const redBorder = (s: string) => theme.fg("error", s);
+
+            // Top border
+            container.addChild(new DynamicBorder(redBorder));
+
+            // Title
+            container.addChild(
+              new Text(
+                theme.fg("error", theme.bold("Dangerous Command Detected")),
+                1,
+                0,
+              ),
+            );
+            container.addChild(new Spacer(1));
+
+            // Description
+            container.addChild(
+              new Text(
+                theme.fg("warning", `This command contains ${description}:`),
+                1,
+                0,
+              ),
+            );
+            container.addChild(new Spacer(1));
+
+            // Full command with border
+            container.addChild(
+              new DynamicBorder((s: string) => theme.fg("muted", s)),
+            );
+            const commandText = new Text("", 1, 0);
+            container.addChild(commandText);
+            container.addChild(
+              new DynamicBorder((s: string) => theme.fg("muted", s)),
+            );
+            container.addChild(new Spacer(1));
+
+            // Prompt
+            container.addChild(
+              new Text(theme.fg("text", "Allow execution?"), 1, 0),
+            );
+            container.addChild(new Spacer(1));
+
+            // Help text
+            container.addChild(
+              new Text(theme.fg("dim", "y/enter: allow • n/esc: deny"), 1, 0),
+            );
+
+            // Bottom border
+            container.addChild(new DynamicBorder(redBorder));
+
+            return {
+              render: (width: number) => {
+                // Update command text with proper wrapping for current width
+                const wrappedCommand = wrapTextWithAnsi(
+                  theme.fg("text", command),
+                  width - 4,
+                ).join("\n");
+                commandText.setText(wrappedCommand);
+                return container.render(width);
+              },
+              invalidate: () => container.invalidate(),
+              handleInput: (data: string) => {
+                if (
+                  matchesKey(data, Key.enter) ||
+                  data === "y" ||
+                  data === "Y"
+                ) {
+                  done(true);
+                } else if (
+                  matchesKey(data, Key.escape) ||
+                  data === "n" ||
+                  data === "N"
+                ) {
+                  done(false);
+                }
+              },
+            };
+          },
         );
 
         if (!proceed) {
