@@ -14,6 +14,20 @@ import {
  * Blocks patterns like rm -rf, sudo, and piped shell execution.
  */
 
+// Notification event channel (duplicated for decoupling)
+const NOTIFICATION_EVENT = "ad:notification";
+const ATTENTION_SOUND = "/System/Library/Sounds/Ping.aiff";
+
+interface NotificationEvent {
+  message: string;
+  sound?: string;
+}
+
+function emitNotification(pi: ExtensionAPI, message: string, sound?: string) {
+  const event: NotificationEvent = { message, sound };
+  pi.events.emit(NOTIFICATION_EVENT, event);
+}
+
 const DANGEROUS_PATTERNS = [
   { pattern: /rm\s+-rf/, description: "recursive force delete" },
   { pattern: /\bsudo\b/, description: "superuser command" },
@@ -35,6 +49,13 @@ export function setupPermissionGateHook(pi: ExtensionAPI) {
 
     for (const { pattern, description } of DANGEROUS_PATTERNS) {
       if (pattern.test(command)) {
+        // Emit notification before showing confirm dialog
+        emitNotification(
+          pi,
+          `Dangerous command: ${description}`,
+          ATTENTION_SOUND,
+        );
+
         const proceed = await ctx.ui.custom<boolean>(
           (_tui, theme, _kb, done) => {
             const container = new Container();
