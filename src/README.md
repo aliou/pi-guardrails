@@ -2,6 +2,33 @@
 
 Security hooks to prevent potentially dangerous operations.
 
+## Installation
+
+Install via the pi-extensions package:
+
+```bash
+pi install git:github.com/aliou/pi-extensions
+```
+
+Or selectively in your `settings.json`:
+
+```json
+{
+  "packages": [
+    {
+      "source": "git:github.com/aliou/pi-extensions",
+      "extensions": ["extensions/guardrails"]
+    }
+  ]
+}
+```
+
+Or from npm:
+
+```bash
+pi install npm:@aliou/pi-guardrails
+```
+
 ## Features
 
 - **prevent-brew**: Blocks Homebrew commands (project uses Nix)
