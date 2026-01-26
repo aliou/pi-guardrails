@@ -2,6 +2,10 @@
 
 Security hooks to prevent potentially dangerous operations.
 
+## Demo
+
+<video src="https://assets.aliou.me/pi-extensions/2026-01-26-guardrails-demo.mp4" controls playsinline muted></video>
+
 ## Installation
 
 Install via the pi-extensions package:
