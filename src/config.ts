@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   enabled: true,
   features: {
     preventBrew: false,
+    preventPython: false,
     protectEnvFiles: true,
     permissionGate: true,
   },

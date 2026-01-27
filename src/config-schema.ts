@@ -9,6 +9,7 @@ export interface GuardrailsConfig {
   enabled?: boolean;
   features?: {
     preventBrew?: boolean;
+    preventPython?: boolean;
     protectEnvFiles?: boolean;
     permissionGate?: boolean;
   };
@@ -34,6 +35,7 @@ export interface ResolvedConfig {
   enabled: boolean;
   features: {
     preventBrew: boolean;
+    preventPython: boolean;
     protectEnvFiles: boolean;
     permissionGate: boolean;
   };
