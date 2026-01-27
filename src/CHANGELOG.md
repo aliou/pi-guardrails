@@ -1,5 +1,16 @@
 # @aliou/pi-guardrails
 
+## 0.4.0
+
+### Minor Changes
+
+- 9916f1f: Add preventPython guardrail to block Python tools.
+
+  - Block python, python3, pip, pip3, poetry, pyenv, virtualenv, and venv commands.
+  - Recommend using uv for Python package management instead.
+  - Disabled by default, configurable via settings.
+  - Provides helpful guidance on using uv as a replacement.
+
 ## 0.3.0
 
 ### Minor Changes
