@@ -197,21 +197,21 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
               : configLoader.getGlobalConfig();
           const resolved = configLoader.getConfig();
 
-          const featureItems = (
-            Object.keys(FEATURE_UI) as FeatureKey[]
-          ).map((key) => {
-            const def = FEATURE_UI[key];
-            return {
-              id: `features.${key}`,
-              label: def.label,
-              description: def.description,
-              currentValue:
-                (config.features?.[key] ?? resolved.features[key])
-                  ? "enabled"
-                  : "disabled",
-              values: ["enabled", "disabled"],
-            };
-          });
+          const featureItems = (Object.keys(FEATURE_UI) as FeatureKey[]).map(
+            (key) => {
+              const def = FEATURE_UI[key];
+              return {
+                id: `features.${key}`,
+                label: def.label,
+                description: def.description,
+                currentValue:
+                  (config.features?.[key] ?? resolved.features[key])
+                    ? "enabled"
+                    : "disabled",
+                values: ["enabled", "disabled"],
+              };
+            },
+          );
 
           const sections: SettingsSection[] = [
             {

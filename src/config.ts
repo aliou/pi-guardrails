@@ -98,8 +98,10 @@ class ConfigLoader {
     return merged;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mergeInto(target: any, source: any): void {
+  private mergeInto(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>,
+  ): void {
     for (const key in source) {
       if (source[key] === undefined) continue;
 
@@ -109,7 +111,10 @@ class ConfigLoader {
         source[key] !== null
       ) {
         if (!target[key]) target[key] = {};
-        this.mergeInto(target[key], source[key]);
+        this.mergeInto(
+          target[key] as Record<string, unknown>,
+          source[key] as Record<string, unknown>,
+        );
       } else {
         target[key] = source[key];
       }
@@ -138,7 +143,7 @@ class ConfigLoader {
     config: GuardrailsConfig,
   ): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify(config, null, 2) + "\n", "utf-8");
+    await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
   }
 
   hasGlobalConfig(): boolean {
