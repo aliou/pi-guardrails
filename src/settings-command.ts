@@ -184,6 +184,18 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
                   values: ["enabled", "disabled"],
                 },
                 {
+                  id: "features.preventPython",
+                  label: "Prevent Python",
+                  description:
+                    "Block python/pip/poetry commands. Use uv instead.",
+                  currentValue:
+                    (config.features?.preventPython ??
+                    resolved.features.preventPython)
+                      ? "enabled"
+                      : "disabled",
+                  values: ["enabled", "disabled"],
+                },
+                {
                   id: "features.protectEnvFiles",
                   label: "Protect .env files",
                   description: "Block access to .env files containing secrets",
