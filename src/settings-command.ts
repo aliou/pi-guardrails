@@ -3,11 +3,40 @@ import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import { Key, matchesKey } from "@mariozechner/pi-tui";
 import { ArrayEditor } from "./array-editor";
 import { configLoader } from "./config";
-import type { GuardrailsConfig } from "./config-schema";
+import type { GuardrailsConfig, ResolvedConfig } from "./config-schema";
 import { PatternEditor } from "./pattern-editor";
 import { SectionedSettings, type SettingsSection } from "./sectioned-settings";
 
 type Tab = "local" | "global";
+
+// Typed feature UI definitions. Adding a key to ResolvedConfig.features
+// without adding it here will cause a type error.
+type FeatureKey = keyof ResolvedConfig["features"];
+
+interface FeatureUiDef {
+  label: string;
+  description: string;
+}
+
+const FEATURE_UI: Record<FeatureKey, FeatureUiDef> = {
+  preventBrew: {
+    label: "Prevent Homebrew",
+    description: "Block brew commands",
+  },
+  preventPython: {
+    label: "Prevent Python",
+    description: "Block python/pip/poetry commands. Use uv instead.",
+  },
+  protectEnvFiles: {
+    label: "Protect .env files",
+    description: "Block access to .env files containing secrets",
+  },
+  permissionGate: {
+    label: "Permission gate",
+    description:
+      "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
+  },
+};
 
 export function registerSettingsCommand(pi: ExtensionAPI): void {
   pi.registerCommand("guardrails:settings", {
@@ -168,57 +197,26 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
               : configLoader.getGlobalConfig();
           const resolved = configLoader.getConfig();
 
+          const featureItems = (
+            Object.keys(FEATURE_UI) as FeatureKey[]
+          ).map((key) => {
+            const def = FEATURE_UI[key];
+            return {
+              id: `features.${key}`,
+              label: def.label,
+              description: def.description,
+              currentValue:
+                (config.features?.[key] ?? resolved.features[key])
+                  ? "enabled"
+                  : "disabled",
+              values: ["enabled", "disabled"],
+            };
+          });
+
           const sections: SettingsSection[] = [
             {
               label: "Features",
-              items: [
-                {
-                  id: "features.preventBrew",
-                  label: "Prevent Homebrew",
-                  description: "Block brew commands",
-                  currentValue:
-                    (config.features?.preventBrew ??
-                    resolved.features.preventBrew)
-                      ? "enabled"
-                      : "disabled",
-                  values: ["enabled", "disabled"],
-                },
-                {
-                  id: "features.preventPython",
-                  label: "Prevent Python",
-                  description:
-                    "Block python/pip/poetry commands. Use uv instead.",
-                  currentValue:
-                    (config.features?.preventPython ??
-                    resolved.features.preventPython)
-                      ? "enabled"
-                      : "disabled",
-                  values: ["enabled", "disabled"],
-                },
-                {
-                  id: "features.protectEnvFiles",
-                  label: "Protect .env files",
-                  description: "Block access to .env files containing secrets",
-                  currentValue:
-                    (config.features?.protectEnvFiles ??
-                    resolved.features.protectEnvFiles)
-                      ? "enabled"
-                      : "disabled",
-                  values: ["enabled", "disabled"],
-                },
-                {
-                  id: "features.permissionGate",
-                  label: "Permission gate",
-                  description:
-                    "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
-                  currentValue:
-                    (config.features?.permissionGate ??
-                    resolved.features.permissionGate)
-                      ? "enabled"
-                      : "disabled",
-                  values: ["enabled", "disabled"],
-                },
-              ],
+              items: featureItems,
             },
             {
               label: "Env Files",
