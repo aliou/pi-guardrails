@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.4.1
+
+### Patch Changes
+
+- dcaa485: Type-safe feature settings: derive settings UI items from a typed record keyed by config feature keys. Adding a new feature without updating the settings UI now causes a type error.
+
 ## 0.4.0
 
 ### Minor Changes
