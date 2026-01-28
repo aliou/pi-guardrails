@@ -98,25 +98,25 @@ class ConfigLoader {
     return merged;
   }
 
-  private mergeInto(
-    target: Record<string, unknown>,
-    source: Record<string, unknown>,
+  private mergeInto<TTarget extends object, TSource extends object>(
+    target: TTarget,
+    source: TSource,
   ): void {
-    for (const key in source) {
-      if (source[key] === undefined) continue;
+    const t = target as Record<string, unknown>;
+    const s = source as Record<string, unknown>;
+
+    for (const key in s) {
+      if (s[key] === undefined) continue;
 
       if (
-        typeof source[key] === "object" &&
-        !Array.isArray(source[key]) &&
-        source[key] !== null
+        typeof s[key] === "object" &&
+        !Array.isArray(s[key]) &&
+        s[key] !== null
       ) {
-        if (!target[key]) target[key] = {};
-        this.mergeInto(
-          target[key] as Record<string, unknown>,
-          source[key] as Record<string, unknown>,
-        );
+        if (!t[key]) t[key] = {};
+        this.mergeInto(t[key] as object, s[key] as object);
       } else {
-        target[key] = source[key];
+        t[key] = s[key];
       }
     }
   }
