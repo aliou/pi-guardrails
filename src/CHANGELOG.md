@@ -1,5 +1,17 @@
 # @aliou/pi-guardrails
 
+## 0.5.0
+
+### Minor Changes
+
+- cb97920: Add enforce-package-manager guardrail
+
+  - New `enforcePackageManager` feature (disabled by default)
+  - Supports npm, pnpm, and bun (npm is default)
+  - Blocks commands using non-selected package managers
+  - Configurable via `packageManager.selected` setting
+  - Also documents the existing `preventPython` feature
+
 ## 0.4.1
 
 ### Patch Changes
