@@ -36,6 +36,11 @@ const FEATURE_UI: Record<FeatureKey, FeatureUiDef> = {
     description:
       "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
   },
+  enforcePackageManager: {
+    label: "Enforce package manager",
+    description:
+      "Enforce using a specific Node package manager (bun, pnpm, or npm)",
+  },
 };
 
 export function registerSettingsCommand(pi: ExtensionAPI): void {
@@ -328,6 +333,21 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
                 },
               ],
             },
+            {
+              label: "Package Manager",
+              items: [
+                {
+                  id: "packageManager.selected",
+                  label: "Selected manager",
+                  description:
+                    "Which package manager to enforce (when feature is enabled)",
+                  currentValue:
+                    config.packageManager?.selected ??
+                    resolved.packageManager.selected,
+                  values: ["npm", "pnpm", "bun"],
+                },
+              ],
+            },
           ];
 
           return new SectionedSettings(
@@ -355,7 +375,7 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
               : configLoader.getGlobalConfig();
           const updated: GuardrailsConfig = structuredClone(config);
 
-          // Boolean toggles only - array saves handled by submenus
+          // Boolean toggles
           if (
             newValue === "enabled" ||
             newValue === "disabled" ||
@@ -364,6 +384,18 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
           ) {
             const boolVal = newValue === "enabled" || newValue === "on";
             setNestedValue(updated, id, boolVal);
+
+            const ok = await saveTabConfig(tab, updated);
+            if (ok) {
+              settings = buildSettings(activeTab);
+              tui.requestRender();
+            }
+            return;
+          }
+
+          // Package manager selection
+          if (id === "packageManager.selected") {
+            setNestedValue(updated, id, newValue);
 
             const ok = await saveTabConfig(tab, updated);
             if (ok) {

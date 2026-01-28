@@ -12,6 +12,10 @@ export interface GuardrailsConfig {
     preventPython?: boolean;
     protectEnvFiles?: boolean;
     permissionGate?: boolean;
+    enforcePackageManager?: boolean;
+  };
+  packageManager?: {
+    selected?: "bun" | "pnpm" | "npm";
   };
   envFiles?: {
     protectedPatterns?: string[];
@@ -38,6 +42,10 @@ export interface ResolvedConfig {
     preventPython: boolean;
     protectEnvFiles: boolean;
     permissionGate: boolean;
+    enforcePackageManager: boolean;
+  };
+  packageManager: {
+    selected: "bun" | "pnpm" | "npm";
   };
   envFiles: {
     protectedPatterns: string[];

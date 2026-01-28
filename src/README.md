@@ -36,8 +36,10 @@ pi install npm:@aliou/pi-guardrails
 ## Features
 
 - **prevent-brew**: Blocks Homebrew commands (disabled by default)
+- **prevent-python**: Blocks Python/pip/poetry commands, suggests uv instead (disabled by default)
 - **protect-env-files**: Prevents access to `.env` files (except `.example`/`.sample`/`.test`)
 - **permission-gate**: Prompts for confirmation on dangerous commands
+- **enforce-package-manager**: Enforces a specific Node package manager (npm, pnpm, or bun) (disabled by default)
 
 ## Configuration
 
@@ -61,8 +63,13 @@ Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly
   "enabled": true,
   "features": {
     "preventBrew": false,
+    "preventPython": false,
     "protectEnvFiles": true,
-    "permissionGate": true
+    "permissionGate": true,
+    "enforcePackageManager": false
+  },
+  "packageManager": {
+    "selected": "npm"
   },
   "envFiles": {
     "protectedPatterns": ["\\.env$", "\\.env\\.local$"],
@@ -96,8 +103,16 @@ All fields are optional. Missing fields use defaults shown above.
 | Key | Default | Description |
 |---|---|---|
 | `preventBrew` | `false` | Block Homebrew install/upgrade commands |
+| `preventPython` | `false` | Block python/pip/poetry commands (use uv instead) |
 | `protectEnvFiles` | `true` | Block access to `.env` files containing secrets |
 | `permissionGate` | `true` | Prompt for confirmation on dangerous commands |
+| `enforcePackageManager` | `false` | Enforce a specific Node package manager |
+
+#### `packageManager`
+
+| Key | Default | Description |
+|---|---|---|
+| `selected` | `"npm"` | Package manager to enforce: `"npm"`, `"pnpm"`, or `"bun"` |
 
 #### `envFiles`
 
@@ -156,6 +171,19 @@ Auto-deny certain commands:
 }
 ```
 
+Enforce pnpm as the package manager:
+
+```json
+{
+  "features": {
+    "enforcePackageManager": true
+  },
+  "packageManager": {
+    "selected": "pnpm"
+  }
+}
+```
+
 ## Events
 
 The extension emits events on the pi event bus for inter-extension communication.
@@ -166,7 +194,7 @@ Emitted when a tool call is blocked by any guardrail.
 
 ```typescript
 interface GuardrailsBlockedEvent {
-  feature: "preventBrew" | "protectEnvFiles" | "permissionGate";
+  feature: "preventBrew" | "preventPython" | "protectEnvFiles" | "permissionGate" | "enforcePackageManager";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;
@@ -201,6 +229,17 @@ Blocked patterns:
 - `brew upgrade`
 - `brew reinstall`
 
+### prevent-python
+
+Blocks bash commands that use Python tooling directly. Disabled by default. Enable if your project uses uv for Python management.
+
+Blocked patterns:
+- `python`, `python3`
+- `pip`, `pip3`
+- `poetry`
+- `pyenv`
+- `virtualenv`, `venv`
+
 ### protect-env-files
 
 Prevents accessing `.env` files that might contain secrets. Only allows access to safe variants:
@@ -225,3 +264,14 @@ Prompts user confirmation before executing dangerous commands:
 - `chown -R` (recursive ownership change)
 
 All patterns are configurable. Supports allow-lists and auto-deny lists.
+
+### enforce-package-manager
+
+Enforces using a specific Node package manager. Disabled by default. When enabled, blocks commands using non-selected package managers.
+
+Configure via `packageManager.selected`:
+- `"npm"` (default)
+- `"pnpm"`
+- `"bun"`
+
+Example: If `selected` is `"pnpm"`, running `npm install` or `bun add` will be blocked with a message instructing the agent to use `pnpm` instead.

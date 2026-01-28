@@ -8,7 +8,8 @@ export interface GuardrailsBlockedEvent {
     | "preventBrew"
     | "preventPython"
     | "protectEnvFiles"
-    | "permissionGate";
+    | "permissionGate"
+    | "enforcePackageManager";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;

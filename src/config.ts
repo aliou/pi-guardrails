@@ -19,6 +19,10 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     preventPython: false,
     protectEnvFiles: true,
     permissionGate: true,
+    enforcePackageManager: false,
+  },
+  packageManager: {
+    selected: "npm",
   },
   envFiles: {
     protectedPatterns: ["\\.env$", "\\.env\\.local$"],
