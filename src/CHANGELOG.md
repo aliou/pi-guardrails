@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.5.1
+
+### Patch Changes
+
+- a1638b9: Add .env.production, .env.prod and .dev.vars to default protected patterns
+
 ## 0.5.0
 
 ### Minor Changes
