@@ -25,7 +25,13 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     selected: "npm",
   },
   envFiles: {
-    protectedPatterns: ["\\.env$", "\\.env\\.local$"],
+    protectedPatterns: [
+      "\\.env$",
+      "\\.env\\.local$",
+      "\\.env\\.production$",
+      "\\.env\\.prod$",
+      "\\.dev\\.vars$",
+    ],
     allowedPatterns: [
       "\\.(example|sample|test)\\.env$",
       "\\.env\\.(example|sample|test)$",
