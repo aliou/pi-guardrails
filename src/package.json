@@ -28,7 +28,7 @@
     "README.md"
   ],
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "0.50.4",
-    "@mariozechner/pi-tui": "0.50.4"
+    "@mariozechner/pi-coding-agent": "0.50.9",
+    "@mariozechner/pi-tui": "0.50.9"
   }
 }
