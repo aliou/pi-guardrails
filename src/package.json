@@ -17,7 +17,8 @@
   "pi": {
     "extensions": [
       "./index.ts"
-    ]
+    ],
+    "video": "https://assets.aliou.me/pi-extensions/2026-01-26-guardrails-demo.mp4"
   },
   "publishConfig": {
     "access": "public"
