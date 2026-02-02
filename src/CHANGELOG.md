@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.5.2
+
+### Patch Changes
+
+- 7736c67: Update pi peerDependencies to 0.51.0. Reorder tool execute parameters to match new signature.
+
 ## 0.5.1
 
 ### Patch Changes
