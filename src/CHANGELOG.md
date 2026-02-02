@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.5.3
+
+### Patch Changes
+
+- dccbf2d: Add preview video to package.json for the pi package browser.
+
 ## 0.5.2
 
 ### Patch Changes
