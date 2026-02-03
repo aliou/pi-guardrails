@@ -47,9 +47,11 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
   pi.registerCommand("guardrails:settings", {
     description: "Configure guardrails (local/global)",
     handler: async (_args, ctx) => {
+      if (!ctx.hasUI) return;
+
       let activeTab: Tab = configLoader.hasProjectConfig() ? "local" : "global";
 
-      await ctx.ui.custom((tui, theme, _kb, done) => {
+      const result = await ctx.ui.custom((tui, theme, _kb, done) => {
         let settings: SectionedSettings | null = null;
         const settingsTheme = getSettingsListTheme();
 
@@ -453,6 +455,11 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
           },
         };
       });
+
+      // RPC fallback
+      if (result === undefined) {
+        ctx.ui.notify("guardrails:settings requires interactive mode", "info");
+      }
     },
   });
 }

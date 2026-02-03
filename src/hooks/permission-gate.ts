@@ -105,6 +105,18 @@ export function setupPermissionGateHook(
         emitDangerous(pi, { command, description, pattern: rawPattern });
 
         if (config.permissionGate.requireConfirmation) {
+          // In print/RPC mode, block by default (safe fallback)
+          if (!ctx.hasUI) {
+            const reason = `Dangerous command blocked (no UI to confirm): ${description}`;
+            emitBlocked(pi, {
+              feature: "permissionGate",
+              toolName: "bash",
+              input: event.input,
+              reason,
+            });
+            return { block: true, reason };
+          }
+
           const proceed = await ctx.ui.custom<boolean>(
             (_tui, theme, _kb, done) => {
               const container = new Container();
