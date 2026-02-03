@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.5.4
+
+### Patch Changes
+
+- b5c4cd1: Update demo video and image URLs for the Pi package browser.
+
 ## 0.5.3
 
 ### Patch Changes
