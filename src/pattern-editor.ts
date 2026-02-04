@@ -8,16 +8,17 @@ import {
 } from "@mariozechner/pi-tui";
 
 /**
- * A submenu component for editing an array of {pattern, description} objects.
+ * A submenu component for editing an array of {pattern, description, regex?} objects.
  *
  * List mode: navigate, delete with 'd', add with 'a', edit with 'e'/Enter.
- * Form mode: two-field form (pattern + description), Tab to switch fields,
- *            Enter to submit, Escape to cancel.
+ * Form mode: three-field form (pattern + description + regex toggle),
+ *            Tab to switch fields, Enter to submit, Escape to cancel.
  */
 
 export interface PatternItem {
   pattern: string;
   description: string;
+  regex?: boolean;
 }
 
 export interface PatternEditorOptions {
@@ -26,10 +27,12 @@ export interface PatternEditorOptions {
   theme: SettingsListTheme;
   onSave: (items: PatternItem[]) => void;
   onDone: () => void;
+  /** Context hint for the pattern field label. */
+  context?: "file" | "command";
   maxVisible?: number;
 }
 
-type Field = "pattern" | "description";
+type Field = "pattern" | "description" | "regex";
 
 export class PatternEditor implements Component {
   private items: PatternItem[];
@@ -37,6 +40,7 @@ export class PatternEditor implements Component {
   private theme: SettingsListTheme;
   private onSave: (items: PatternItem[]) => void;
   private onDone: () => void;
+  private context: "file" | "command";
   private selectedIndex = 0;
   private maxVisible: number;
   private mode: "list" | "add" | "edit" = "list";
@@ -46,6 +50,7 @@ export class PatternEditor implements Component {
   private patternInput: Input;
   private descriptionInput: Input;
   private activeField: Field = "pattern";
+  private regexEnabled = false;
 
   constructor(options: PatternEditorOptions) {
     this.items = [...options.items];
@@ -53,6 +58,7 @@ export class PatternEditor implements Component {
     this.theme = options.theme;
     this.onSave = options.onSave;
     this.onDone = options.onDone;
+    this.context = options.context ?? "command";
     this.maxVisible = options.maxVisible ?? 10;
 
     this.patternInput = new Input();
@@ -72,7 +78,13 @@ export class PatternEditor implements Component {
       return;
     }
 
-    // If on description field (or pattern is empty), submit
+    // If on description field, move to regex toggle
+    if (this.activeField === "description") {
+      this.activeField = "regex";
+      return;
+    }
+
+    // If on regex field, submit
     this.submitForm();
   }
 
@@ -89,6 +101,9 @@ export class PatternEditor implements Component {
       pattern,
       description: description || pattern,
     };
+    if (this.regexEnabled) {
+      item.regex = true;
+    }
 
     if (this.mode === "edit") {
       this.items[this.editIndex] = item;
@@ -105,6 +120,7 @@ export class PatternEditor implements Component {
     this.mode = "list";
     this.editIndex = -1;
     this.activeField = "pattern";
+    this.regexEnabled = false;
     this.patternInput.setValue("");
     this.descriptionInput.setValue("");
   }
@@ -118,6 +134,7 @@ export class PatternEditor implements Component {
     this.activeField = "pattern";
     this.patternInput.setValue(item.pattern);
     this.descriptionInput.setValue(item.description);
+    this.regexEnabled = item.regex ?? false;
   }
 
   private deleteSelected() {
@@ -167,7 +184,8 @@ export class PatternEditor implements Component {
         const prefix = isSelected ? this.theme.cursor : "  ";
         const prefixWidth = visibleWidth(prefix);
         const maxItemWidth = width - prefixWidth - 2;
-        const display = `${item.description} (${item.pattern})`;
+        const regexTag = item.regex ? " [regex]" : "";
+        const display = `${item.description} (${item.pattern})${regexTag}`;
         const text = this.theme.value(
           truncateToWidth(display, maxItemWidth, ""),
           isSelected,
@@ -197,13 +215,16 @@ export class PatternEditor implements Component {
 
     const patternActive = this.activeField === "pattern";
     const descActive = this.activeField === "description";
+    const regexActive = this.activeField === "regex";
 
     // Title
     lines.push(this.theme.hint(isEdit ? "  Edit pattern:" : "  New pattern:"));
     lines.push("");
 
     // Pattern field
-    const patternLabel = "  Pattern (regex):";
+    const patternHint =
+      this.context === "file" ? "(glob or regex)" : "(substring or regex)";
+    const patternLabel = `  Pattern ${patternHint}:`;
     lines.push(
       patternActive
         ? this.theme.label(patternLabel, true)
@@ -222,8 +243,21 @@ export class PatternEditor implements Component {
     lines.push(`  ${this.descriptionInput.render(inputWidth).join("")}`);
     lines.push("");
 
+    // Regex toggle
+    const regexLabel = "  Regex:";
+    const regexValue = this.regexEnabled ? "on" : "off";
+    const regexDisplay = `${regexLabel} ${regexValue}`;
     lines.push(
-      this.theme.hint("  Tab: switch field · Enter: next/submit · Esc: cancel"),
+      regexActive
+        ? this.theme.label(regexDisplay, true)
+        : this.theme.hint(regexDisplay),
+    );
+    lines.push("");
+
+    lines.push(
+      this.theme.hint(
+        "  Tab: switch field · Space: toggle regex · Enter: next/submit · Esc: cancel",
+      ),
     );
 
     return lines;
@@ -251,6 +285,7 @@ export class PatternEditor implements Component {
     } else if (data === "a" || data === "A") {
       this.mode = "add";
       this.activeField = "pattern";
+      this.regexEnabled = false;
       this.patternInput.setValue("");
       this.descriptionInput.setValue("");
     } else if (data === "e" || data === "E" || matchesKey(data, Key.enter)) {
@@ -264,13 +299,29 @@ export class PatternEditor implements Component {
 
   private handleFormInput(data: string) {
     if (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab"))) {
-      this.activeField =
-        this.activeField === "pattern" ? "description" : "pattern";
+      const fields: Field[] = ["pattern", "description", "regex"];
+      const idx = fields.indexOf(this.activeField);
+      const dir = matchesKey(data, Key.shift("tab")) ? -1 : 1;
+      this.activeField = fields[
+        (idx + dir + fields.length) % fields.length
+      ] as Field;
       return;
     }
 
     if (matchesKey(data, Key.escape)) {
       this.cancelForm();
+      return;
+    }
+
+    // Regex toggle: space toggles when on regex field
+    if (this.activeField === "regex") {
+      if (data === " " || matchesKey(data, Key.enter)) {
+        this.regexEnabled = !this.regexEnabled;
+      }
+      // Enter on regex field submits if we already have a pattern
+      if (matchesKey(data, Key.enter) && this.patternInput.getValue().trim()) {
+        this.submitForm();
+      }
       return;
     }
 

@@ -3,7 +3,12 @@ import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import { Key, matchesKey } from "@mariozechner/pi-tui";
 import { ArrayEditor } from "./array-editor";
 import { configLoader } from "./config";
-import type { GuardrailsConfig, ResolvedConfig } from "./config-schema";
+import type {
+  DangerousPattern,
+  GuardrailsConfig,
+  PatternConfig,
+  ResolvedConfig,
+} from "./config-schema";
 import { PatternEditor } from "./pattern-editor";
 import { SectionedSettings, type SettingsSection } from "./sectioned-settings";
 
@@ -158,6 +163,7 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
         function patternArraySubmenu(
           id: string,
           label: string,
+          context?: "file" | "command",
         ): (
           currentValue: string,
           done: (selectedValue?: string) => void,
@@ -166,22 +172,72 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
             const config = getTabConfig();
             const resolved = configLoader.getConfig();
             const currentPatterns =
-              (getNestedValue(config, id) as
-                | Array<{ pattern: string; description: string }>
-                | undefined) ??
-              (getNestedValue(resolved, id) as Array<{
-                pattern: string;
-                description: string;
-              }>) ??
+              (getNestedValue(config, id) as DangerousPattern[] | undefined) ??
+              (getNestedValue(resolved, id) as DangerousPattern[]) ??
               [];
 
             return new PatternEditor({
               label,
               items: [...currentPatterns],
               theme: settingsTheme,
+              context,
               onSave: (patterns) => {
                 const updated: GuardrailsConfig = structuredClone(config);
                 setNestedValue(updated, id, patterns);
+                void saveTabConfig(activeTab, updated).then((ok) => {
+                  if (ok) tui.requestRender();
+                });
+              },
+              onDone: () => {
+                submenuDone(formatCount(id));
+                settings = buildSettings(activeTab);
+                tui.requestRender();
+              },
+            });
+          };
+        }
+
+        /**
+         * Submenu for PatternConfig[] arrays (no description field).
+         * Reuses PatternEditor with description auto-filled from pattern.
+         */
+        function patternConfigSubmenu(
+          id: string,
+          label: string,
+          context?: "file" | "command",
+        ): (
+          currentValue: string,
+          done: (selectedValue?: string) => void,
+        ) => PatternEditor {
+          return (_currentValue, submenuDone) => {
+            const config = getTabConfig();
+            const resolved = configLoader.getConfig();
+            const currentItems =
+              (getNestedValue(config, id) as PatternConfig[] | undefined) ??
+              (getNestedValue(resolved, id) as PatternConfig[]) ??
+              [];
+
+            // Convert PatternConfig to PatternItem (add description = pattern)
+            const items = currentItems.map((p) => ({
+              pattern: p.pattern,
+              description: p.pattern,
+              regex: p.regex,
+            }));
+
+            return new PatternEditor({
+              label,
+              items,
+              theme: settingsTheme,
+              context,
+              onSave: (patterns) => {
+                // Strip description when saving (PatternConfig has no description)
+                const configs: PatternConfig[] = patterns.map((p) => {
+                  const cfg: PatternConfig = { pattern: p.pattern };
+                  if (p.regex) cfg.regex = true;
+                  return cfg;
+                });
+                const updated: GuardrailsConfig = structuredClone(config);
+                setNestedValue(updated, id, configs);
                 void saveTabConfig(activeTab, updated).then((ok) => {
                   if (ok) tui.requestRender();
                 });
@@ -244,32 +300,34 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
                   id: "envFiles.protectedPatterns",
                   label: "Protected patterns",
                   description:
-                    "Regex patterns for files to protect (e.g. \\.env$)",
+                    "Patterns for files to protect (e.g. .env.local)",
                   currentValue: formatCount("envFiles.protectedPatterns"),
-                  submenu: stringArraySubmenu(
+                  submenu: patternConfigSubmenu(
                     "envFiles.protectedPatterns",
                     "Protected Patterns",
+                    "file",
                   ),
                 },
                 {
                   id: "envFiles.allowedPatterns",
                   label: "Allowed patterns",
-                  description:
-                    "Regex patterns for exceptions (e.g. \\.env\\.example$)",
+                  description: "Patterns for exceptions (e.g. .env.example)",
                   currentValue: formatCount("envFiles.allowedPatterns"),
-                  submenu: stringArraySubmenu(
+                  submenu: patternConfigSubmenu(
                     "envFiles.allowedPatterns",
                     "Allowed Patterns",
+                    "file",
                   ),
                 },
                 {
                   id: "envFiles.protectedDirectories",
                   label: "Protected directories",
-                  description: "Regex patterns for directories to protect",
+                  description: "Patterns for directories to protect",
                   currentValue: formatCount("envFiles.protectedDirectories"),
-                  submenu: stringArraySubmenu(
+                  submenu: patternConfigSubmenu(
                     "envFiles.protectedDirectories",
                     "Protected Directories",
+                    "file",
                   ),
                 },
                 {
@@ -309,28 +367,31 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
                   submenu: patternArraySubmenu(
                     "permissionGate.patterns",
                     "Dangerous Patterns",
+                    "command",
                   ),
                 },
                 {
                   id: "permissionGate.allowedPatterns",
                   label: "Allowed commands",
                   description:
-                    "Regex patterns that bypass the permission gate entirely",
+                    "Patterns that bypass the permission gate entirely",
                   currentValue: formatCount("permissionGate.allowedPatterns"),
-                  submenu: stringArraySubmenu(
+                  submenu: patternConfigSubmenu(
                     "permissionGate.allowedPatterns",
                     "Allowed Commands",
+                    "command",
                   ),
                 },
                 {
                   id: "permissionGate.autoDenyPatterns",
                   label: "Auto-deny patterns",
                   description:
-                    "Regex patterns that are blocked immediately without dialog",
+                    "Patterns that block commands immediately without dialog",
                   currentValue: formatCount("permissionGate.autoDenyPatterns"),
-                  submenu: stringArraySubmenu(
+                  submenu: patternConfigSubmenu(
                     "permissionGate.autoDenyPatterns",
                     "Auto-Deny Patterns",
+                    "command",
                   ),
                 },
               ],

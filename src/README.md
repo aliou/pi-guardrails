@@ -41,6 +41,8 @@ pi install npm:@aliou/pi-guardrails
 - **permission-gate**: Prompts for confirmation on dangerous commands
 - **enforce-package-manager**: Enforces a specific Node package manager (npm, pnpm, or bun) (disabled by default)
 
+All hooks use structural shell parsing via `@aliou/sh` to avoid false positives from keywords inside commit messages, grep patterns, heredocs, or file paths. On parse failure, each hook falls back to regex matching (previous behavior).
+
 ## Configuration
 
 Configuration is loaded from two optional JSON files, merged in order (project overrides global):
@@ -54,12 +56,20 @@ Run `/guardrails:settings` to open an interactive settings UI with two tabs:
 - **Local**: edit project-scoped config (`.pi/extensions/guardrails.json`)
 - **Global**: edit global config (`~/.pi/agent/extensions/guardrails.json`)
 
-Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly. Array/object settings (patterns, tools) require manual JSON editing.
+Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly.
+
+### Migration from v0
+
+Configs without a `version` field are automatically migrated on first load. The migration:
+- Backs up the original as `guardrails.v0.json`
+- Converts all string patterns to `{ pattern, regex: true }` to preserve behavior
+- Adds a `version` field
 
 ### Configuration Schema
 
 ```json
 {
+  "version": "0.6.0-20260204",
   "enabled": true,
   "features": {
     "preventBrew": false,
@@ -72,10 +82,15 @@ Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly
     "selected": "npm"
   },
   "envFiles": {
-    "protectedPatterns": ["\\.env$", "\\.env\\.local$"],
+    "protectedPatterns": [
+      { "pattern": ".env" },
+      { "pattern": ".env.local" },
+      { "pattern": ".env.production" }
+    ],
     "allowedPatterns": [
-      "\\.(example|sample|test)\\.env$",
-      "\\.env\\.(example|sample|test)$"
+      { "pattern": ".env.example" },
+      { "pattern": ".env.sample" },
+      { "pattern": "*.example.env" }
     ],
     "protectedDirectories": [],
     "protectedTools": ["read", "write", "edit", "bash", "grep", "find", "ls"],
@@ -84,7 +99,8 @@ Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly
   },
   "permissionGate": {
     "patterns": [
-      { "pattern": "rm\\s+-rf", "description": "recursive force delete" }
+      { "pattern": "rm -rf", "description": "recursive force delete" },
+      { "pattern": "sudo", "description": "superuser command" }
     ],
     "customPatterns": [],
     "requireConfirmation": true,
@@ -95,6 +111,20 @@ Use `Tab` / `Shift+Tab` to switch tabs. Boolean settings can be toggled directly
 ```
 
 All fields are optional. Missing fields use defaults shown above.
+
+### Pattern Format
+
+Patterns support two modes controlled by the `regex` flag:
+
+**File patterns** (envFiles section):
+- Default (`regex` omitted or `false`): glob matching against the filename. `*` matches any non-`/` chars, `?` matches a single char. Example: `.env.*` matches `.env.local`, `.env.production`.
+- `regex: true`: full regex (case-insensitive) against the full path. Example: `{ "pattern": "\\.env$", "regex": true }`.
+
+**Command patterns** (permissionGate section):
+- Default (`regex` omitted or `false`): substring matching against the raw command string. Example: `"rm -rf"` matches any command containing `rm -rf`.
+- `regex: true`: full regex against the raw command string. Example: `{ "pattern": "rm\\s+-rf", "regex": true }`.
+
+Built-in dangerous command patterns (`rm -rf`, `sudo`, `dd if=`, `mkfs.*`, `chmod -R 777`, `chown -R`) are matched structurally via AST parsing, independent of the pattern format.
 
 ### Configuration Details
 
@@ -118,9 +148,9 @@ All fields are optional. Missing fields use defaults shown above.
 
 | Key | Default | Description |
 |---|---|---|
-| `protectedPatterns` | `["\\.env$", "\\.env\\.local$"]` | Regex patterns for files to protect |
-| `allowedPatterns` | `["\\.(example\|sample\|test)\\.env$", ...]` | Regex patterns for allowed exceptions |
-| `protectedDirectories` | `[]` | Regex patterns for directories to protect |
+| `protectedPatterns` | `[".env", ".env.local", ...]` | Patterns for files to protect (glob by default) |
+| `allowedPatterns` | `[".env.example", "*.example.env", ...]` | Patterns for allowed exceptions |
+| `protectedDirectories` | `[]` | Patterns for directories to protect |
 | `protectedTools` | `["read", "write", "edit", "bash", "grep", "find", "ls"]` | Tools to intercept |
 | `onlyBlockIfExists` | `true` | Only block if the file exists on disk |
 | `blockMessage` | See defaults | Message shown when blocked. Supports `{file}` placeholder |
@@ -132,8 +162,8 @@ All fields are optional. Missing fields use defaults shown above.
 | `patterns` | See defaults | Array of `{ pattern, description }` for dangerous commands |
 | `customPatterns` | Not set | If set, replaces `patterns` entirely |
 | `requireConfirmation` | `true` | Show confirmation dialog (if `false`, just warns) |
-| `allowedPatterns` | `[]` | Regex patterns that bypass the gate |
-| `autoDenyPatterns` | `[]` | Regex patterns that are blocked immediately without dialog |
+| `allowedPatterns` | `[]` | Patterns that bypass the gate |
+| `autoDenyPatterns` | `[]` | Patterns that are blocked immediately without dialog |
 
 ### Examples
 
@@ -147,26 +177,42 @@ Enable `prevent-brew` for a project using Nix:
 }
 ```
 
-Add a custom dangerous command pattern:
+Add a custom dangerous command pattern (substring match):
 
 ```json
 {
   "permissionGate": {
     "patterns": [
-      { "pattern": "rm\\s+-rf", "description": "recursive force delete" },
-      { "pattern": "\\bsudo\\b", "description": "superuser command" },
-      { "pattern": "docker\\s+system\\s+prune", "description": "docker system prune" }
+      { "pattern": "rm -rf", "description": "recursive force delete" },
+      { "pattern": "sudo", "description": "superuser command" },
+      { "pattern": "docker system prune", "description": "docker system prune" }
     ]
   }
 }
 ```
 
-Auto-deny certain commands:
+Add a regex-based pattern:
 
 ```json
 {
   "permissionGate": {
-    "autoDenyPatterns": ["rm\\s+-rf\\s+/(?!tmp)"]
+    "patterns": [
+      { "pattern": "rm\\s+-rf\\s+/(?!tmp)", "description": "rm -rf outside /tmp", "regex": true }
+    ]
+  }
+}
+```
+
+Protect env files with glob patterns:
+
+```json
+{
+  "envFiles": {
+    "protectedPatterns": [
+      { "pattern": ".env" },
+      { "pattern": ".env.*" },
+      { "pattern": ".dev.vars" }
+    ]
   }
 }
 ```
@@ -220,35 +266,19 @@ The [presenter extension](../presenter) listens for `guardrails:dangerous` event
 
 ### prevent-brew
 
-Blocks bash commands that attempt to install packages using Homebrew. Disabled by default. Enable via config if your project uses Nix.
-
-Blocked patterns:
-- `brew install`
-- `brew cask install`
-- `brew bundle`
-- `brew upgrade`
-- `brew reinstall`
+Blocks bash commands that use Homebrew. Disabled by default. Enable via config if your project uses Nix.
 
 ### prevent-python
 
 Blocks bash commands that use Python tooling directly. Disabled by default. Enable if your project uses uv for Python management.
 
-Blocked patterns:
-- `python`, `python3`
-- `pip`, `pip3`
-- `poetry`
-- `pyenv`
-- `virtualenv`, `venv`
+Blocked commands: `python`, `python3`, `pip`, `pip3`, `poetry`, `pyenv`, `virtualenv`.
 
 ### protect-env-files
 
-Prevents accessing `.env` files that might contain secrets. Only allows access to safe variants:
-- `.env.example`
-- `.env.sample`
-- `.env.test`
-- `*.example.env`
-- `*.sample.env`
-- `*.test.env`
+Prevents accessing `.env` files that might contain secrets. Only allows access to safe variants like `.env.example`, `.env.sample`, `.env.test`.
+
+Shell globs (e.g. `.env*`) are expanded via `fd` to check if any expanded path matches a protected pattern.
 
 Covers tools: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls` (configurable).
 
@@ -257,21 +287,15 @@ Covers tools: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls` (configurabl
 Prompts user confirmation before executing dangerous commands:
 - `rm -rf` (recursive force delete)
 - `sudo` (superuser command)
-- `: | sh` (piped shell execution)
 - `dd if=` (disk write operation)
 - `mkfs.` (filesystem format)
 - `chmod -R 777` (insecure recursive permissions)
 - `chown -R` (recursive ownership change)
 
-All patterns are configurable. Supports allow-lists and auto-deny lists.
+Built-in patterns are matched structurally (AST-based). Custom patterns use substring or regex matching. Supports allow-lists and auto-deny lists.
 
 ### enforce-package-manager
 
 Enforces using a specific Node package manager. Disabled by default. When enabled, blocks commands using non-selected package managers.
 
-Configure via `packageManager.selected`:
-- `"npm"` (default)
-- `"pnpm"`
-- `"bun"`
-
-Example: If `selected` is `"pnpm"`, running `npm install` or `bun add` will be blocked with a message instructing the agent to use `pnpm` instead.
+Configure via `packageManager.selected`: `"npm"` (default), `"pnpm"`, or `"bun"`.

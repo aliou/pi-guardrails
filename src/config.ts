@@ -1,18 +1,22 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
+import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import type { GuardrailsConfig, ResolvedConfig } from "./config-schema";
+import {
+  backupConfig,
+  CURRENT_VERSION,
+  migrateV0,
+  needsMigration,
+} from "./migration";
 
-const GLOBAL_CONFIG_PATH = resolve(
-  homedir(),
-  ".pi/agent/extensions/guardrails.json",
-);
+const GLOBAL_CONFIG_PATH = resolve(getAgentDir(), "extensions/guardrails.json");
 const PROJECT_CONFIG_PATH = resolve(
   process.cwd(),
   ".pi/extensions/guardrails.json",
 );
 
 const DEFAULT_CONFIG: ResolvedConfig = {
+  version: CURRENT_VERSION,
   enabled: true,
   features: {
     preventBrew: false,
@@ -26,15 +30,19 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
   envFiles: {
     protectedPatterns: [
-      "\\.env$",
-      "\\.env\\.local$",
-      "\\.env\\.production$",
-      "\\.env\\.prod$",
-      "\\.dev\\.vars$",
+      { pattern: ".env" },
+      { pattern: ".env.local" },
+      { pattern: ".env.production" },
+      { pattern: ".env.prod" },
+      { pattern: ".dev.vars" },
     ],
     allowedPatterns: [
-      "\\.(example|sample|test)\\.env$",
-      "\\.env\\.(example|sample|test)$",
+      { pattern: "*.example.env" },
+      { pattern: "*.sample.env" },
+      { pattern: "*.test.env" },
+      { pattern: ".env.example" },
+      { pattern: ".env.sample" },
+      { pattern: ".env.test" },
     ],
     protectedDirectories: [],
     protectedTools: ["read", "write", "edit", "bash", "grep", "find", "ls"],
@@ -46,20 +54,17 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
   permissionGate: {
     patterns: [
-      { pattern: "rm\\s+-rf", description: "recursive force delete" },
-      { pattern: "\\bsudo\\b", description: "superuser command" },
-      { pattern: ":\\s*\\|\\s*sh", description: "piped shell execution" },
-      { pattern: "\\bdd\\s+if=", description: "disk write operation" },
-      { pattern: "mkfs\\.", description: "filesystem format" },
+      { pattern: "rm -rf", description: "recursive force delete" },
+      { pattern: "sudo", description: "superuser command" },
+      { pattern: "dd if=", description: "disk write operation" },
+      { pattern: "mkfs.", description: "filesystem format" },
       {
-        pattern: "\\bchmod\\s+-R\\s+777",
+        pattern: "chmod -R 777",
         description: "insecure recursive permissions",
       },
-      {
-        pattern: "\\bchown\\s+-R",
-        description: "recursive ownership change",
-      },
+      { pattern: "chown -R", description: "recursive ownership change" },
     ],
+    useBuiltinMatchers: true,
     requireConfirmation: true,
     allowedPatterns: [],
     autoDenyPatterns: [],
@@ -74,7 +79,31 @@ class ConfigLoader {
   async load(): Promise<void> {
     this.globalConfig = await this.loadConfigFile(GLOBAL_CONFIG_PATH);
     this.projectConfig = await this.loadConfigFile(PROJECT_CONFIG_PATH);
+
+    // Migrate v0 configs
+    if (this.globalConfig && needsMigration(this.globalConfig)) {
+      await this.migrateConfigFile(GLOBAL_CONFIG_PATH, this.globalConfig);
+      this.globalConfig = await this.loadConfigFile(GLOBAL_CONFIG_PATH);
+    }
+    if (this.projectConfig && needsMigration(this.projectConfig)) {
+      await this.migrateConfigFile(PROJECT_CONFIG_PATH, this.projectConfig);
+      this.projectConfig = await this.loadConfigFile(PROJECT_CONFIG_PATH);
+    }
+
     this.resolved = this.mergeConfigs();
+  }
+
+  private async migrateConfigFile(
+    path: string,
+    config: GuardrailsConfig,
+  ): Promise<void> {
+    await backupConfig(path);
+    const migrated = migrateV0(config);
+    try {
+      await this.saveConfigFile(path, migrated);
+    } catch {
+      // Can't write -- use migrated version in memory only
+    }
   }
 
   private async loadConfigFile(path: string): Promise<GuardrailsConfig | null> {
@@ -96,13 +125,16 @@ class ConfigLoader {
       this.mergeInto(merged, this.projectConfig);
     }
 
-    // customPatterns replaces entire patterns array
+    // customPatterns replaces entire patterns array and disables
+    // built-in structural matchers (user owns all matching)
     if (this.projectConfig?.permissionGate?.customPatterns) {
       merged.permissionGate.patterns =
         this.projectConfig.permissionGate.customPatterns;
+      merged.permissionGate.useBuiltinMatchers = false;
     } else if (this.globalConfig?.permissionGate?.customPatterns) {
       merged.permissionGate.patterns =
         this.globalConfig.permissionGate.customPatterns;
+      merged.permissionGate.useBuiltinMatchers = false;
     }
 
     return merged;
