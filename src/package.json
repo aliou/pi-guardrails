@@ -30,7 +30,7 @@
   ],
   "dependencies": {
     "@aliou/pi-utils-settings": "workspace:^0.1.0",
-    "@aliou/sh": "github:aliou/sh#v0.1.0"
+    "@aliou/sh": "^0.1.0"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": ">=0.51.0"
