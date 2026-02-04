@@ -28,14 +28,8 @@ export interface GuardrailsConfig {
   version?: string;
   enabled?: boolean;
   features?: {
-    preventBrew?: boolean;
-    preventPython?: boolean;
     protectEnvFiles?: boolean;
     permissionGate?: boolean;
-    enforcePackageManager?: boolean;
-  };
-  packageManager?: {
-    selected?: "bun" | "pnpm" | "npm";
   };
   envFiles?: {
     protectedPatterns?: PatternConfig[];
@@ -59,14 +53,8 @@ export interface ResolvedConfig {
   version: string;
   enabled: boolean;
   features: {
-    preventBrew: boolean;
-    preventPython: boolean;
     protectEnvFiles: boolean;
     permissionGate: boolean;
-    enforcePackageManager: boolean;
-  };
-  packageManager: {
-    selected: "bun" | "pnpm" | "npm";
   };
   envFiles: {
     protectedPatterns: PatternConfig[];

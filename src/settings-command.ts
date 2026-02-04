@@ -1,7 +1,12 @@
+import {
+  ArrayEditor,
+  getNestedValue,
+  registerSettingsCommand,
+  type SettingsSection,
+  setNestedValue,
+} from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
-import { Key, matchesKey } from "@mariozechner/pi-tui";
-import { ArrayEditor } from "./array-editor";
 import { configLoader } from "./config";
 import type {
   DangerousPattern,
@@ -10,28 +15,10 @@ import type {
   ResolvedConfig,
 } from "./config-schema";
 import { PatternEditor } from "./pattern-editor";
-import { SectionedSettings, type SettingsSection } from "./sectioned-settings";
 
-type Tab = "local" | "global";
-
-// Typed feature UI definitions. Adding a key to ResolvedConfig.features
-// without adding it here will cause a type error.
 type FeatureKey = keyof ResolvedConfig["features"];
 
-interface FeatureUiDef {
-  label: string;
-  description: string;
-}
-
-const FEATURE_UI: Record<FeatureKey, FeatureUiDef> = {
-  preventBrew: {
-    label: "Prevent Homebrew",
-    description: "Block brew commands",
-  },
-  preventPython: {
-    label: "Prevent Python",
-    description: "Block python/pip/poetry commands. Use uv instead.",
-  },
+const FEATURE_UI: Record<FeatureKey, { label: string; description: string }> = {
   protectEnvFiles: {
     label: "Protect .env files",
     description: "Block access to .env files containing secrets",
@@ -41,486 +28,252 @@ const FEATURE_UI: Record<FeatureKey, FeatureUiDef> = {
     description:
       "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
   },
-  enforcePackageManager: {
-    label: "Enforce package manager",
-    description:
-      "Enforce using a specific Node package manager (bun, pnpm, or npm)",
-  },
 };
 
-export function registerSettingsCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("guardrails:settings", {
-    description: "Configure guardrails (local/global)",
-    handler: async (_args, ctx) => {
-      if (!ctx.hasUI) return;
+export function registerGuardrailsSettings(pi: ExtensionAPI): void {
+  const settingsTheme = getSettingsListTheme();
 
-      let activeTab: Tab = configLoader.hasProjectConfig() ? "local" : "global";
+  registerSettingsCommand<GuardrailsConfig, ResolvedConfig>(pi, {
+    commandName: "guardrails:settings",
+    title: "Guardrails Settings",
+    configStore: configLoader,
+    buildSections: (
+      tabConfig: GuardrailsConfig | null,
+      resolved: ResolvedConfig,
+      { setDraft },
+    ): SettingsSection[] => {
+      // --- Helpers ---
 
-      const result = await ctx.ui.custom((tui, theme, _kb, done) => {
-        let settings: SectionedSettings | null = null;
-        const settingsTheme = getSettingsListTheme();
-
-        // --- Helpers ---
-
-        function getTabConfig(): GuardrailsConfig {
-          return activeTab === "local"
-            ? configLoader.getProjectConfig()
-            : configLoader.getGlobalConfig();
-        }
-
-        async function saveTabConfig(
-          tab: Tab,
-          config: GuardrailsConfig,
-        ): Promise<boolean> {
-          try {
-            if (tab === "local") {
-              await configLoader.saveProject(config);
-            } else {
-              await configLoader.saveGlobal(config);
-            }
-            ctx.ui.notify(`guardrails: saved to ${tab} config`, "info");
-            return true;
-          } catch (error) {
-            ctx.ui.notify(`guardrails: failed to save: ${error}`, "error");
-            return false;
-          }
-        }
-
-        function setNestedValue(
-          config: GuardrailsConfig,
-          id: string,
-          value: unknown,
-        ): void {
-          const parts = id.split(".");
-          // biome-ignore lint/suspicious/noExplicitAny: dynamic config path traversal
-          let target: any = config;
-          for (let i = 0; i < parts.length - 1; i++) {
-            const key = parts[i] as string;
-            if (!target[key]) target[key] = {};
-            target = target[key];
-          }
-          target[parts[parts.length - 1] as string] = value;
-        }
-
-        function getNestedValue(config: GuardrailsConfig, id: string): unknown {
-          const parts = id.split(".");
-          // biome-ignore lint/suspicious/noExplicitAny: dynamic config path traversal
-          let target: any = config;
-          for (const part of parts) {
-            if (target == null) return undefined;
-            target = target[part];
-          }
-          return target;
-        }
-
-        function formatCount(id: string): string {
-          const config = getTabConfig();
-          const resolved = configLoader.getConfig();
-          const val =
-            (getNestedValue(config, id) as unknown[] | undefined) ??
-            (getNestedValue(resolved, id) as unknown[]) ??
-            [];
-          return `${val.length} items`;
-        }
-
-        // --- Submenu factories ---
-
-        function stringArraySubmenu(
-          id: string,
-          label: string,
-        ): (
-          currentValue: string,
-          done: (selectedValue?: string) => void,
-        ) => ArrayEditor {
-          return (_currentValue, submenuDone) => {
-            const config = getTabConfig();
-            const resolved = configLoader.getConfig();
-            const currentItems =
-              (getNestedValue(config, id) as string[] | undefined) ??
-              (getNestedValue(resolved, id) as string[]) ??
-              [];
-
-            return new ArrayEditor({
-              label,
-              items: [...currentItems],
-              theme: settingsTheme,
-              onSave: (items) => {
-                const updated: GuardrailsConfig = structuredClone(config);
-                setNestedValue(updated, id, items);
-                void saveTabConfig(activeTab, updated).then((ok) => {
-                  if (ok) tui.requestRender();
-                });
-              },
-              onDone: () => {
-                submenuDone(formatCount(id));
-                settings = buildSettings(activeTab);
-                tui.requestRender();
-              },
-            });
-          };
-        }
-
-        function patternArraySubmenu(
-          id: string,
-          label: string,
-          context?: "file" | "command",
-        ): (
-          currentValue: string,
-          done: (selectedValue?: string) => void,
-        ) => PatternEditor {
-          return (_currentValue, submenuDone) => {
-            const config = getTabConfig();
-            const resolved = configLoader.getConfig();
-            const currentPatterns =
-              (getNestedValue(config, id) as DangerousPattern[] | undefined) ??
-              (getNestedValue(resolved, id) as DangerousPattern[]) ??
-              [];
-
-            return new PatternEditor({
-              label,
-              items: [...currentPatterns],
-              theme: settingsTheme,
-              context,
-              onSave: (patterns) => {
-                const updated: GuardrailsConfig = structuredClone(config);
-                setNestedValue(updated, id, patterns);
-                void saveTabConfig(activeTab, updated).then((ok) => {
-                  if (ok) tui.requestRender();
-                });
-              },
-              onDone: () => {
-                submenuDone(formatCount(id));
-                settings = buildSettings(activeTab);
-                tui.requestRender();
-              },
-            });
-          };
-        }
-
-        /**
-         * Submenu for PatternConfig[] arrays (no description field).
-         * Reuses PatternEditor with description auto-filled from pattern.
-         */
-        function patternConfigSubmenu(
-          id: string,
-          label: string,
-          context?: "file" | "command",
-        ): (
-          currentValue: string,
-          done: (selectedValue?: string) => void,
-        ) => PatternEditor {
-          return (_currentValue, submenuDone) => {
-            const config = getTabConfig();
-            const resolved = configLoader.getConfig();
-            const currentItems =
-              (getNestedValue(config, id) as PatternConfig[] | undefined) ??
-              (getNestedValue(resolved, id) as PatternConfig[]) ??
-              [];
-
-            // Convert PatternConfig to PatternItem (add description = pattern)
-            const items = currentItems.map((p) => ({
-              pattern: p.pattern,
-              description: p.pattern,
-              regex: p.regex,
-            }));
-
-            return new PatternEditor({
-              label,
-              items,
-              theme: settingsTheme,
-              context,
-              onSave: (patterns) => {
-                // Strip description when saving (PatternConfig has no description)
-                const configs: PatternConfig[] = patterns.map((p) => {
-                  const cfg: PatternConfig = { pattern: p.pattern };
-                  if (p.regex) cfg.regex = true;
-                  return cfg;
-                });
-                const updated: GuardrailsConfig = structuredClone(config);
-                setNestedValue(updated, id, configs);
-                void saveTabConfig(activeTab, updated).then((ok) => {
-                  if (ok) tui.requestRender();
-                });
-              },
-              onDone: () => {
-                submenuDone(formatCount(id));
-                settings = buildSettings(activeTab);
-                tui.requestRender();
-              },
-            });
-          };
-        }
-
-        // --- Build sections ---
-
-        function buildSettings(tab: Tab): SectionedSettings {
-          const config =
-            tab === "local"
-              ? configLoader.getProjectConfig()
-              : configLoader.getGlobalConfig();
-          const resolved = configLoader.getConfig();
-
-          const featureItems = (Object.keys(FEATURE_UI) as FeatureKey[]).map(
-            (key) => {
-              const def = FEATURE_UI[key];
-              return {
-                id: `features.${key}`,
-                label: def.label,
-                description: def.description,
-                currentValue:
-                  (config.features?.[key] ?? resolved.features[key])
-                    ? "enabled"
-                    : "disabled",
-                values: ["enabled", "disabled"],
-              };
-            },
-          );
-
-          const sections: SettingsSection[] = [
-            {
-              label: "Features",
-              items: featureItems,
-            },
-            {
-              label: "Env Files",
-              items: [
-                {
-                  id: "envFiles.onlyBlockIfExists",
-                  label: "Only block existing files",
-                  description:
-                    "Only block .env file access if the file exists on disk",
-                  currentValue:
-                    (config.envFiles?.onlyBlockIfExists ??
-                    resolved.envFiles.onlyBlockIfExists)
-                      ? "on"
-                      : "off",
-                  values: ["on", "off"],
-                },
-                {
-                  id: "envFiles.protectedPatterns",
-                  label: "Protected patterns",
-                  description:
-                    "Patterns for files to protect (e.g. .env.local)",
-                  currentValue: formatCount("envFiles.protectedPatterns"),
-                  submenu: patternConfigSubmenu(
-                    "envFiles.protectedPatterns",
-                    "Protected Patterns",
-                    "file",
-                  ),
-                },
-                {
-                  id: "envFiles.allowedPatterns",
-                  label: "Allowed patterns",
-                  description: "Patterns for exceptions (e.g. .env.example)",
-                  currentValue: formatCount("envFiles.allowedPatterns"),
-                  submenu: patternConfigSubmenu(
-                    "envFiles.allowedPatterns",
-                    "Allowed Patterns",
-                    "file",
-                  ),
-                },
-                {
-                  id: "envFiles.protectedDirectories",
-                  label: "Protected directories",
-                  description: "Patterns for directories to protect",
-                  currentValue: formatCount("envFiles.protectedDirectories"),
-                  submenu: patternConfigSubmenu(
-                    "envFiles.protectedDirectories",
-                    "Protected Directories",
-                    "file",
-                  ),
-                },
-                {
-                  id: "envFiles.protectedTools",
-                  label: "Protected tools",
-                  description:
-                    "Tools to intercept (read, write, edit, bash, grep, find, ls)",
-                  currentValue: formatCount("envFiles.protectedTools"),
-                  submenu: stringArraySubmenu(
-                    "envFiles.protectedTools",
-                    "Protected Tools",
-                  ),
-                },
-              ],
-            },
-            {
-              label: "Permission Gate",
-              items: [
-                {
-                  id: "permissionGate.requireConfirmation",
-                  label: "Require confirmation",
-                  description:
-                    "Show confirmation dialog for dangerous commands (if off, just warns)",
-                  currentValue:
-                    (config.permissionGate?.requireConfirmation ??
-                    resolved.permissionGate.requireConfirmation)
-                      ? "on"
-                      : "off",
-                  values: ["on", "off"],
-                },
-                {
-                  id: "permissionGate.patterns",
-                  label: "Dangerous patterns",
-                  description:
-                    "Command patterns that trigger the permission gate",
-                  currentValue: formatCount("permissionGate.patterns"),
-                  submenu: patternArraySubmenu(
-                    "permissionGate.patterns",
-                    "Dangerous Patterns",
-                    "command",
-                  ),
-                },
-                {
-                  id: "permissionGate.allowedPatterns",
-                  label: "Allowed commands",
-                  description:
-                    "Patterns that bypass the permission gate entirely",
-                  currentValue: formatCount("permissionGate.allowedPatterns"),
-                  submenu: patternConfigSubmenu(
-                    "permissionGate.allowedPatterns",
-                    "Allowed Commands",
-                    "command",
-                  ),
-                },
-                {
-                  id: "permissionGate.autoDenyPatterns",
-                  label: "Auto-deny patterns",
-                  description:
-                    "Patterns that block commands immediately without dialog",
-                  currentValue: formatCount("permissionGate.autoDenyPatterns"),
-                  submenu: patternConfigSubmenu(
-                    "permissionGate.autoDenyPatterns",
-                    "Auto-Deny Patterns",
-                    "command",
-                  ),
-                },
-              ],
-            },
-            {
-              label: "Package Manager",
-              items: [
-                {
-                  id: "packageManager.selected",
-                  label: "Selected manager",
-                  description:
-                    "Which package manager to enforce (when feature is enabled)",
-                  currentValue:
-                    config.packageManager?.selected ??
-                    resolved.packageManager.selected,
-                  values: ["npm", "pnpm", "bun"],
-                },
-              ],
-            },
-          ];
-
-          return new SectionedSettings(
-            sections,
-            15,
-            settingsTheme,
-            (id, newValue) => {
-              void handleSettingChange(tab, id, newValue);
-            },
-            () => done(undefined),
-            { enableSearch: true },
-          );
-        }
-
-        // --- Change handler ---
-
-        async function handleSettingChange(
-          tab: Tab,
-          id: string,
-          newValue: string,
-        ): Promise<void> {
-          const config =
-            tab === "local"
-              ? configLoader.getProjectConfig()
-              : configLoader.getGlobalConfig();
-          const updated: GuardrailsConfig = structuredClone(config);
-
-          // Boolean toggles
-          if (
-            newValue === "enabled" ||
-            newValue === "disabled" ||
-            newValue === "on" ||
-            newValue === "off"
-          ) {
-            const boolVal = newValue === "enabled" || newValue === "on";
-            setNestedValue(updated, id, boolVal);
-
-            const ok = await saveTabConfig(tab, updated);
-            if (ok) {
-              settings = buildSettings(activeTab);
-              tui.requestRender();
-            }
-            return;
-          }
-
-          // Package manager selection
-          if (id === "packageManager.selected") {
-            setNestedValue(updated, id, newValue);
-
-            const ok = await saveTabConfig(tab, updated);
-            if (ok) {
-              settings = buildSettings(activeTab);
-              tui.requestRender();
-            }
-          }
-        }
-
-        // --- Tab rendering ---
-
-        function renderTabs(): string[] {
-          const localLabel =
-            activeTab === "local"
-              ? theme.bg("selectedBg", theme.fg("accent", " Local "))
-              : theme.fg("dim", " Local ");
-          const globalLabel =
-            activeTab === "global"
-              ? theme.bg("selectedBg", theme.fg("accent", " Global "))
-              : theme.fg("dim", " Global ");
-
-          return ["", `  ${localLabel}  ${globalLabel}`, ""];
-        }
-
-        function handleTabSwitch(data: string): boolean {
-          if (matchesKey(data, Key.tab) || matchesKey(data, Key.shift("tab"))) {
-            activeTab = activeTab === "local" ? "global" : "local";
-            settings = buildSettings(activeTab);
-            tui.requestRender();
-            return true;
-          }
-          return false;
-        }
-
-        // --- Init ---
-
-        settings = buildSettings(activeTab);
-
-        return {
-          render(width: number) {
-            const lines: string[] = [];
-            lines.push(theme.fg("accent", theme.bold("Guardrails Settings")));
-            lines.push(...renderTabs());
-            lines.push(...(settings?.render(width) ?? []));
-            return lines;
-          },
-          invalidate() {
-            settings?.invalidate?.();
-          },
-          handleInput(data: string) {
-            // Don't switch tabs when a submenu is active (it needs Tab)
-            if (!settings?.hasActiveSubmenu() && handleTabSwitch(data)) return;
-            settings?.handleInput?.(data);
-            tui.requestRender();
-          },
-        };
-      });
-
-      // RPC fallback
-      if (result === undefined) {
-        ctx.ui.notify("guardrails:settings requires interactive mode", "info");
+      function count(id: string): string {
+        const val =
+          (getNestedValue(tabConfig ?? {}, id) as unknown[] | undefined) ??
+          (getNestedValue(resolved, id) as unknown[]) ??
+          [];
+        return `${val.length} items`;
       }
+
+      function applyDraft(id: string, value: unknown): void {
+        const updated = structuredClone(tabConfig ?? {}) as GuardrailsConfig;
+        setNestedValue(updated, id, value);
+        setDraft(updated);
+      }
+
+      // --- Submenu factories ---
+
+      function stringArraySubmenu(id: string, label: string) {
+        return (_val: string, submenuDone: (v?: string) => void) => {
+          const items =
+            (getNestedValue(tabConfig ?? {}, id) as string[] | undefined) ??
+            (getNestedValue(resolved, id) as string[]) ??
+            [];
+          let latest = [...items];
+          return new ArrayEditor({
+            label,
+            items: [...items],
+            theme: settingsTheme,
+            onSave: (newItems) => {
+              latest = newItems;
+              applyDraft(id, newItems);
+            },
+            onDone: () => submenuDone(`${latest.length} items`),
+          });
+        };
+      }
+
+      function patternSubmenu(
+        id: string,
+        label: string,
+        context?: "file" | "command",
+      ) {
+        return (_val: string, submenuDone: (v?: string) => void) => {
+          const items =
+            (getNestedValue(tabConfig ?? {}, id) as
+              | DangerousPattern[]
+              | undefined) ??
+            (getNestedValue(resolved, id) as DangerousPattern[]) ??
+            [];
+          let latestCount = items.length;
+          return new PatternEditor({
+            label,
+            items: [...items],
+            theme: settingsTheme,
+            context,
+            onSave: (newItems) => {
+              latestCount = newItems.length;
+              applyDraft(id, newItems);
+            },
+            onDone: () => submenuDone(`${latestCount} items`),
+          });
+        };
+      }
+
+      function patternConfigSubmenu(
+        id: string,
+        label: string,
+        context?: "file" | "command",
+      ) {
+        return (_val: string, submenuDone: (v?: string) => void) => {
+          const currentItems =
+            (getNestedValue(tabConfig ?? {}, id) as
+              | PatternConfig[]
+              | undefined) ??
+            (getNestedValue(resolved, id) as PatternConfig[]) ??
+            [];
+          const items = currentItems.map((p) => ({
+            pattern: p.pattern,
+            description: p.pattern,
+            regex: p.regex,
+          }));
+          let latestCount = items.length;
+          return new PatternEditor({
+            label,
+            items,
+            theme: settingsTheme,
+            context,
+            onSave: (newItems) => {
+              latestCount = newItems.length;
+              const configs: PatternConfig[] = newItems.map((p) => {
+                const cfg: PatternConfig = { pattern: p.pattern };
+                if (p.regex) cfg.regex = true;
+                return cfg;
+              });
+              applyDraft(id, configs);
+            },
+            onDone: () => submenuDone(`${latestCount} items`),
+          });
+        };
+      }
+
+      // --- Sections ---
+
+      const featureItems = (Object.keys(FEATURE_UI) as FeatureKey[]).map(
+        (key) => ({
+          id: `features.${key}`,
+          label: FEATURE_UI[key].label,
+          description: FEATURE_UI[key].description,
+          currentValue:
+            (tabConfig?.features?.[key] ?? resolved.features[key])
+              ? "enabled"
+              : "disabled",
+          values: ["enabled", "disabled"],
+        }),
+      );
+
+      return [
+        { label: "Features", items: featureItems },
+        {
+          label: "Env Files",
+          items: [
+            {
+              id: "envFiles.onlyBlockIfExists",
+              label: "Only block existing files",
+              description:
+                "Only block .env file access if the file exists on disk",
+              currentValue:
+                (tabConfig?.envFiles?.onlyBlockIfExists ??
+                resolved.envFiles.onlyBlockIfExists)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
+            {
+              id: "envFiles.protectedPatterns",
+              label: "Protected patterns",
+              description: "Patterns for files to protect (e.g. .env.local)",
+              currentValue: count("envFiles.protectedPatterns"),
+              submenu: patternConfigSubmenu(
+                "envFiles.protectedPatterns",
+                "Protected Patterns",
+                "file",
+              ),
+            },
+            {
+              id: "envFiles.allowedPatterns",
+              label: "Allowed patterns",
+              description: "Patterns for exceptions (e.g. .env.example)",
+              currentValue: count("envFiles.allowedPatterns"),
+              submenu: patternConfigSubmenu(
+                "envFiles.allowedPatterns",
+                "Allowed Patterns",
+                "file",
+              ),
+            },
+            {
+              id: "envFiles.protectedDirectories",
+              label: "Protected directories",
+              description: "Patterns for directories to protect",
+              currentValue: count("envFiles.protectedDirectories"),
+              submenu: patternConfigSubmenu(
+                "envFiles.protectedDirectories",
+                "Protected Directories",
+                "file",
+              ),
+            },
+            {
+              id: "envFiles.protectedTools",
+              label: "Protected tools",
+              description:
+                "Tools to intercept (read, write, edit, bash, grep, find, ls)",
+              currentValue: count("envFiles.protectedTools"),
+              submenu: stringArraySubmenu(
+                "envFiles.protectedTools",
+                "Protected Tools",
+              ),
+            },
+          ],
+        },
+        {
+          label: "Permission Gate",
+          items: [
+            {
+              id: "permissionGate.requireConfirmation",
+              label: "Require confirmation",
+              description:
+                "Show confirmation dialog for dangerous commands (if off, just warns)",
+              currentValue:
+                (tabConfig?.permissionGate?.requireConfirmation ??
+                resolved.permissionGate.requireConfirmation)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
+            {
+              id: "permissionGate.patterns",
+              label: "Dangerous patterns",
+              description: "Command patterns that trigger the permission gate",
+              currentValue: count("permissionGate.patterns"),
+              submenu: patternSubmenu(
+                "permissionGate.patterns",
+                "Dangerous Patterns",
+                "command",
+              ),
+            },
+            {
+              id: "permissionGate.allowedPatterns",
+              label: "Allowed commands",
+              description: "Patterns that bypass the permission gate entirely",
+              currentValue: count("permissionGate.allowedPatterns"),
+              submenu: patternConfigSubmenu(
+                "permissionGate.allowedPatterns",
+                "Allowed Commands",
+                "command",
+              ),
+            },
+            {
+              id: "permissionGate.autoDenyPatterns",
+              label: "Auto-deny patterns",
+              description:
+                "Patterns that block commands immediately without dialog",
+              currentValue: count("permissionGate.autoDenyPatterns"),
+              submenu: patternConfigSubmenu(
+                "permissionGate.autoDenyPatterns",
+                "Auto-Deny Patterns",
+                "command",
+              ),
+            },
+          ],
+        },
+      ];
     },
   });
 }

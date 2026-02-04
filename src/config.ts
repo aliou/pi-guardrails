@@ -1,6 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+import { ConfigLoader, type Migration } from "@aliou/pi-utils-settings";
 import type { GuardrailsConfig, ResolvedConfig } from "./config-schema";
 import {
   backupConfig,
@@ -9,24 +7,76 @@ import {
   needsMigration,
 } from "./migration";
 
-const GLOBAL_CONFIG_PATH = resolve(getAgentDir(), "extensions/guardrails.json");
-const PROJECT_CONFIG_PATH = resolve(
-  process.cwd(),
-  ".pi/extensions/guardrails.json",
-);
+/**
+ * Config fields removed in the toolchain extraction.
+ * Old configs containing these are auto-cleaned on first load.
+ */
+const REMOVED_FEATURE_KEYS = [
+  "preventBrew",
+  "preventPython",
+  "enforcePackageManager",
+] as const;
+
+const TOOLCHAIN_MIGRATION_VERSION = "0.7.0-20260204";
+
+function hasRemovedFields(config: GuardrailsConfig): boolean {
+  const raw = config as Record<string, unknown>;
+  const features = raw.features as Record<string, unknown> | undefined;
+  if (features) {
+    for (const key of REMOVED_FEATURE_KEYS) {
+      if (key in features) return true;
+    }
+  }
+  return "packageManager" in raw;
+}
+
+function stripRemovedFields(config: GuardrailsConfig): GuardrailsConfig {
+  const cleaned = structuredClone(config) as Record<string, unknown>;
+  const features = cleaned.features as Record<string, unknown> | undefined;
+  if (features) {
+    for (const key of REMOVED_FEATURE_KEYS) {
+      delete features[key];
+    }
+  }
+  delete cleaned.packageManager;
+  cleaned.version = TOOLCHAIN_MIGRATION_VERSION;
+  return cleaned as GuardrailsConfig;
+}
+
+const migrations: Migration<GuardrailsConfig>[] = [
+  {
+    name: "v0-format-upgrade",
+    shouldRun: (config) => needsMigration(config),
+    run: async (config, filePath) => {
+      await backupConfig(filePath);
+      return migrateV0(config);
+    },
+  },
+  {
+    name: "strip-toolchain-fields",
+    shouldRun: (config) => hasRemovedFields(config),
+    run: (config) => {
+      const version = (config as Record<string, unknown>).version as
+        | string
+        | undefined;
+      if (!version || version < TOOLCHAIN_MIGRATION_VERSION) {
+        console.error(
+          "[guardrails] preventBrew, preventPython, enforcePackageManager, and packageManager " +
+            "have been removed from guardrails and moved to @aliou/pi-toolchain. " +
+            "These fields will be stripped from your config.",
+        );
+      }
+      return stripRemovedFields(config);
+    },
+  },
+];
 
 const DEFAULT_CONFIG: ResolvedConfig = {
   version: CURRENT_VERSION,
   enabled: true,
   features: {
-    preventBrew: false,
-    preventPython: false,
     protectEnvFiles: true,
     permissionGate: true,
-    enforcePackageManager: false,
-  },
-  packageManager: {
-    selected: "npm",
   },
   envFiles: {
     protectedPatterns: [
@@ -71,138 +121,23 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
 };
 
-class ConfigLoader {
-  private globalConfig: GuardrailsConfig | null = null;
-  private projectConfig: GuardrailsConfig | null = null;
-  private resolved: ResolvedConfig | null = null;
-
-  async load(): Promise<void> {
-    this.globalConfig = await this.loadConfigFile(GLOBAL_CONFIG_PATH);
-    this.projectConfig = await this.loadConfigFile(PROJECT_CONFIG_PATH);
-
-    // Migrate v0 configs
-    if (this.globalConfig && needsMigration(this.globalConfig)) {
-      await this.migrateConfigFile(GLOBAL_CONFIG_PATH, this.globalConfig);
-      this.globalConfig = await this.loadConfigFile(GLOBAL_CONFIG_PATH);
-    }
-    if (this.projectConfig && needsMigration(this.projectConfig)) {
-      await this.migrateConfigFile(PROJECT_CONFIG_PATH, this.projectConfig);
-      this.projectConfig = await this.loadConfigFile(PROJECT_CONFIG_PATH);
-    }
-
-    this.resolved = this.mergeConfigs();
-  }
-
-  private async migrateConfigFile(
-    path: string,
-    config: GuardrailsConfig,
-  ): Promise<void> {
-    await backupConfig(path);
-    const migrated = migrateV0(config);
-    try {
-      await this.saveConfigFile(path, migrated);
-    } catch {
-      // Can't write -- use migrated version in memory only
-    }
-  }
-
-  private async loadConfigFile(path: string): Promise<GuardrailsConfig | null> {
-    try {
-      const content = await readFile(path, "utf-8");
-      return JSON.parse(content) as GuardrailsConfig;
-    } catch {
-      return null;
-    }
-  }
-
-  private mergeConfigs(): ResolvedConfig {
-    const merged = structuredClone(DEFAULT_CONFIG);
-
-    if (this.globalConfig) {
-      this.mergeInto(merged, this.globalConfig);
-    }
-    if (this.projectConfig) {
-      this.mergeInto(merged, this.projectConfig);
-    }
-
-    // customPatterns replaces entire patterns array and disables
-    // built-in structural matchers (user owns all matching)
-    if (this.projectConfig?.permissionGate?.customPatterns) {
-      merged.permissionGate.patterns =
-        this.projectConfig.permissionGate.customPatterns;
-      merged.permissionGate.useBuiltinMatchers = false;
-    } else if (this.globalConfig?.permissionGate?.customPatterns) {
-      merged.permissionGate.patterns =
-        this.globalConfig.permissionGate.customPatterns;
-      merged.permissionGate.useBuiltinMatchers = false;
-    }
-
-    return merged;
-  }
-
-  private mergeInto<TTarget extends object, TSource extends object>(
-    target: TTarget,
-    source: TSource,
-  ): void {
-    const t = target as Record<string, unknown>;
-    const s = source as Record<string, unknown>;
-
-    for (const key in s) {
-      if (s[key] === undefined) continue;
-
-      if (
-        typeof s[key] === "object" &&
-        !Array.isArray(s[key]) &&
-        s[key] !== null
-      ) {
-        if (!t[key]) t[key] = {};
-        this.mergeInto(t[key] as object, s[key] as object);
-      } else {
-        t[key] = s[key];
+export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
+  "guardrails",
+  DEFAULT_CONFIG,
+  {
+    migrations,
+    afterMerge: (resolved, global, project) => {
+      // customPatterns replaces the entire patterns array and disables
+      // built-in structural matchers (user owns all matching).
+      if (project?.permissionGate?.customPatterns) {
+        resolved.permissionGate.patterns =
+          project.permissionGate.customPatterns;
+        resolved.permissionGate.useBuiltinMatchers = false;
+      } else if (global?.permissionGate?.customPatterns) {
+        resolved.permissionGate.patterns = global.permissionGate.customPatterns;
+        resolved.permissionGate.useBuiltinMatchers = false;
       }
-    }
-  }
-
-  getConfig(): ResolvedConfig {
-    if (!this.resolved) {
-      throw new Error("Config not loaded. Call load() first.");
-    }
-    return this.resolved;
-  }
-
-  async saveGlobal(config: GuardrailsConfig): Promise<void> {
-    await this.saveConfigFile(GLOBAL_CONFIG_PATH, config);
-    await this.load();
-  }
-
-  async saveProject(config: GuardrailsConfig): Promise<void> {
-    await this.saveConfigFile(PROJECT_CONFIG_PATH, config);
-    await this.load();
-  }
-
-  private async saveConfigFile(
-    path: string,
-    config: GuardrailsConfig,
-  ): Promise<void> {
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
-  }
-
-  hasGlobalConfig(): boolean {
-    return this.globalConfig !== null;
-  }
-
-  hasProjectConfig(): boolean {
-    return this.projectConfig !== null;
-  }
-
-  getGlobalConfig(): GuardrailsConfig {
-    return this.globalConfig ?? {};
-  }
-
-  getProjectConfig(): GuardrailsConfig {
-    return this.projectConfig ?? {};
-  }
-}
-
-export const configLoader = new ConfigLoader();
+      return resolved;
+    },
+  },
+);

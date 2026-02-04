@@ -4,12 +4,7 @@ export const GUARDRAILS_BLOCKED_EVENT = "guardrails:blocked";
 export const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous";
 
 export interface GuardrailsBlockedEvent {
-  feature:
-    | "preventBrew"
-    | "preventPython"
-    | "protectEnvFiles"
-    | "permissionGate"
-    | "enforcePackageManager";
+  feature: "protectEnvFiles" | "permissionGate";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;

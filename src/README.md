@@ -35,13 +35,12 @@ pi install npm:@aliou/pi-guardrails
 
 ## Features
 
-- **prevent-brew**: Blocks Homebrew commands (disabled by default)
-- **prevent-python**: Blocks Python/pip/poetry commands, suggests uv instead (disabled by default)
 - **protect-env-files**: Prevents access to `.env` files (except `.example`/`.sample`/`.test`)
 - **permission-gate**: Prompts for confirmation on dangerous commands
-- **enforce-package-manager**: Enforces a specific Node package manager (npm, pnpm, or bun) (disabled by default)
 
 All hooks use structural shell parsing via `@aliou/sh` to avoid false positives from keywords inside commit messages, grep patterns, heredocs, or file paths. On parse failure, each hook falls back to regex matching (previous behavior).
+
+> **Migration note**: The `preventBrew`, `preventPython`, `enforcePackageManager`, and `packageManager` fields have been removed from guardrails and moved to the [`@aliou/pi-toolchain`](../toolchain) extension. Old configs containing these fields are auto-cleaned on first load with a one-time warning. Install `@aliou/pi-toolchain` and configure `.pi/extensions/toolchain.json` instead.
 
 ## Configuration
 
@@ -69,17 +68,11 @@ Configs without a `version` field are automatically migrated on first load. The 
 
 ```json
 {
-  "version": "0.6.0-20260204",
+  "version": "0.7.0-20260204",
   "enabled": true,
   "features": {
-    "preventBrew": false,
-    "preventPython": false,
     "protectEnvFiles": true,
-    "permissionGate": true,
-    "enforcePackageManager": false
-  },
-  "packageManager": {
-    "selected": "npm"
+    "permissionGate": true
   },
   "envFiles": {
     "protectedPatterns": [
@@ -132,17 +125,8 @@ Built-in dangerous command patterns (`rm -rf`, `sudo`, `dd if=`, `mkfs.*`, `chmo
 
 | Key | Default | Description |
 |---|---|---|
-| `preventBrew` | `false` | Block Homebrew install/upgrade commands |
-| `preventPython` | `false` | Block python/pip/poetry commands (use uv instead) |
 | `protectEnvFiles` | `true` | Block access to `.env` files containing secrets |
 | `permissionGate` | `true` | Prompt for confirmation on dangerous commands |
-| `enforcePackageManager` | `false` | Enforce a specific Node package manager |
-
-#### `packageManager`
-
-| Key | Default | Description |
-|---|---|---|
-| `selected` | `"npm"` | Package manager to enforce: `"npm"`, `"pnpm"`, or `"bun"` |
 
 #### `envFiles`
 
@@ -166,16 +150,6 @@ Built-in dangerous command patterns (`rm -rf`, `sudo`, `dd if=`, `mkfs.*`, `chmo
 | `autoDenyPatterns` | `[]` | Patterns that are blocked immediately without dialog |
 
 ### Examples
-
-Enable `prevent-brew` for a project using Nix:
-
-```json
-{
-  "features": {
-    "preventBrew": true
-  }
-}
-```
 
 Add a custom dangerous command pattern (substring match):
 
@@ -217,19 +191,6 @@ Protect env files with glob patterns:
 }
 ```
 
-Enforce pnpm as the package manager:
-
-```json
-{
-  "features": {
-    "enforcePackageManager": true
-  },
-  "packageManager": {
-    "selected": "pnpm"
-  }
-}
-```
-
 ## Events
 
 The extension emits events on the pi event bus for inter-extension communication.
@@ -240,7 +201,7 @@ Emitted when a tool call is blocked by any guardrail.
 
 ```typescript
 interface GuardrailsBlockedEvent {
-  feature: "preventBrew" | "preventPython" | "protectEnvFiles" | "permissionGate" | "enforcePackageManager";
+  feature: "protectEnvFiles" | "permissionGate";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;
@@ -264,16 +225,6 @@ The [presenter extension](../presenter) listens for `guardrails:dangerous` event
 
 ## Hooks
 
-### prevent-brew
-
-Blocks bash commands that use Homebrew. Disabled by default. Enable via config if your project uses Nix.
-
-### prevent-python
-
-Blocks bash commands that use Python tooling directly. Disabled by default. Enable if your project uses uv for Python management.
-
-Blocked commands: `python`, `python3`, `pip`, `pip3`, `poetry`, `pyenv`, `virtualenv`.
-
 ### protect-env-files
 
 Prevents accessing `.env` files that might contain secrets. Only allows access to safe variants like `.env.example`, `.env.sample`, `.env.test`.
@@ -293,9 +244,3 @@ Prompts user confirmation before executing dangerous commands:
 - `chown -R` (recursive ownership change)
 
 Built-in patterns are matched structurally (AST-based). Custom patterns use substring or regex matching. Supports allow-lists and auto-deny lists.
-
-### enforce-package-manager
-
-Enforces using a specific Node package manager. Disabled by default. When enabled, blocks commands using non-selected package managers.
-
-Configure via `packageManager.selected`: `"npm"` (default), `"pnpm"`, or `"bun"`.
