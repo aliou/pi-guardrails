@@ -8,7 +8,7 @@
  * Both support `regex: true` for full regex matching.
  */
 
-import type { PatternConfig } from "./config-schema";
+import type { PatternConfig } from "../config";
 
 export interface CompiledPattern {
   test: (input: string) => boolean;

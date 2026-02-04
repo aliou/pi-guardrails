@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { registerGuardrailsSettings } from "./commands/settings-command";
 import { configLoader } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
-import { registerGuardrailsSettings } from "./settings-command";
 
 /**
  * Guardrails Extension

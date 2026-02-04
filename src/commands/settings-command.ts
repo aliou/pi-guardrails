@@ -7,14 +7,14 @@ import {
 } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
-import { configLoader } from "./config";
+import { PatternEditor } from "../components/pattern-editor";
 import type {
   DangerousPattern,
   GuardrailsConfig,
   PatternConfig,
   ResolvedConfig,
-} from "./config-schema";
-import { PatternEditor } from "./pattern-editor";
+} from "../config";
+import { configLoader } from "../config";
 
 type FeatureKey = keyof ResolvedConfig["features"];
 

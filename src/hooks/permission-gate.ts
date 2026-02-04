@@ -9,10 +9,13 @@ import {
   Text,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
-import type { DangerousPattern, ResolvedConfig } from "../config-schema";
-import { emitBlocked, emitDangerous } from "../events";
-import { type CompiledPattern, compileCommandPatterns } from "../matching";
-import { walkCommands, wordToString } from "../shell-utils";
+import type { DangerousPattern, ResolvedConfig } from "../config";
+import { emitBlocked, emitDangerous } from "../utils/events";
+import {
+  type CompiledPattern,
+  compileCommandPatterns,
+} from "../utils/matching";
+import { walkCommands, wordToString } from "../utils/shell-utils";
 
 /**
  * Permission gate that prompts user confirmation for dangerous commands.

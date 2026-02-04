@@ -12,7 +12,7 @@ import type {
   DangerousPattern,
   GuardrailsConfig,
   PatternConfig,
-} from "./config-schema";
+} from "../config";
 
 export const CURRENT_VERSION = "0.6.0-20260204";
 

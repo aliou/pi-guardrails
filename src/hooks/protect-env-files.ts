@@ -2,11 +2,11 @@ import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { ResolvedConfig } from "../config-schema";
-import { emitBlocked } from "../events";
-import { expandGlob, hasGlobChars } from "../glob-expander";
-import { type CompiledPattern, compileFilePatterns } from "../matching";
-import { walkCommands, wordToString } from "../shell-utils";
+import type { ResolvedConfig } from "../config";
+import { emitBlocked } from "../utils/events";
+import { expandGlob, hasGlobChars } from "../utils/glob-expander";
+import { type CompiledPattern, compileFilePatterns } from "../utils/matching";
+import { walkCommands, wordToString } from "../utils/shell-utils";
 
 /**
  * Prevents accessing .env files unless they match an allowed pattern.

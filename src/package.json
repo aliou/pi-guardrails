@@ -26,6 +26,9 @@
   "files": [
     "*.ts",
     "hooks",
+    "commands",
+    "components",
+    "utils",
     "README.md"
   ],
   "dependencies": {
