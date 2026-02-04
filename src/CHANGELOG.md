@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.6.0
+
+### Minor Changes
+
+- 29b61a5: Remove toolchain features (preventBrew, preventPython, enforcePackageManager) -- moved to @aliou/pi-toolchain. Replace custom config loader and settings UI with @aliou/pi-utils-settings.
+
 ## 0.5.4
 
 ### Patch Changes
