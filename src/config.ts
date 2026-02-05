@@ -201,16 +201,18 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
   "guardrails",
   DEFAULT_CONFIG,
   {
+    scopes: ["global", "local", "memory"],
     migrations,
-    afterMerge: (resolved, global, project) => {
+    afterMerge: (resolved, global, local, memory) => {
       // customPatterns replaces the entire patterns array and disables
       // built-in structural matchers (user owns all matching).
-      if (project?.permissionGate?.customPatterns) {
-        resolved.permissionGate.patterns =
-          project.permissionGate.customPatterns;
-        resolved.permissionGate.useBuiltinMatchers = false;
-      } else if (global?.permissionGate?.customPatterns) {
-        resolved.permissionGate.patterns = global.permissionGate.customPatterns;
+      // Priority: memory > local > global
+      const customPatterns =
+        memory?.permissionGate?.customPatterns ??
+        local?.permissionGate?.customPatterns ??
+        global?.permissionGate?.customPatterns;
+      if (customPatterns) {
+        resolved.permissionGate.patterns = customPatterns;
         resolved.permissionGate.useBuiltinMatchers = false;
       }
       return resolved;
