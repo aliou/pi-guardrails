@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.6.2
+
+### Patch Changes
+
+- Updated dependencies [06e7e0c]
+  - @aliou/pi-utils-settings@0.2.0
+
 ## 0.6.1
 
 ### Patch Changes
