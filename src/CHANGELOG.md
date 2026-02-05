@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.7.0
+
+### Minor Changes
+
+- 7a3f659: Add memory scope for ephemeral settings overrides
+
 ## 0.6.2
 
 ### Patch Changes
