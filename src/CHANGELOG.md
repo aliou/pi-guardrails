@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.6.1
+
+### Patch Changes
+
+- 3471b6c: Explicitly add deps to root package.json
+- d73dadb: Reorganize file structure: move commands to commands/, components to components/, utils to utils/. Merge config-schema types into config.ts.
+
 ## 0.6.0
 
 ### Minor Changes
