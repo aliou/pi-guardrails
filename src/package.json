@@ -32,7 +32,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "workspace:^0.1.0",
+    "@aliou/pi-utils-settings": "^0.1.0",
     "@aliou/sh": "^0.1.0"
   },
   "peerDependencies": {
