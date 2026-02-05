@@ -31,8 +31,6 @@ const FEATURE_UI: Record<FeatureKey, { label: string; description: string }> = {
 };
 
 export function registerGuardrailsSettings(pi: ExtensionAPI): void {
-  const settingsTheme = getSettingsListTheme();
-
   registerSettingsCommand<GuardrailsConfig, ResolvedConfig>(pi, {
     commandName: "guardrails:settings",
     title: "Guardrails Settings",
@@ -42,6 +40,7 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
       resolved: ResolvedConfig,
       { setDraft },
     ): SettingsSection[] => {
+      const settingsTheme = getSettingsListTheme();
       // --- Helpers ---
 
       function count(id: string): string {
