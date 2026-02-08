@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.7.1
+
+### Patch Changes
+
+- 2d9a958: update README documentation to match current implementation
+
 ## 0.7.0
 
 ### Minor Changes
