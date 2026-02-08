@@ -68,7 +68,6 @@ Configs without a `version` field are automatically migrated on first load. The 
 
 ```json
 {
-  "version": "0.7.0-20260204",
   "enabled": true,
   "features": {
     "protectEnvFiles": true,
@@ -78,12 +77,17 @@ Configs without a `version` field are automatically migrated on first load. The 
     "protectedPatterns": [
       { "pattern": ".env" },
       { "pattern": ".env.local" },
-      { "pattern": ".env.production" }
+      { "pattern": ".env.production" },
+      { "pattern": ".env.prod" },
+      { "pattern": ".dev.vars" }
     ],
     "allowedPatterns": [
       { "pattern": ".env.example" },
       { "pattern": ".env.sample" },
-      { "pattern": "*.example.env" }
+      { "pattern": ".env.test" },
+      { "pattern": "*.example.env" },
+      { "pattern": "*.sample.env" },
+      { "pattern": "*.test.env" }
     ],
     "protectedDirectories": [],
     "protectedTools": ["read", "write", "edit", "bash", "grep", "find", "ls"],
@@ -103,7 +107,7 @@ Configs without a `version` field are automatically migrated on first load. The 
 }
 ```
 
-All fields are optional. Missing fields use defaults shown above.
+All fields are optional. Missing fields use defaults shown above. The default patterns listed here may change between versions. Check the source code or run `/guardrails:settings` to see the current defaults and update them to your liking.
 
 ### Pattern Format
 
