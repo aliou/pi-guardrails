@@ -10,6 +10,7 @@ import {
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 import type { DangerousPattern, ResolvedConfig } from "../config";
+import { configLoader } from "../config";
 import { emitBlocked, emitDangerous } from "../utils/events";
 import {
   type CompiledPattern,
@@ -221,70 +222,100 @@ export function setupPermissionGateHook(
         return { block: true, reason };
       }
 
-      const proceed = await ctx.ui.custom<boolean>((_tui, theme, _kb, done) => {
-        const container = new Container();
-        const redBorder = (s: string) => theme.fg("error", s);
+      type ConfirmResult = "allow" | "allow-session" | "deny";
 
-        container.addChild(new DynamicBorder(redBorder));
-        container.addChild(
-          new Text(
-            theme.fg("error", theme.bold("Dangerous Command Detected")),
-            1,
-            0,
-          ),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new Text(
-            theme.fg("warning", `This command contains ${description}:`),
-            1,
-            0,
-          ),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new DynamicBorder((s: string) => theme.fg("muted", s)),
-        );
-        const commandText = new Text("", 1, 0);
-        container.addChild(commandText);
-        container.addChild(
-          new DynamicBorder((s: string) => theme.fg("muted", s)),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new Text(theme.fg("text", "Allow execution?"), 1, 0),
-        );
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new Text(theme.fg("dim", "y/enter: allow • n/esc: deny"), 1, 0),
-        );
-        container.addChild(new DynamicBorder(redBorder));
+      const result = await ctx.ui.custom<ConfirmResult>(
+        (_tui, theme, _kb, done) => {
+          const container = new Container();
+          const redBorder = (s: string) => theme.fg("error", s);
 
-        return {
-          render: (width: number) => {
-            const wrappedCommand = wrapTextWithAnsi(
-              theme.fg("text", command),
-              width - 4,
-            ).join("\n");
-            commandText.setText(wrappedCommand);
-            return container.render(width);
+          container.addChild(new DynamicBorder(redBorder));
+          container.addChild(
+            new Text(
+              theme.fg("error", theme.bold("Dangerous Command Detected")),
+              1,
+              0,
+            ),
+          );
+          container.addChild(new Spacer(1));
+          container.addChild(
+            new Text(
+              theme.fg("warning", `This command contains ${description}:`),
+              1,
+              0,
+            ),
+          );
+          container.addChild(new Spacer(1));
+          container.addChild(
+            new DynamicBorder((s: string) => theme.fg("muted", s)),
+          );
+          const commandText = new Text("", 1, 0);
+          container.addChild(commandText);
+          container.addChild(
+            new DynamicBorder((s: string) => theme.fg("muted", s)),
+          );
+          container.addChild(new Spacer(1));
+          container.addChild(
+            new Text(theme.fg("text", "Allow execution?"), 1, 0),
+          );
+          container.addChild(new Spacer(1));
+          container.addChild(
+            new Text(
+              theme.fg(
+                "dim",
+                "y/enter: allow • a: allow for session • n/esc: deny",
+              ),
+              1,
+              0,
+            ),
+          );
+          container.addChild(new DynamicBorder(redBorder));
+
+          return {
+            render: (width: number) => {
+              const wrappedCommand = wrapTextWithAnsi(
+                theme.fg("text", command),
+                width - 4,
+              ).join("\n");
+              commandText.setText(wrappedCommand);
+              return container.render(width);
+            },
+            invalidate: () => container.invalidate(),
+            handleInput: (data: string) => {
+              if (matchesKey(data, Key.enter) || data === "y" || data === "Y") {
+                done("allow");
+              } else if (data === "a" || data === "A") {
+                done("allow-session");
+              } else if (
+                matchesKey(data, Key.escape) ||
+                data === "n" ||
+                data === "N"
+              ) {
+                done("deny");
+              }
+            },
+          };
+        },
+      );
+
+      if (result === "allow-session") {
+        // Save command as allowed in memory scope (session-only).
+        // Spread the resolved allowed patterns and append the new one.
+        const resolved = configLoader.getConfig();
+        await configLoader.save("memory", {
+          permissionGate: {
+            allowedPatterns: [
+              ...resolved.permissionGate.allowedPatterns,
+              { pattern: command },
+            ],
           },
-          invalidate: () => container.invalidate(),
-          handleInput: (data: string) => {
-            if (matchesKey(data, Key.enter) || data === "y" || data === "Y") {
-              done(true);
-            } else if (
-              matchesKey(data, Key.escape) ||
-              data === "n" ||
-              data === "N"
-            ) {
-              done(false);
-            }
-          },
-        };
-      });
+        });
 
-      if (!proceed) {
+        // Update the local cache so it takes effect immediately
+        allowedPatterns.push(...compileCommandPatterns([{ pattern: command }]));
+      }
+
+      if (result === "deny") {
         emitBlocked(pi, {
           feature: "permissionGate",
           toolName: "bash",
