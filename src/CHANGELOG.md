@@ -1,5 +1,13 @@
 # @aliou/pi-guardrails
 
+## 0.7.2
+
+### Patch Changes
+
+- 9ba0cb9: Add "allow for session" option to permission gate confirmation dialog. Pressing `a` saves the command as an allowed pattern in the memory scope, bypassing future prompts for the same command in the current session.
+- Updated dependencies [756552a]
+  - @aliou/pi-utils-settings@0.3.0
+
 ## 0.7.1
 
 ### Patch Changes
