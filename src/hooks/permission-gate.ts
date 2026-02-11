@@ -120,7 +120,11 @@ function findDangerousMatch(
         }
         return false;
       });
-      if (match) return match;
+      // Structural matching succeeded -- return result (even if no match).
+      // Do NOT fall through to compiled patterns which do raw substring
+      // matching and would false-positive on e.g. "sudo" inside a quoted
+      // commit message argument.
+      return match;
     } catch {
       // Parse failed -- fall back to substring matching on raw string
       for (const p of fallbackPatterns) {
@@ -132,7 +136,8 @@ function findDangerousMatch(
   }
 
   // Check compiled patterns (substring/regex on raw string).
-  // When customPatterns replaces defaults, this is the only matching path.
+  // Only reached when customPatterns replaces defaults (useBuiltinMatchers
+  // is false) or when the structural parse failed and no fallback matched.
   for (const cp of compiledPatterns) {
     if (cp.test(command)) {
       const src = cp.source as DangerousPattern;
