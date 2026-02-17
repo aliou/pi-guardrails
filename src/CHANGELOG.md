@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.7.4
+
+### Patch Changes
+
+- Updated dependencies [7df01a2]
+  - @aliou/pi-utils-settings@0.4.0
+
 ## 0.7.3
 
 ### Patch Changes
