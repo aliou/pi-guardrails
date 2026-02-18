@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.7.5
+
+### Patch Changes
+
+- 6c5b699: Move to standalone repository
+
 ## 0.7.4
 
 ### Patch Changes
