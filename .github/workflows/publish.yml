@@ -1,0 +1,151 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip-checks:
+        description: "Skip lint and typecheck"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip-checks) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  publish:
+    name: Publish
+    needs: check
+    if: ${{ always() && (needs.check.result == 'success' || needs.check.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          scope: "@aliou"
+          cache: "pnpm"
+
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Get release info
+        id: release-info
+        run: |
+          pnpm changeset status --output=release.json 2>/dev/null || echo '{"releases":[]}' > release.json
+          node <<NODE
+          const fs = require('fs');
+          const release = JSON.parse(fs.readFileSync('release.json', 'utf8'));
+          const releases = release.releases?.filter(r => r.type !== 'none') || [];
+
+          let title = 'Version Packages';
+          let commit = 'Version Packages';
+          if (releases.length === 1) {
+            const { name, newVersion } = releases[0];
+            title = 'Updating ' + name + ' to version ' + newVersion;
+            commit = name + '@' + newVersion;
+          } else if (releases.length > 1) {
+            const summary = releases.map(r => r.name + '@' + r.newVersion).join(', ');
+            title = 'Updating ' + summary;
+            commit = summary;
+          }
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'title=' + title + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'commit=' + commit + '\n');
+          NODE
+          rm -f release.json
+        continue-on-error: true
+
+      - name: Create Release PR or Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          publish: pnpm changeset publish
+          title: ${{ steps.release-info.outputs.title || 'Version Packages' }}
+          commit: ${{ steps.release-info.outputs.commit || 'Version Packages' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Create GitHub releases
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          node <<'NODE'
+          const { execSync } = require("node:child_process");
+
+          const published = JSON.parse(process.env.PUBLISHED_PACKAGES || "[]");
+
+          for (const pkg of published) {
+            const shortName = pkg.name.replace(/^@[^/]+\//, "");
+            const tag = `${shortName}@${pkg.version}`;
+
+            const existing = execSync(`git tag --list ${tag}`, { encoding: "utf8" }).trim();
+            if (!existing) {
+              execSync(`git tag ${tag}`);
+              execSync(`git push origin ${tag}`);
+            }
+
+            let hasRelease = false;
+            try {
+              const output = execSync(`gh release view ${tag} --json tagName --jq .tagName`, {
+                stdio: ["ignore", "pipe", "ignore"],
+              }).toString().trim();
+              hasRelease = output.length > 0;
+            } catch {
+              hasRelease = false;
+            }
+
+            if (!hasRelease) {
+              execSync(`gh release create ${tag} --title ${tag} --notes "Release ${tag}"`, {
+                stdio: "inherit",
+              });
+            }
+          }
+          NODE

@@ -1,0 +1,64 @@
+{
+  "name": "@aliou/pi-guardrails",
+  "version": "0.7.4",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi",
+    "guardrails",
+    "security"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aliou/pi-guardrails"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "video": "https://assets.aliou.me/pi-extensions/demos/pi-guardrails.mp4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "dependencies": {
+    "@aliou/pi-utils-settings": "^0.4.0",
+    "@aliou/sh": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": ">=0.51.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@changesets/cli": "^2.27.11",
+    "@mariozechner/pi-coding-agent": "0.52.7",
+    "@mariozechner/pi-tui": "0.52.7",
+    "@sinclair/typebox": "^0.34.48",
+    "@types/node": "^25.0.10",
+    "husky": "^9.1.7",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "@mariozechner/pi-ai": "$@mariozechner/pi-coding-agent",
+      "@mariozechner/pi-tui": "$@mariozechner/pi-coding-agent"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "format": "biome check --write",
+    "prepare": "husky",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm changeset publish"
+  },
+  "packageManager": "pnpm@10.26.1"
+}

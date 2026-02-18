@@ -8,29 +8,14 @@ Security hooks to prevent potentially dangerous operations.
 
 ## Installation
 
-Install via the pi-extensions package:
-
-```bash
-pi install git:github.com/aliou/pi-extensions
-```
-
-Or selectively in your `settings.json`:
-
-```json
-{
-  "packages": [
-    {
-      "source": "git:github.com/aliou/pi-extensions",
-      "extensions": ["extensions/guardrails"]
-    }
-  ]
-}
-```
-
-Or from npm:
-
 ```bash
 pi install npm:@aliou/pi-guardrails
+```
+
+Or from git:
+
+```bash
+pi install git:github.com/aliou/pi-guardrails
 ```
 
 ## Features
@@ -40,7 +25,7 @@ pi install npm:@aliou/pi-guardrails
 
 All hooks use structural shell parsing via `@aliou/sh` to avoid false positives from keywords inside commit messages, grep patterns, heredocs, or file paths. On parse failure, each hook falls back to regex matching (previous behavior).
 
-> **Migration note**: The `preventBrew`, `preventPython`, `enforcePackageManager`, and `packageManager` fields have been removed from guardrails and moved to the [`@aliou/pi-toolchain`](../toolchain) extension. Old configs containing these fields are auto-cleaned on first load with a one-time warning. Install `@aliou/pi-toolchain` and configure `.pi/extensions/toolchain.json` instead.
+> **Migration note**: The `preventBrew`, `preventPython`, `enforcePackageManager`, and `packageManager` fields have been removed from guardrails and moved to the [`@aliou/pi-toolchain`](https://github.com/aliou/pi-toolchain) extension. Old configs containing these fields are auto-cleaned on first load with a one-time warning. Install `@aliou/pi-toolchain` and configure `.pi/extensions/toolchain.json` instead.
 
 ## Configuration
 
@@ -225,7 +210,7 @@ interface GuardrailsDangerousEvent {
 }
 ```
 
-The [presenter extension](../presenter) listens for `guardrails:dangerous` events and plays a notification sound.
+The [presenter extension](https://github.com/aliou/pi-extensions/tree/main/extensions/presenter) listens for `guardrails:dangerous` events and plays a notification sound.
 
 ## Hooks
 
