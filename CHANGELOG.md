@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.7.6
+
+### Patch Changes
+
+- 31ae8f0: mark pi SDK peer deps as optional to prevent koffi OOM in Gondolin VMs
+
 ## 0.7.5
 
 ### Patch Changes
