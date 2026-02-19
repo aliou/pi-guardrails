@@ -60,5 +60,10 @@
     "version": "changeset version",
     "release": "pnpm changeset publish"
   },
-  "packageManager": "pnpm@10.26.1"
+  "packageManager": "pnpm@10.26.1",
+  "peerDependenciesMeta": {
+    "@mariozechner/pi-coding-agent": {
+      "optional": true
+    }
+  }
 }
