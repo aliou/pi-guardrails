@@ -37,6 +37,7 @@
     "@mariozechner/pi-tui": ">=0.51.0"
   },
   "devDependencies": {
+    "@aliou/biome-plugins": "^0.3.2",
     "@biomejs/biome": "^2.3.13",
     "@changesets/cli": "^2.27.11",
     "@mariozechner/pi-coding-agent": "0.52.7",
@@ -55,6 +56,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check",
     "format": "biome check --write",
+    "check:lockfile": "pnpm install --frozen-lockfile --ignore-scripts",
     "prepare": "[ -d .git ] && husky || true",
     "changeset": "changeset",
     "version": "changeset version",

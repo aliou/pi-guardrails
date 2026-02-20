@@ -1,5 +1,10 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.13/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.2/schema.json",
+  "plugins": [
+    "./node_modules/@aliou/biome-plugins/plugins/no-inline-imports.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-js-import-extension.grit",
+    "./node_modules/@aliou/biome-plugins/plugins/no-emojis.grit"
+  ],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
