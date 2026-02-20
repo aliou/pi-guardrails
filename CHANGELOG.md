@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.7.7
+
+### Patch Changes
+
+- 0b5ab5b: Move `@mariozechner/pi-tui` to peer dependencies to avoid bundling the SDK alongside the extension.
+- 3ea037a: Replace all `console.error`/`console.warn` calls with a module-level warnings queue. Warnings collected during config loading, migration, and pattern compilation are now drained and reported via `ctx.ui.notify` at `session_start`.
+
 ## 0.7.6
 
 ### Patch Changes
