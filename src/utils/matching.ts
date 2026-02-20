@@ -9,6 +9,7 @@
  */
 
 import type { PatternConfig } from "../config";
+import { pendingWarnings } from "./warnings";
 
 export interface CompiledPattern {
   test: (input: string) => boolean;
@@ -62,7 +63,9 @@ export function compileFilePattern(config: PatternConfig): CompiledPattern {
       const re = new RegExp(config.pattern, "i");
       return { test: (input) => re.test(input), source: config };
     } catch {
-      console.error(`Invalid regex in guardrails config: ${config.pattern}`);
+      pendingWarnings.push(
+        `Invalid regex in guardrails config: ${config.pattern}`,
+      );
       return { test: () => false, source: config };
     }
   }
@@ -89,7 +92,9 @@ export function compileCommandPattern(config: PatternConfig): CompiledPattern {
       const re = new RegExp(config.pattern);
       return { test: (input) => re.test(input), source: config };
     } catch {
-      console.error(`Invalid regex in guardrails config: ${config.pattern}`);
+      pendingWarnings.push(
+        `Invalid regex in guardrails config: ${config.pattern}`,
+      );
       return { test: () => false, source: config };
     }
   }

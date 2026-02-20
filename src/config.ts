@@ -82,6 +82,7 @@ import {
   migrateV0,
   needsMigration,
 } from "./utils/migration";
+import { pendingWarnings } from "./utils/warnings";
 
 /**
  * Config fields removed in the toolchain extraction.
@@ -136,7 +137,7 @@ const migrations: Migration<GuardrailsConfig>[] = [
         | string
         | undefined;
       if (!version || version < TOOLCHAIN_MIGRATION_VERSION) {
-        console.error(
+        pendingWarnings.push(
           "[guardrails] preventBrew, preventPython, enforcePackageManager, and packageManager " +
             "have been removed from guardrails and moved to @aliou/pi-toolchain. " +
             "These fields will be stripped from your config.",

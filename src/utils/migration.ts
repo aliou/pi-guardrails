@@ -13,6 +13,7 @@ import type {
   GuardrailsConfig,
   PatternConfig,
 } from "../config";
+import { pendingWarnings } from "./warnings";
 
 export const CURRENT_VERSION = "0.6.0-20260204";
 
@@ -129,7 +130,7 @@ export async function backupConfig(configPath: string): Promise<void> {
     try {
       await copyFile(configPath, backupPath);
     } catch (err) {
-      console.warn(`guardrails: could not back up config: ${err}`);
+      pendingWarnings.push(`guardrails: could not back up config: ${err}`);
     }
   }
 }

@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { registerGuardrailsSettings } from "./commands/settings-command";
 import { configLoader } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
+import { pendingWarnings } from "./utils/warnings";
 
 /**
  * Guardrails Extension
@@ -27,4 +28,10 @@ export default async function (pi: ExtensionAPI) {
 
   setupGuardrailsHooks(pi, config);
   registerGuardrailsSettings(pi);
+
+  pi.on("session_start", (_event, ctx) => {
+    for (const warning of pendingWarnings.splice(0)) {
+      ctx.ui.notify(warning, "warning");
+    }
+  });
 }
