@@ -465,6 +465,19 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
         };
       }
 
+      function getExplainModel(): string {
+        const model = tabConfig?.permissionGate?.explainModel;
+        if (model !== undefined) return model;
+        return resolved.permissionGate.explainModel ?? "";
+      }
+
+      function getExplainTimeout(): number {
+        return (
+          tabConfig?.permissionGate?.explainTimeout ??
+          resolved.permissionGate.explainTimeout
+        );
+      }
+
       const featureItems = (Object.keys(FEATURE_UI) as FeatureKey[])
         .filter((key) => key !== "policies")
         .map((key) => ({
@@ -585,6 +598,75 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
                 "Auto-Deny Patterns",
                 "command",
               ),
+            },
+            {
+              id: "permissionGate.explainCommands",
+              label: "Explain commands",
+              description:
+                "Call an LLM to explain dangerous commands in the confirmation dialog",
+              currentValue:
+                (tabConfig?.permissionGate?.explainCommands ??
+                resolved.permissionGate.explainCommands)
+                  ? "on"
+                  : "off",
+              values: ["on", "off"],
+            },
+            {
+              id: "permissionGate.explainModel",
+              label: "Explain model",
+              description: "Model spec in provider/model-id format",
+              currentValue: getExplainModel() || "(not set)",
+              submenu: (_val: string, submenuDone: (v?: string) => void) =>
+                new SettingsDetailEditor({
+                  title: "Explain Commands: Model",
+                  theme: settingsTheme,
+                  onDone: submenuDone,
+                  getDoneSummary: () => getExplainModel() || "(not set)",
+                  fields: [
+                    {
+                      id: "permissionGate.explainModel",
+                      type: "text",
+                      label: "Model",
+                      description: "Format: provider/model-id",
+                      getValue: getExplainModel,
+                      setValue: (value) => {
+                        const model = value.trim();
+                        applyDraft(
+                          "permissionGate.explainModel",
+                          model || undefined,
+                        );
+                      },
+                      emptyValueText: "(not set)",
+                    },
+                  ],
+                }),
+            },
+            {
+              id: "permissionGate.explainTimeout",
+              label: "Explain timeout",
+              description: "Timeout for LLM explanation in milliseconds",
+              currentValue: `${getExplainTimeout()}ms`,
+              submenu: (_val: string, submenuDone: (v?: string) => void) =>
+                new SettingsDetailEditor({
+                  title: "Explain Commands: Timeout",
+                  theme: settingsTheme,
+                  onDone: submenuDone,
+                  getDoneSummary: () => `${getExplainTimeout()}ms`,
+                  fields: [
+                    {
+                      id: "permissionGate.explainTimeout",
+                      type: "text",
+                      label: "Timeout (ms)",
+                      description: "Abort explanation call after this many ms",
+                      getValue: () => String(getExplainTimeout()),
+                      setValue: (value) => {
+                        const parsed = Number.parseInt(value.trim(), 10);
+                        if (Number.isNaN(parsed) || parsed < 1) return;
+                        applyDraft("permissionGate.explainTimeout", parsed);
+                      },
+                    },
+                  ],
+                }),
             },
           ],
         },

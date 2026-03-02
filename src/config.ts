@@ -81,6 +81,9 @@ export interface GuardrailsConfig {
     requireConfirmation?: boolean;
     allowedPatterns?: PatternConfig[];
     autoDenyPatterns?: PatternConfig[];
+    explainCommands?: boolean;
+    explainModel?: string;
+    explainTimeout?: number;
   };
 }
 
@@ -102,6 +105,9 @@ export interface ResolvedConfig {
     requireConfirmation: boolean;
     allowedPatterns: PatternConfig[];
     autoDenyPatterns: PatternConfig[];
+    explainCommands: boolean;
+    explainModel: string | null;
+    explainTimeout: number;
   };
 }
 
@@ -229,6 +235,9 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     requireConfirmation: true,
     allowedPatterns: [],
     autoDenyPatterns: [],
+    explainCommands: false,
+    explainModel: null,
+    explainTimeout: 5000,
   },
 };
 
