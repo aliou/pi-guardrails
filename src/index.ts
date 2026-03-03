@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { registerAddPolicyCommand } from "./commands/add-policy";
 import { registerGuardrailsSettings } from "./commands/settings-command";
 import { configLoader } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
@@ -29,7 +28,6 @@ export default async function (pi: ExtensionAPI) {
 
   setupGuardrailsHooks(pi, config);
   registerGuardrailsSettings(pi);
-  registerAddPolicyCommand(pi);
 
   pi.on("session_start", (_event, ctx) => {
     for (const warning of pendingWarnings.splice(0)) {
