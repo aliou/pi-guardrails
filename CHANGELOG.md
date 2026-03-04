@@ -1,5 +1,17 @@
 # @aliou/pi-guardrails
 
+## 0.8.0
+
+### Minor Changes
+
+- e8eea2f: Redesign file protection from legacy `envFiles` to a new `policies` system with per-rule protection levels (`noAccess`, `readOnly`, `none`), add migration from old config fields, and replace the old env hook with a general policies hook.
+- e762afc: Add opt-in LLM command explanations to the permission gate dialog with configurable model and timeout settings, plus graceful fallback when model resolution or explanation calls fail.
+
+### Patch Changes
+
+- e4a8438: Update docs and migration semantics for config schema versioning. Bump `@aliou/pi-utils-settings` to latest `0.5.x`, clarify fallback behavior in README/AGENTS, ignore `.pi/settings.json`, and ensure migrated configs write the current schema version without lexicographic version comparisons.
+- d9f91cd: Harden permission-gate command explanation prompt handling, fix dangerous-pattern matching flow after successful AST parses, and improve policy enforcement by skipping empty rules and resolving onlyIfExists checks relative to session cwd. Also refresh README/AGENTS docs for the policies-based architecture.
+
 ## 0.7.7
 
 ### Patch Changes
