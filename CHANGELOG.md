@@ -1,5 +1,13 @@
 # @aliou/pi-guardrails
 
+## 0.9.1
+
+### Patch Changes
+
+- a01452d: Fix policy file glob matching for nested paths like `drizzle/**/*.sql` by using native Node glob matching on normalized relative targets.
+
+  This keeps basename matching for simple patterns (for backward compatibility), while allowing patterns with `/` to match full relative paths as users expect.
+
 ## 0.9.0
 
 ### Minor Changes
