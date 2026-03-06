@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.9.2
+
+### Patch Changes
+
+- 9cd0054: bump @aliou/pi-utils-settings to ^0.10.0 (local scope fix)
+
 ## 0.9.1
 
 ### Patch Changes
