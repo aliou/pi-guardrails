@@ -1,5 +1,28 @@
 # @aliou/pi-guardrails
 
+## 0.9.3
+
+### Patch Changes
+
+- ae512a6: Add more policy and command examples in settings UI
+
+  File policy presets:
+
+  - SSH keys (_.pem, _\_rsa, \*\_ed25519)
+  - AWS credentials (.aws/credentials, .aws/config)
+  - Database files (_.db, _.sqlite, \*.sqlite3) - read-only
+  - Kubernetes secrets (.kube/config, _kubeconfig_)
+  - Certificates (_.crt, _.key, \*.p12)
+
+  Dangerous command presets:
+
+  - terraform apply/destroy
+  - kubectl delete
+  - docker system prune
+  - git push --force
+  - npm/yarn/pnpm publish
+  - DROP DATABASE/TABLE
+
 ## 0.9.2
 
 ### Patch Changes
