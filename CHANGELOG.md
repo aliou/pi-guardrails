@@ -1,5 +1,14 @@
 # @aliou/pi-guardrails
 
+## 0.9.4
+
+### Patch Changes
+
+- d5047c5: fix: update `@aliou/pi-utils-settings` to 0.10.1 for nested wizard Ctrl+S handling
+
+  - pulls in the `pi-utils-settings` fix that lets nested settings submenus receive `Ctrl+S` before the top-level settings screen intercepts save
+  - fixes the add-policy flow so the review step can submit with `Ctrl+S`
+
 ## 0.9.3
 
 ### Patch Changes
