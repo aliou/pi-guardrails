@@ -1,5 +1,15 @@
 # @aliou/pi-guardrails
 
+## 0.9.5
+
+### Patch Changes
+
+- da0f0b7: chore: update Pi peer and dev package versions to 0.61.0
+
+  - update `@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`, and `@mariozechner/pi-tui` to `0.61.0`
+  - verify the extension against Pi 0.61.0 changelogs and docs
+  - confirm no source-level migration was needed for namespaced keybinding ids or tool wrapper execute signatures
+
 ## 0.9.4
 
 ### Patch Changes
