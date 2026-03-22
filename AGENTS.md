@@ -42,6 +42,13 @@ src/
 - `config.version` is a schema marker for debugging/inspection, not the package version
 - Events emitted on the pi event bus for inter-extension communication (`guardrails:blocked`, `guardrails:dangerous`)
 
+## Documentation
+
+When adding, updating, or removing default policy rules, default permission gate patterns, or example presets, you must also update the corresponding documentation files:
+
+- [`docs/defaults.md`](docs/defaults.md) — mirrors `DEFAULT_CONFIG` in `src/config.ts`
+- [`docs/examples.md`](docs/examples.md) — mirrors `POLICY_EXAMPLES` and `COMMAND_EXAMPLES` in `src/commands/settings-command.ts`
+
 ## Versioning
 
 Uses changesets. Run `pnpm changeset` before committing user-facing changes.

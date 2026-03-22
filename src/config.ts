@@ -217,6 +217,51 @@ const DEFAULT_CONFIG: ResolvedConfig = {
           "Accessing {file} is not allowed. This file contains secrets. " +
           "Explain to the user why you want to access this file, and if changes are needed ask the user to make them.",
       },
+      {
+        id: "home-ssh",
+        description: "SSH directory and keys",
+        enabled: false,
+        patterns: [
+          { pattern: "~/.ssh/**" },
+          { pattern: "~/.ssh/*_rsa" },
+          { pattern: "~/.ssh/*_ed25519" },
+          { pattern: "~/.ssh/*.pem" },
+        ],
+        allowedPatterns: [{ pattern: "~/.ssh/*.pub" }],
+        protection: "noAccess",
+        onlyIfExists: true,
+        blockMessage:
+          "Accessing {file} is not allowed. This file is part of your SSH configuration and may contain private keys or sensitive host information.",
+      },
+      {
+        id: "home-config",
+        description: "Sensitive user configuration directories",
+        enabled: false,
+        patterns: [
+          { pattern: "~/.config/gh/**" },
+          { pattern: "~/.config/gcloud/**" },
+          { pattern: "~/.config/op/**" },
+          { pattern: "~/.config/sops/**" },
+        ],
+        protection: "noAccess",
+        onlyIfExists: true,
+        blockMessage:
+          "Accessing {file} is not allowed. This file is in a sensitive user configuration directory and may contain credentials or tokens.",
+      },
+      {
+        id: "home-gpg",
+        description: "GPG keys and configuration",
+        enabled: false,
+        patterns: [
+          { pattern: "~/.gnupg/**" },
+          { pattern: "~/*.gpg" },
+          { pattern: "~/.gpg-agent.conf" },
+        ],
+        protection: "noAccess",
+        onlyIfExists: true,
+        blockMessage:
+          "Accessing {file} is not allowed. This file is part of your GPG configuration and may contain private keys or trust settings.",
+      },
     ],
   },
   permissionGate: {

@@ -10,6 +10,7 @@ import {
   compileFilePatterns,
   normalizeFilePath,
 } from "../utils/matching";
+import { expandHomePath } from "../utils/path";
 import { walkCommands, wordToString } from "../utils/shell-utils";
 import { pendingWarnings } from "../utils/warnings";
 
@@ -37,9 +38,9 @@ interface CompiledRule {
   enabled: boolean;
 }
 
-async function fileExists(cwd: string, filePath: string): Promise<boolean> {
+async function fileExists(filePath: string, cwd: string): Promise<boolean> {
   try {
-    await stat(resolve(cwd, filePath));
+    await stat(resolvePolicyPath(filePath, cwd));
     return true;
   } catch {
     return false;
@@ -118,13 +119,28 @@ function maybePathLike(token: string): boolean {
 }
 
 function normalizeTargetForPolicy(filePath: string, cwd: string): string {
-  const absolute = resolve(cwd, filePath);
+  if (filePath === "~" || filePath.startsWith("~/")) {
+    return normalizeFilePath(filePath);
+  }
+
+  const expanded = expandHomePath(filePath);
+  const absolute = resolve(cwd, expanded);
   const rel = relative(cwd, absolute);
+  const normalizedHome = normalizeFilePath(expandHomePath("~"));
+  const normalizedAbsolute = normalizeFilePath(absolute);
+
+  if (normalizedAbsolute.startsWith(`${normalizedHome}/`)) {
+    return normalizeFilePath(`~/${relative(expandHomePath("~"), absolute)}`);
+  }
 
   const candidate =
     rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : absolute;
 
   return normalizeFilePath(candidate);
+}
+
+function resolvePolicyPath(filePath: string, cwd: string): string {
+  return resolve(cwd, expandHomePath(filePath));
 }
 
 function matchesAnyPolicyPattern(
@@ -236,7 +252,7 @@ async function getEffectiveProtection(
     );
     if (allowed) continue;
 
-    if (rule.onlyIfExists && !(await fileExists(cwd, filePath))) continue;
+    if (rule.onlyIfExists && !(await fileExists(filePath, cwd))) continue;
 
     const rank = protectionRank(rule.protection);
     if (!bestMatch || rank > bestMatch.rank) {

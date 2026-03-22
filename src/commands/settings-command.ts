@@ -258,6 +258,118 @@ const COMMAND_EXAMPLES: Array<{
     description: "Require confirmation for table drops",
     pattern: { pattern: "DROP TABLE", description: "SQL table drop" },
   },
+  {
+    label: "dbt run",
+    description: "Require confirmation for dbt model runs",
+    pattern: {
+      pattern: "dbt run",
+      description: "dbt model execution",
+    },
+  },
+  {
+    label: "dbt seed",
+    description: "Require confirmation for dbt seed data loading",
+    pattern: {
+      pattern: "dbt seed",
+      description: "dbt seed data loading",
+    },
+  },
+  {
+    label: "aws s3 rm",
+    description: "Require confirmation for AWS S3 deletions",
+    pattern: {
+      pattern: "aws s3 rm",
+      description: "AWS S3 object deletion",
+    },
+  },
+  {
+    label: "aws iam",
+    description: "Require confirmation for AWS IAM changes",
+    pattern: {
+      pattern: "aws iam",
+      description: "AWS IAM permission changes",
+    },
+  },
+  {
+    label: "aws ec2 terminate",
+    description: "Require confirmation for EC2 instance termination",
+    pattern: {
+      pattern: "aws ec2 terminate-instances",
+      description: "AWS EC2 instance termination",
+    },
+  },
+  {
+    label: "kubectl apply",
+    description: "Require confirmation for k8s resource application",
+    pattern: {
+      pattern: "kubectl apply",
+      description: "Kubernetes resource application",
+    },
+  },
+  {
+    label: "kubectl scale",
+    description: "Require confirmation for k8s scaling operations",
+    pattern: {
+      pattern: "kubectl scale",
+      description: "Kubernetes scaling operation",
+    },
+  },
+  {
+    label: "docker rm",
+    description: "Require confirmation for Docker container removal",
+    pattern: {
+      pattern: "docker rm",
+      description: "Docker container removal",
+    },
+  },
+  {
+    label: "docker rmi",
+    description: "Require confirmation for Docker image removal",
+    pattern: {
+      pattern: "docker rmi",
+      description: "Docker image removal",
+    },
+  },
+  {
+    label: "docker compose down",
+    description: "Require confirmation for Docker Compose teardown",
+    pattern: {
+      pattern: "docker compose down",
+      description: "Docker Compose service teardown",
+    },
+  },
+  {
+    label: "terraform import",
+    description: "Require confirmation for Terraform resource import",
+    pattern: {
+      pattern: "terraform import",
+      description: "Terraform resource import",
+    },
+  },
+  {
+    label: "gcloud compute delete",
+    description: "Require confirmation for GCP compute instance deletion",
+    pattern: {
+      pattern: "gcloud compute instances delete",
+      description: "GCP compute instance deletion",
+    },
+  },
+  {
+    label: "gcloud iam",
+    description: "Require confirmation for GCP IAM changes",
+    pattern: {
+      pattern: "gcloud iam",
+      description: "GCP IAM permission changes",
+    },
+  },
+  {
+    label: "gcloud sql delete",
+    description: "Require confirmation for GCP SQL instance deletion",
+    pattern: {
+      pattern: "gcloud sql instances delete",
+      description: "GCP Cloud SQL instance deletion",
+    },
+  },
 ];
 
 function toKebabCase(input: string): string {

@@ -18,6 +18,11 @@ Or from git:
 pi install git:github.com/aliou/pi-guardrails
 ```
 
+## Documentation
+
+- [Default configuration](docs/defaults.md) — built-in policy rules and permission gate patterns
+- [Example presets](docs/examples.md) — pre-configured presets available in settings
+
 ## What it does
 
 - **policies**: named file-protection rules with per-rule protection levels.
