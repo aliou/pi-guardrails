@@ -56,6 +56,8 @@ export interface PolicyRule {
 export interface GuardrailsConfig {
   version?: string;
   enabled?: boolean;
+  /** Deprecated-defaults bridge: when true, applies built-in policy defaults. */
+  applyBuiltinDefaults?: boolean;
   features?: {
     policies?: boolean;
     permissionGate?: boolean;
@@ -90,6 +92,7 @@ export interface GuardrailsConfig {
 export interface ResolvedConfig {
   version: string;
   enabled: boolean;
+  applyBuiltinDefaults: boolean;
   features: {
     policies: boolean;
     permissionGate: boolean;
@@ -115,8 +118,10 @@ import { ConfigLoader, type Migration } from "@aliou/pi-utils-settings";
 import {
   backupConfig,
   CURRENT_VERSION,
+  migrateApplyBuiltinDefaults,
   migrateEnvFilesToPolicies,
   migrateV0,
+  needsApplyBuiltinDefaultsMigration,
   needsEnvFilesToPoliciesMigration,
   needsMigration,
 } from "./utils/migration";
@@ -182,11 +187,17 @@ const migrations: Migration<GuardrailsConfig>[] = [
     shouldRun: (config) => needsEnvFilesToPoliciesMigration(config),
     run: (config) => migrateEnvFilesToPolicies(config),
   },
+  {
+    name: "apply-builtin-defaults-bridge",
+    shouldRun: (config) => needsApplyBuiltinDefaultsMigration(config),
+    run: (config) => migrateApplyBuiltinDefaults(config),
+  },
 ];
 
 const DEFAULT_CONFIG: ResolvedConfig = {
   version: CURRENT_VERSION,
   enabled: true,
+  applyBuiltinDefaults: true,
   features: {
     policies: true,
     permissionGate: true,
@@ -295,8 +306,10 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
     afterMerge: (resolved, global, local, memory) => {
       const ruleMap = new Map<string, PolicyRule>();
 
-      for (const rule of DEFAULT_CONFIG.policies.rules) {
-        ruleMap.set(rule.id, rule);
+      if (resolved.applyBuiltinDefaults) {
+        for (const rule of DEFAULT_CONFIG.policies.rules) {
+          ruleMap.set(rule.id, rule);
+        }
       }
       if (global?.policies?.rules) {
         for (const rule of global.policies.rules) {

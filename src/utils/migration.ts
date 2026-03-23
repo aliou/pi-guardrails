@@ -21,7 +21,7 @@ import { pendingWarnings } from "./warnings";
  * Keep this independent from package.json version.
  * Bump only when config schema/default migration markers change.
  */
-export const CURRENT_VERSION = "0.8.0-20260228";
+export const CURRENT_VERSION = "0.9.0-20260323";
 
 /**
  * Check if a config needs migration (no version field = v0).
@@ -95,6 +95,36 @@ export function needsEnvFilesToPoliciesMigration(
 
   const features = raw.features as Record<string, unknown> | undefined;
   return features?.protectEnvFiles !== undefined;
+}
+
+/**
+ * Check if config needs applyBuiltinDefaults bridge migration.
+ * This runs only for existing config files loaded by ConfigLoader.
+ */
+export function needsApplyBuiltinDefaultsMigration(
+  config: GuardrailsConfig,
+): boolean {
+  return config.applyBuiltinDefaults === undefined;
+}
+
+/**
+ * Bridge migration for defaults deprecation.
+ * Existing config files get applyBuiltinDefaults=true to preserve behavior.
+ */
+export function migrateApplyBuiltinDefaults(
+  config: GuardrailsConfig,
+): GuardrailsConfig {
+  const migrated = structuredClone(config);
+  migrated.applyBuiltinDefaults = true;
+  migrated.version = CURRENT_VERSION;
+
+  pendingWarnings.push(
+    "Guardrails config was migrated. `applyBuiltinDefaults` was set to `true` to preserve current behavior.\n" +
+      "Built-in policy defaults will be deprecated in a future version. " +
+      "Use /guardrails:settings -> Policies -> Apply defaults to store the current defaults in your global settings file (`~/.pi/agent/extensions/guardrails.json`).",
+  );
+
+  return migrated;
 }
 
 /**

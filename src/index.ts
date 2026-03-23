@@ -1,7 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { registerGuardrailsSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
+import { configLoader, type GuardrailsConfig } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
+import { CURRENT_VERSION } from "./utils/migration";
 import { pendingWarnings } from "./utils/warnings";
 
 /**
@@ -22,6 +23,17 @@ import { pendingWarnings } from "./utils/warnings";
  */
 export default async function (pi: ExtensionAPI) {
   await configLoader.load();
+
+  // First-run bootstrap: create global settings file with explicit
+  // applyBuiltinDefaults=false (no warning, no migration path).
+  if (!configLoader.hasConfig("global")) {
+    const bootstrap: GuardrailsConfig = {
+      version: CURRENT_VERSION,
+      applyBuiltinDefaults: false,
+    };
+    await configLoader.save("global", bootstrap);
+  }
+
   const config = configLoader.getConfig();
 
   if (!config.enabled) return;
