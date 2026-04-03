@@ -957,7 +957,7 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
     buildSections: (
       tabConfig: GuardrailsConfig | null,
       _resolved: ResolvedConfig,
-      { setDraft, theme },
+      { setDraft, theme, scope },
     ): SettingsSection[] => {
       const settingsTheme = theme;
       let scopedConfig = structuredClone(tabConfig ?? {}) as GuardrailsConfig;
@@ -1117,9 +1117,11 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
         return scopedConfig.permissionGate?.explainTimeout ?? null;
       }
 
-      const featureItems = (Object.keys(FEATURE_UI) as FeatureKey[])
+      const featureItems: SettingItem[] = (
+        Object.keys(FEATURE_UI) as FeatureKey[]
+      )
         .filter((key) => key !== "policies")
-        .map((key) => {
+        .map((key): SettingItem => {
           const scopedValue = scopedConfig.features?.[key];
           return {
             id: `features.${key}`,
@@ -1134,6 +1136,18 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
             values: ["enabled", "disabled"],
           };
         });
+
+      if (scope === "global") {
+        featureItems.push({
+          id: "onboarding.run",
+          label: "Onboarding status",
+          description: "Use /guardrails:onboarding to run onboarding",
+          currentValue:
+            scopedConfig.onboarding?.completed === true
+              ? "completed"
+              : "pending",
+        });
+      }
 
       const policyRules = getPolicyRules();
 

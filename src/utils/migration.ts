@@ -21,7 +21,7 @@ import { pendingWarnings } from "./warnings";
  * Keep this independent from package.json version.
  * Bump only when config schema/default migration markers change.
  */
-export const CURRENT_VERSION = "0.9.0-20260323";
+export const CURRENT_VERSION = "0.9.0-20260327";
 
 /**
  * Check if a config needs migration (no version field = v0).
@@ -119,11 +119,35 @@ export function migrateApplyBuiltinDefaults(
   migrated.version = CURRENT_VERSION;
 
   pendingWarnings.push(
-    "Guardrails config was migrated. `applyBuiltinDefaults` was set to `true` to preserve current behavior.\n" +
-      "Built-in policy defaults will be deprecated in a future version. " +
-      "Use /guardrails:settings -> Policies -> Apply defaults to store the current defaults in your global settings file (`~/.pi/agent/extensions/guardrails.json`).",
+    "Guardrails config was migrated. `applyBuiltinDefaults` was set to `true` to preserve current behavior.",
   );
 
+  return migrated;
+}
+
+export function needsOnboardingDoneMigration(
+  config: GuardrailsConfig,
+): boolean {
+  return (
+    config.onboarding?.completed === undefined &&
+    config.applyBuiltinDefaults !== undefined
+  );
+}
+
+export function migrateMarkOnboardingDone(
+  config: GuardrailsConfig,
+): GuardrailsConfig {
+  const migrated = structuredClone(config);
+  pendingWarnings.push(
+    "Guardrails config was migrated. Existing setup marked as onboarding-complete.",
+  );
+  migrated.onboarding = {
+    ...(migrated.onboarding ?? {}),
+    completed: true,
+    completedAt: migrated.onboarding?.completedAt ?? new Date().toISOString(),
+    version: migrated.onboarding?.version ?? CURRENT_VERSION,
+  };
+  migrated.version = CURRENT_VERSION;
   return migrated;
 }
 

@@ -58,6 +58,11 @@ export interface GuardrailsConfig {
   enabled?: boolean;
   /** Deprecated-defaults bridge: when true, applies built-in policy defaults. */
   applyBuiltinDefaults?: boolean;
+  onboarding?: {
+    completed?: boolean;
+    completedAt?: string;
+    version?: string;
+  };
   features?: {
     policies?: boolean;
     permissionGate?: boolean;
@@ -118,10 +123,8 @@ import { ConfigLoader, type Migration } from "@aliou/pi-utils-settings";
 import {
   backupConfig,
   CURRENT_VERSION,
-  migrateApplyBuiltinDefaults,
   migrateEnvFilesToPolicies,
   migrateV0,
-  needsApplyBuiltinDefaultsMigration,
   needsEnvFilesToPoliciesMigration,
   needsMigration,
 } from "./utils/migration";
@@ -186,11 +189,6 @@ const migrations: Migration<GuardrailsConfig>[] = [
     name: "envFiles-to-policies",
     shouldRun: (config) => needsEnvFilesToPoliciesMigration(config),
     run: (config) => migrateEnvFilesToPolicies(config),
-  },
-  {
-    name: "apply-builtin-defaults-bridge",
-    shouldRun: (config) => needsApplyBuiltinDefaultsMigration(config),
-    run: (config) => migrateApplyBuiltinDefaults(config),
   },
 ];
 

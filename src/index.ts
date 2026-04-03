@@ -1,8 +1,15 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { isOnboardingPending } from "./commands/onboarding";
+import { registerGuardrailsOnboardingCommand } from "./commands/onboarding-command";
 import { registerGuardrailsSettings } from "./commands/settings-command";
-import { configLoader, type GuardrailsConfig } from "./config";
+import { configLoader } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
-import { CURRENT_VERSION } from "./utils/migration";
+import {
+  migrateApplyBuiltinDefaults,
+  migrateMarkOnboardingDone,
+  needsApplyBuiltinDefaultsMigration,
+  needsOnboardingDoneMigration,
+} from "./utils/migration";
 import { pendingWarnings } from "./utils/warnings";
 
 /**
@@ -24,26 +31,66 @@ import { pendingWarnings } from "./utils/warnings";
 export default async function (pi: ExtensionAPI) {
   await configLoader.load();
 
-  // First-run bootstrap: create global settings file with explicit
-  // applyBuiltinDefaults=false (no warning, no migration path).
-  if (!configLoader.hasConfig("global")) {
-    const bootstrap: GuardrailsConfig = {
-      version: CURRENT_VERSION,
-      applyBuiltinDefaults: false,
-    };
-    await configLoader.save("global", bootstrap);
+  const hasGlobalConfig = configLoader.hasConfig("global");
+
+  if (hasGlobalConfig) {
+    const globalConfig = configLoader.getRawConfig("global");
+    if (globalConfig) {
+      let migrated = globalConfig;
+      let changed = false;
+
+      if (needsApplyBuiltinDefaultsMigration(migrated)) {
+        migrated = migrateApplyBuiltinDefaults(migrated);
+        changed = true;
+      }
+
+      if (needsOnboardingDoneMigration(migrated)) {
+        migrated = migrateMarkOnboardingDone(migrated);
+        changed = true;
+      }
+
+      if (changed) {
+        await configLoader.save("global", migrated);
+        await configLoader.load();
+      }
+    }
   }
 
-  const config = configLoader.getConfig();
+  let hooksRegistered = false;
 
-  if (!config.enabled) return;
-
-  setupGuardrailsHooks(pi, config);
   registerGuardrailsSettings(pi);
+
+  const maybeRegisterHooks = () => {
+    if (hooksRegistered) return;
+    const config = configLoader.getConfig();
+    if (!config.enabled) return;
+    setupGuardrailsHooks(pi, config);
+    hooksRegistered = true;
+  };
+
+  if (isOnboardingPending(configLoader.getRawConfig("global"))) {
+    registerGuardrailsOnboardingCommand(pi, maybeRegisterHooks);
+  } else {
+    maybeRegisterHooks();
+  }
 
   pi.on("session_start", (_event, ctx) => {
     for (const warning of pendingWarnings.splice(0)) {
       ctx.ui.notify(warning, "warning");
     }
+
+    if (!ctx.hasUI) {
+      return;
+    }
+
+    if (isOnboardingPending(configLoader.getRawConfig("global"))) {
+      ctx.ui.notify(
+        "[Guardrails] setup pending. Run `/guardrails:onboarding` to choose recommended or minimal protection defaults.",
+        "info",
+      );
+      return;
+    }
+
+    maybeRegisterHooks();
   });
 }
