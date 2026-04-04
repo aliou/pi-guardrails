@@ -99,7 +99,8 @@ Each rule has:
 
 - `id`: stable identifier used for overrides across scopes.
 - `patterns`: files to match (glob by default, regex if `regex: true`). Glob semantics: patterns containing `/` match the full relative path; patterns without `/` match basename only.
-- `allowedPatterns`: exceptions.
+  - `relativeOnly`: when `true`, pattern only matches files inside the current working directory.
+- `allowedPatterns`: exceptions (same format as `patterns`).
 - `protection`:
   - `noAccess`: block `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`
   - `readOnly`: block `write`, `edit`, `bash`

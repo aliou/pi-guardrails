@@ -55,7 +55,7 @@ export function compileFilePattern(
     try {
       const re = new RegExp(config.pattern, "i");
       return {
-        test: (input: string, cwd: string) => {
+        test: (input, cwd) => {
           const normalized = normalizeFilePath(input);
           if (!re.test(normalized)) return false;
           if (config.relativeOnly) {
@@ -76,7 +76,7 @@ export function compileFilePattern(
   const matchFullPath = config.pattern.includes("/");
 
   return {
-    test: (input: string, cwd: string) => {
+    test: (input, cwd) => {
       const normalized = normalizeFilePath(input);
       const candidate = matchFullPath
         ? normalized
@@ -104,7 +104,7 @@ export function compileCommandPattern(
   if (config.regex) {
     try {
       const re = new RegExp(config.pattern);
-      return { test: (input: string) => re.test(input), source: config };
+      return { test: (input) => re.test(input), source: config };
     } catch {
       pendingWarnings.push(
         `Invalid regex in guardrails config: ${config.pattern}`,
@@ -114,7 +114,7 @@ export function compileCommandPattern(
   }
 
   return {
-    test: (input: string) => input.includes(config.pattern),
+    test: (input) => input.includes(config.pattern),
     source: config,
   };
 }

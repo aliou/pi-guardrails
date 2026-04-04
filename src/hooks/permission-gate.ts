@@ -21,7 +21,7 @@ import { configLoader } from "../config";
 import { executeSubagent, resolveModel } from "../lib";
 import { emitBlocked, emitDangerous } from "../utils/events";
 import {
-  type CompiledPattern,
+  type CompiledCommandPattern,
   compileCommandPatterns,
 } from "../utils/matching";
 import { walkCommands, wordToString } from "../utils/shell-utils";
@@ -182,7 +182,7 @@ function checkBuiltinDangerous(words: string[]): DangerMatch | undefined {
  */
 function findDangerousMatch(
   command: string,
-  compiledPatterns: CompiledPattern[],
+  compiledPatterns: CompiledCommandPattern[],
   useBuiltinMatchers: boolean,
   fallbackPatterns: DangerousPattern[],
 ): DangerMatch | undefined {
