@@ -6,7 +6,7 @@ import type { PolicyRule, Protection, ResolvedConfig } from "../config";
 import { emitBlocked } from "../utils/events";
 import { expandGlob, hasGlobChars } from "../utils/glob-expander";
 import {
-  type CompiledPattern,
+  type CompiledFilePattern,
   compileFilePatterns,
   normalizeFilePath,
 } from "../utils/matching";
@@ -31,8 +31,8 @@ const BLOCKED_TOOLS: Record<Protection, Set<string>> = {
 interface CompiledRule {
   id: string;
   protection: Protection;
-  patterns: CompiledPattern[];
-  allowedPatterns: CompiledPattern[];
+  patterns: CompiledFilePattern[];
+  allowedPatterns: CompiledFilePattern[];
   onlyIfExists: boolean;
   blockMessage: string;
   enabled: boolean;
@@ -146,10 +146,12 @@ function resolvePolicyPath(filePath: string, cwd: string): string {
 function matchesAnyPolicyPattern(
   filePath: string,
   rules: CompiledRule[],
+  cwd: string,
 ): boolean {
   return rules.some(
     (rule) =>
-      rule.enabled && rule.patterns.some((pattern) => pattern.test(filePath)),
+      rule.enabled &&
+      rule.patterns.some((pattern) => pattern.test(filePath, cwd)),
   );
 }
 
@@ -175,7 +177,7 @@ async function extractBashFileTargets(
     const expanded = await expandCandidate(candidate);
     for (const file of expanded) {
       const normalized = normalizeTargetForPolicy(file, cwd);
-      if (matchesAnyPolicyPattern(normalized, rules)) {
+      if (matchesAnyPolicyPattern(normalized, rules, cwd)) {
         targets.add(normalized);
       }
     }
@@ -215,7 +217,7 @@ async function extractBashFileTargets(
       const expanded = await expandCandidate(token);
       for (const file of expanded) {
         const normalized = normalizeTargetForPolicy(file, cwd);
-        if (matchesAnyPolicyPattern(normalized, rules)) {
+        if (matchesAnyPolicyPattern(normalized, rules, cwd)) {
           targets.add(normalized);
         }
       }
@@ -244,11 +246,13 @@ async function getEffectiveProtection(
   for (const rule of compiledRules) {
     if (!rule.enabled) continue;
 
-    const matched = rule.patterns.some((pattern) => pattern.test(filePath));
+    const matched = rule.patterns.some((pattern) =>
+      pattern.test(filePath, cwd),
+    );
     if (!matched) continue;
 
     const allowed = rule.allowedPatterns.some((pattern) =>
-      pattern.test(filePath),
+      pattern.test(filePath, cwd),
     );
     if (allowed) continue;
 

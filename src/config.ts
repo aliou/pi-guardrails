@@ -6,9 +6,9 @@
  */
 
 /**
- * A pattern with explicit matching mode.
- * Default: glob for files, substring for commands.
- * regex: true means full regex matching.
+ * Base pattern with explicit matching mode.
+ * - Default: glob for files, substring for commands.
+ * - regex: true means full regex matching.
  */
 export interface PatternConfig {
   pattern: string;
@@ -16,11 +16,25 @@ export interface PatternConfig {
 }
 
 /**
+ * File pattern config with relativeOnly support.
+ * - relativeOnly: true means only match if the resolved path is inside the
+ *   current working directory.
+ */
+export interface FilePatternConfig extends PatternConfig {
+  relativeOnly?: boolean;
+}
+
+/**
+ * Command pattern config (no relativeOnly, not applicable in command context).
+ */
+export type CommandPatternConfig = PatternConfig;
+
+/**
  * Permission gate pattern. When regex is false (default), the pattern
  * is matched as substring against the raw command string.
  * When regex is true, uses full regex against the raw string.
  */
-export interface DangerousPattern extends PatternConfig {
+export interface DangerousPattern extends CommandPatternConfig {
   description: string;
 }
 
@@ -40,9 +54,9 @@ export interface PolicyRule {
   /** Human-readable description. */
   description?: string;
   /** File patterns to protect. */
-  patterns: PatternConfig[];
+  patterns: FilePatternConfig[];
   /** Optional exceptions. */
-  allowedPatterns?: PatternConfig[];
+  allowedPatterns?: FilePatternConfig[];
   /** Protection level. */
   protection: Protection;
   /** Block only when file exists on disk. Default true. */

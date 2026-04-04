@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /**
  * Expand a leading tilde to the current user's home directory.
@@ -15,4 +15,15 @@ export function expandHomePath(input: string): string {
   }
 
   return input;
+}
+
+/**
+ * Check if a child path is inside a parent directory.
+ */
+export function isPathInside(parentDir: string, childPath: string): boolean {
+  const resolvedParent = resolve(parentDir);
+  const resolvedChild = resolve(childPath);
+  const rel = relative(resolvedParent, resolvedChild);
+
+  return !rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel);
 }

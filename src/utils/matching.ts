@@ -9,12 +9,22 @@
  */
 
 import { matchesGlob } from "node:path";
-import type { PatternConfig } from "../config";
+import type { CommandPatternConfig, FilePatternConfig } from "../config";
+import { isPathInside } from "./path";
 import { pendingWarnings } from "./warnings";
 
-export interface CompiledPattern {
+interface CompiledPatternBase<TConfig> {
+  source: TConfig;
+}
+
+export interface CompiledFilePattern
+  extends CompiledPatternBase<FilePatternConfig> {
+  test: (input: string, cwd: string) => boolean;
+}
+
+export interface CompiledCommandPattern
+  extends CompiledPatternBase<CommandPatternConfig> {
   test: (input: string) => boolean;
-  source: PatternConfig;
 }
 
 /**
@@ -38,12 +48,21 @@ export function normalizeFilePath(input: string): string {
  * - Otherwise, match basename only (backward compatible).
  * regex: true -> full regex (case-insensitive) against normalized path.
  */
-export function compileFilePattern(config: PatternConfig): CompiledPattern {
+export function compileFilePattern(
+  config: FilePatternConfig,
+): CompiledFilePattern {
   if (config.regex) {
     try {
       const re = new RegExp(config.pattern, "i");
       return {
-        test: (input) => re.test(normalizeFilePath(input)),
+        test: (input: string, cwd: string) => {
+          const normalized = normalizeFilePath(input);
+          if (!re.test(normalized)) return false;
+          if (config.relativeOnly) {
+            return isPathInside(cwd, input);
+          }
+          return true;
+        },
         source: config,
       };
     } catch {
@@ -57,13 +76,18 @@ export function compileFilePattern(config: PatternConfig): CompiledPattern {
   const matchFullPath = config.pattern.includes("/");
 
   return {
-    test: (input) => {
+    test: (input: string, cwd: string) => {
       const normalized = normalizeFilePath(input);
       const candidate = matchFullPath
         ? normalized
         : (normalized.split("/").pop() ?? normalized);
 
-      return matchesGlob(candidate, config.pattern);
+      const matches = matchesGlob(candidate, config.pattern);
+      if (!matches) return false;
+      if (config.relativeOnly) {
+        return isPathInside(cwd, input);
+      }
+      return true;
     },
     source: config,
   };
@@ -74,11 +98,13 @@ export function compileFilePattern(config: PatternConfig): CompiledPattern {
  * Default: substring match against raw command string.
  * regex: true -> full regex against raw command string.
  */
-export function compileCommandPattern(config: PatternConfig): CompiledPattern {
+export function compileCommandPattern(
+  config: CommandPatternConfig,
+): CompiledCommandPattern {
   if (config.regex) {
     try {
       const re = new RegExp(config.pattern);
-      return { test: (input) => re.test(input), source: config };
+      return { test: (input: string) => re.test(input), source: config };
     } catch {
       pendingWarnings.push(
         `Invalid regex in guardrails config: ${config.pattern}`,
@@ -88,7 +114,7 @@ export function compileCommandPattern(config: PatternConfig): CompiledPattern {
   }
 
   return {
-    test: (input) => input.includes(config.pattern),
+    test: (input: string) => input.includes(config.pattern),
     source: config,
   };
 }
@@ -97,8 +123,8 @@ export function compileCommandPattern(config: PatternConfig): CompiledPattern {
  * Compile an array of patterns for file-context matching.
  */
 export function compileFilePatterns(
-  configs: PatternConfig[],
-): CompiledPattern[] {
+  configs: FilePatternConfig[],
+): CompiledFilePattern[] {
   return configs.map(compileFilePattern);
 }
 
@@ -106,7 +132,7 @@ export function compileFilePatterns(
  * Compile an array of patterns for command-context matching.
  */
 export function compileCommandPatterns(
-  configs: PatternConfig[],
-): CompiledPattern[] {
+  configs: CommandPatternConfig[],
+): CompiledCommandPattern[] {
   return configs.map(compileCommandPattern);
 }
