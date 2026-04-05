@@ -16,16 +16,21 @@ export interface PatternConfig {
 }
 
 /**
- * File pattern config with relativeOnly support.
- * - relativeOnly: true means only match if the resolved path is inside the
- *   current working directory.
+ * File pattern config with pathFilter support.
+ * - pathFilter: optional array of paths to restrict matches to. Supports:
+ *   - "." or "./" for current working directory
+ *   - "../" for parent of cwd
+ *   - "~" or "~/" for home directory
+ *   - Absolute paths (e.g., "/home/user/docs", "C:/Windows")
+ *   Pattern matches if file is inside ANY of the specified paths.
+ *   If not set, pattern matches anywhere (no restriction).
  */
 export interface FilePatternConfig extends PatternConfig {
-  relativeOnly?: boolean;
+  pathFilter?: string[];
 }
 
 /**
- * Command pattern config (no relativeOnly, not applicable in command context).
+ * Command pattern config (no basePath, not applicable in command context).
  */
 export type CommandPatternConfig = PatternConfig;
 

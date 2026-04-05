@@ -99,7 +99,15 @@ Each rule has:
 
 - `id`: stable identifier used for overrides across scopes.
 - `patterns`: files to match (glob by default, regex if `regex: true`). Glob semantics: patterns containing `/` match the full relative path; patterns without `/` match basename only.
-  - `relativeOnly`: when `true`, pattern only matches files inside the current working directory.
+  - `pathFilter`: optional array of paths to restrict matches to. Supports:
+    - `.` or `./something` - relative to current working directory
+    - `../something` - parent of cwd
+    - `~/something` or `~` - home directory
+    - Absolute paths like `/home/user/docs` or `C:/Windows/System32`
+    Pattern matches if file is inside ANY of the specified paths.
+    If not set, pattern matches anywhere (no restriction).
+
+    Example: `"pathFilter": ["."]` for cwd only, `"pathFilter": [".", "~/.config"]` for cwd and home config.
 - `allowedPatterns`: exceptions (same format as `patterns`).
 - `protection`:
   - `noAccess`: block `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`

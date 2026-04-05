@@ -10,7 +10,7 @@
 
 import { matchesGlob } from "node:path";
 import type { CommandPatternConfig, FilePatternConfig } from "../config";
-import { isPathInside } from "./path";
+import { isPathInsideAny } from "./path";
 import { pendingWarnings } from "./warnings";
 
 interface CompiledPatternBase<TConfig> {
@@ -58,8 +58,8 @@ export function compileFilePattern(
         test: (input, cwd) => {
           const normalized = normalizeFilePath(input);
           if (!re.test(normalized)) return false;
-          if (config.relativeOnly) {
-            return isPathInside(cwd, input);
+          if (config.pathFilter !== undefined) {
+            return isPathInsideAny(config.pathFilter, cwd, input);
           }
           return true;
         },
@@ -84,8 +84,8 @@ export function compileFilePattern(
 
       const matches = matchesGlob(candidate, config.pattern);
       if (!matches) return false;
-      if (config.relativeOnly) {
-        return isPathInside(cwd, input);
+      if (config.pathFilter !== undefined) {
+        return isPathInsideAny(config.pathFilter, cwd, input);
       }
       return true;
     },
