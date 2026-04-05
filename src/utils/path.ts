@@ -10,7 +10,7 @@ export function expandHomePath(input: string): string {
     return homedir();
   }
 
-  if (input.startsWith("~/")) {
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
     return join(homedir(), input.slice(2));
   }
 
@@ -21,8 +21,8 @@ export function expandHomePath(input: string): string {
  * Check if a child path is inside a parent directory.
  */
 export function isPathInside(parentDir: string, childPath: string): boolean {
-  const resolvedParent = resolve(parentDir);
-  const resolvedChild = resolve(childPath);
+  const resolvedParent = resolve(expandHomePath(parentDir));
+  const resolvedChild = resolve(expandHomePath(childPath));
   const rel = relative(resolvedParent, resolvedChild);
 
   return !rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel);
