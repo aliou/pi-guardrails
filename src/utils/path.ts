@@ -18,7 +18,7 @@ export function expandHomePath(input: string): string {
 }
 
 /**
- * Resolve a basePath value to an absolute path.
+ * Resolve a pathFilter value to an absolute path.
  * Supports:
  *   - "." or "./" for current working directory
  *   - "../" for parent directories relative to cwd
@@ -27,9 +27,12 @@ export function expandHomePath(input: string): string {
  *
  * Returns null if the path cannot be resolved.
  */
-export function resolveBasePath(basePath: string, cwd: string): string | null {
+export function resolvePathFilter(
+  pathFilter: string,
+  cwd: string,
+): string | null {
   // Expand home directory first
-  const expanded = expandHomePath(basePath);
+  const expanded = expandHomePath(pathFilter);
 
   // If it's already absolute after home expansion, return it
   if (isAbsolute(expanded)) {
@@ -56,13 +59,13 @@ export function isPathInside(parentDir: string, childPath: string): boolean {
  * Returns true if the path is inside at least one parent directory.
  */
 export function isPathInsideAny(
-  basePaths: string[],
+  pathFilters: string[],
   cwd: string,
   childPath: string,
 ): boolean {
-  for (const basePath of basePaths) {
-    const resolvedBase = resolveBasePath(basePath, cwd);
-    if (resolvedBase && isPathInside(resolvedBase, childPath)) {
+  for (const pathFilter of pathFilters) {
+    const resolvedFilter = resolvePathFilter(pathFilter, cwd);
+    if (resolvedFilter && isPathInside(resolvedFilter, childPath)) {
       return true;
     }
   }

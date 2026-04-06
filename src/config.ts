@@ -30,7 +30,7 @@ export interface FilePatternConfig extends PatternConfig {
 }
 
 /**
- * Command pattern config (no basePath, not applicable in command context).
+ * Command pattern config (no pathFilter, not applicable in command context).
  */
 export type CommandPatternConfig = PatternConfig;
 
