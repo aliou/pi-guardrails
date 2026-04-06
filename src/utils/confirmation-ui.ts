@@ -186,7 +186,6 @@ export function createConfirmationUI(options: ConfirmationOptions) {
 
     container.addChild(new Spacer(1));
 
-    // Use scrollable command display (from createPermissionGateConfirmComponent)
     const commandTopBorder = new Text("", 0, 0);
     container.addChild(commandTopBorder);
     const commandText = new Text("", 1, 0);

@@ -395,7 +395,6 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
         continue;
       }
 
-      // Handle noAccess and readOnly (existing behavior)
       ctx.ui.notify(
         `Blocked ${toolName} on protected file: ${normalizedTarget} (${effective.ruleId})`,
         "warning",
