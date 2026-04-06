@@ -334,24 +334,21 @@ export function setupPermissionGateHook(
       }
 
       const result = await ctx.ui.custom<ConfirmResult>(
-        createConfirmationUI(
-          {
-            title: "Dangerous Command Detected",
-            subtitle: `This command contains ${description}:`,
-            detailText: command,
-            explanation: explanation
-              ? {
-                  text: explanation.text,
-                  modelName: explanation.modelName,
-                  modelId: explanation.modelId,
-                  provider: explanation.provider,
-                }
-              : null,
-            promptText: "Allow execution?",
-            borderColor: "error",
-          },
-          (res) => res,
-        ),
+        createConfirmationUI({
+          title: "Dangerous Command Detected",
+          subtitle: `This command contains ${description}:`,
+          detailText: command,
+          explanation: explanation
+            ? {
+                text: explanation.text,
+                modelName: explanation.modelName,
+                modelId: explanation.modelId,
+                provider: explanation.provider,
+              }
+            : null,
+          promptText: "Allow execution?",
+          borderColor: "error",
+        }),
       );
 
       if (result === "allow-session") {

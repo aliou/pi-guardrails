@@ -7,6 +7,7 @@
 import {
   DynamicBorder,
   getMarkdownTheme,
+  type KeybindingsManager,
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import {
@@ -41,12 +42,9 @@ interface ConfirmationOptions {
 
 /**
  * Create a confirmation UI handler for dangerous actions.
- * Returns a handler object compatible with ctx.ui.custom()
+ * Returns a factory function compatible with ctx.ui.custom()
  */
-export function createConfirmationUI(
-  options: ConfirmationOptions,
-  done: (result: ConfirmResult) => void,
-) {
+export function createConfirmationUI(options: ConfirmationOptions) {
   const {
     title,
     subtitle,
@@ -56,7 +54,12 @@ export function createConfirmationUI(
     borderColor = "error",
   } = options;
 
-  return (_tui: TUI, theme: Theme) => {
+  return (
+    _tui: TUI,
+    theme: Theme,
+    _kb: KeybindingsManager,
+    done: (result: ConfirmResult) => void,
+  ) => {
     const container = new Container();
     const borderFn =
       borderColor === "error"
@@ -142,30 +145,4 @@ export function createConfirmationUI(
       },
     };
   };
-}
-
-/**
- * Handle the confirmation result and update memory-allowed patterns if needed.
- * For permissionGate: saves command patterns
- * For policies: saves file patterns to specific rule
- */
-export async function handleSessionAllow<T>(
-  result: ConfirmResult,
-  itemToAllow: string,
-  compilePatternFn: (pattern: string) => T,
-  pushToAllowed: (item: T) => void,
-  saveToMemoryFn: () => Promise<void>,
-): Promise<{ allowed: boolean; denied: boolean }> {
-  if (result === "allow-session") {
-    await saveToMemoryFn();
-    pushToAllowed(compilePatternFn(itemToAllow));
-    return { allowed: true, denied: false };
-  }
-
-  if (result === "deny") {
-    return { allowed: false, denied: true };
-  }
-
-  // result === "allow" - one time access
-  return { allowed: true, denied: false };
 }

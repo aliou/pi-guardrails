@@ -335,15 +335,12 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
         }
 
         const result = await ctx.ui.custom<ConfirmResult>(
-          createConfirmationUI(
-            {
-              title: "Protected File Access",
-              detailText: `File: ${normalizedTarget}\n\n${effective.blockMessage.replace("{file}", normalizedTarget)}`,
-              promptText: "Allow access?",
-              borderColor: "warning",
-            },
-            (res) => res,
-          ),
+          createConfirmationUI({
+            title: "Protected File Access",
+            detailText: `File: ${normalizedTarget}\n\n${effective.blockMessage.replace("{file}", normalizedTarget)}`,
+            promptText: "Allow access?",
+            borderColor: "warning",
+          }),
         );
 
         if (result === "allow-session") {
@@ -366,6 +363,16 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
                 ],
               },
             });
+
+            // Update local cache so it takes effect immediately
+            const compiledRule = compiledRules.find(
+              (r) => r.id === effective.ruleId,
+            );
+            if (compiledRule) {
+              compiledRule.allowedPatterns.push(
+                ...compileFilePatterns([{ pattern: normalizedTarget }]),
+              );
+            }
           }
         }
 
