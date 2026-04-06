@@ -1,24 +1,16 @@
 import { parse } from "@aliou/sh";
 import {
-  DynamicBorder,
   type ExtensionAPI,
   type ExtensionContext,
-  getMarkdownTheme,
   isToolCallEventType,
 } from "@mariozechner/pi-coding-agent";
-import {
-  Box,
-  Container,
-  Key,
-  Markdown,
-  matchesKey,
-  Spacer,
-  Text,
-  wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
 import type { DangerousPattern, ResolvedConfig } from "../config";
 import { configLoader } from "../config";
 import { executeSubagent, resolveModel } from "../lib";
+import {
+  type ConfirmResult,
+  createConfirmationUI,
+} from "../utils/confirmation-ui";
 import { emitBlocked, emitDangerous } from "../utils/events";
 import {
   type CompiledPattern,
@@ -341,104 +333,25 @@ export function setupPermissionGateHook(
         }
       }
 
-      type ConfirmResult = "allow" | "allow-session" | "deny";
-
       const result = await ctx.ui.custom<ConfirmResult>(
-        (_tui, theme, _kb, done) => {
-          const container = new Container();
-          const redBorder = (s: string) => theme.fg("error", s);
-
-          if (explanation) {
-            const explanationBox = new Box(1, 1, (s: string) =>
-              theme.bg("customMessageBg", s),
-            );
-            explanationBox.addChild(
-              new Text(
-                theme.fg(
-                  "accent",
-                  theme.bold(
-                    `Model explanation (${explanation.modelName} / ${explanation.modelId} / ${explanation.provider})`,
-                  ),
-                ),
-                0,
-                0,
-              ),
-            );
-            explanationBox.addChild(new Spacer(1));
-            explanationBox.addChild(
-              new Markdown(explanation.text, 0, 0, getMarkdownTheme(), {
-                color: (s: string) => theme.fg("text", s),
-              }),
-            );
-            container.addChild(explanationBox);
-          }
-          container.addChild(new DynamicBorder(redBorder));
-          container.addChild(
-            new Text(
-              theme.fg("error", theme.bold("Dangerous Command Detected")),
-              1,
-              0,
-            ),
-          );
-          container.addChild(new Spacer(1));
-          container.addChild(
-            new Text(
-              theme.fg("warning", `This command contains ${description}:`),
-              1,
-              0,
-            ),
-          );
-          container.addChild(new Spacer(1));
-          container.addChild(
-            new DynamicBorder((s: string) => theme.fg("muted", s)),
-          );
-          const commandText = new Text("", 1, 0);
-          container.addChild(commandText);
-          container.addChild(
-            new DynamicBorder((s: string) => theme.fg("muted", s)),
-          );
-          container.addChild(new Spacer(1));
-          container.addChild(
-            new Text(theme.fg("text", "Allow execution?"), 1, 0),
-          );
-          container.addChild(new Spacer(1));
-          container.addChild(
-            new Text(
-              theme.fg(
-                "dim",
-                "y/enter: allow • a: allow for session • n/esc: deny",
-              ),
-              1,
-              0,
-            ),
-          );
-          container.addChild(new DynamicBorder(redBorder));
-
-          return {
-            render: (width: number) => {
-              const wrappedCommand = wrapTextWithAnsi(
-                theme.fg("text", command),
-                width - 4,
-              ).join("\n");
-              commandText.setText(wrappedCommand);
-              return container.render(width);
-            },
-            invalidate: () => container.invalidate(),
-            handleInput: (data: string) => {
-              if (matchesKey(data, Key.enter) || data === "y" || data === "Y") {
-                done("allow");
-              } else if (data === "a" || data === "A") {
-                done("allow-session");
-              } else if (
-                matchesKey(data, Key.escape) ||
-                data === "n" ||
-                data === "N"
-              ) {
-                done("deny");
-              }
-            },
-          };
-        },
+        createConfirmationUI(
+          {
+            title: "Dangerous Command Detected",
+            subtitle: `This command contains ${description}:`,
+            detailText: command,
+            explanation: explanation
+              ? {
+                  text: explanation.text,
+                  modelName: explanation.modelName,
+                  modelId: explanation.modelId,
+                  provider: explanation.provider,
+                }
+              : null,
+            promptText: "Allow execution?",
+            borderColor: "error",
+          },
+          (res) => res,
+        ),
       );
 
       if (result === "allow-session") {

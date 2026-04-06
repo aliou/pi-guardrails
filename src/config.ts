@@ -27,7 +27,7 @@ export interface DangerousPattern extends PatternConfig {
 /**
  * Protection level for a policy rule.
  */
-export type Protection = "none" | "readOnly" | "noAccess";
+export type Protection = "none" | "readOnly" | "noAccess" | "ask";
 
 /**
  * A named policy rule. Matches files by patterns and enforces a protection level.

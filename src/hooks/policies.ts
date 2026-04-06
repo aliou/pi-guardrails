@@ -3,6 +3,11 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { PolicyRule, Protection, ResolvedConfig } from "../config";
+import { configLoader } from "../config";
+import {
+  type ConfirmResult,
+  createConfirmationUI,
+} from "../utils/confirmation-ui";
 import { emitBlocked } from "../utils/events";
 import { expandGlob, hasGlobChars } from "../utils/glob-expander";
 import {
@@ -19,12 +24,14 @@ const DEFAULT_BLOCK_MESSAGES: Record<Protection, string> = {
     "Accessing {file} is not allowed. This file is protected. Ask the user if changes are needed.",
   readOnly:
     "Writing to {file} is not allowed. This file is read-only. Use the read tool to inspect it instead of bash commands like cat or ls.",
+  ask: "Accessing {file} requires confirmation. This file is protected and needs explicit permission.",
   none: "",
 };
 
 const BLOCKED_TOOLS: Record<Protection, Set<string>> = {
   noAccess: new Set(["read", "write", "edit", "bash", "grep", "find", "ls"]),
   readOnly: new Set(["write", "edit", "bash"]),
+  ask: new Set(["read", "write", "edit", "bash", "grep", "find", "ls"]),
   none: new Set(),
 };
 
@@ -51,10 +58,12 @@ function protectionRank(protection: Protection): number {
   switch (protection) {
     case "none":
       return 0;
-    case "readOnly":
+    case "ask":
       return 1;
-    case "noAccess":
+    case "readOnly":
       return 2;
+    case "noAccess":
+      return 3;
   }
 }
 
@@ -71,7 +80,8 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
     if (
       rule.protection !== "none" &&
       rule.protection !== "readOnly" &&
-      rule.protection !== "noAccess"
+      rule.protection !== "noAccess" &&
+      rule.protection !== "ask"
     ) {
       pendingWarnings.push(
         `[guardrails] skipping policy rule "${id}": invalid protection.`,
@@ -310,6 +320,75 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
       const blockedTools = BLOCKED_TOOLS[effective.protection];
       if (!blockedTools.has(toolName)) continue;
 
+      // Handle "ask" protection with confirmation dialog
+      if (effective.protection === "ask") {
+        // In print/RPC mode, block by default (safe fallback)
+        if (!ctx.hasUI) {
+          const reason = `Access to ${normalizedTarget} blocked (no UI to confirm): ${effective.blockMessage}`;
+          emitBlocked(pi, {
+            feature: "policies",
+            toolName,
+            input: event.input,
+            reason,
+          });
+          return { block: true, reason };
+        }
+
+        const result = await ctx.ui.custom<ConfirmResult>(
+          createConfirmationUI(
+            {
+              title: "Protected File Access",
+              detailText: `File: ${normalizedTarget}\n\n${effective.blockMessage.replace("{file}", normalizedTarget)}`,
+              promptText: "Allow access?",
+              borderColor: "warning",
+            },
+            (res) => res,
+          ),
+        );
+
+        if (result === "allow-session") {
+          // Save to memory scope for persistence across the session
+          const resolved = configLoader.getConfig();
+          const rule = resolved.policies.rules.find(
+            (r) => r.id === effective.ruleId,
+          );
+          if (rule) {
+            await configLoader.save("memory", {
+              policies: {
+                rules: [
+                  {
+                    ...rule,
+                    allowedPatterns: [
+                      ...(rule.allowedPatterns ?? []),
+                      { pattern: normalizedTarget },
+                    ],
+                  },
+                ],
+              },
+            });
+          }
+        }
+
+        if (result === "deny") {
+          const reason = effective.blockMessage.replace(
+            "{file}",
+            normalizedTarget,
+          );
+          emitBlocked(pi, {
+            feature: "policies",
+            toolName,
+            input: event.input,
+            reason,
+            userDenied: true,
+          });
+          return { block: true, reason: "User denied file access" };
+        }
+
+        // If "allow" or "allow-session", continue without blocking
+        continue;
+      }
+
+      // Handle noAccess and readOnly (existing behavior)
       ctx.ui.notify(
         `Blocked ${toolName} on protected file: ${normalizedTarget} (${effective.ruleId})`,
         "warning",
