@@ -88,6 +88,15 @@ interface CommandExplanation {
   provider: string;
 }
 
+const BUILTIN_KEYWORD_PATTERNS = new Set([
+  "rm -rf",
+  "sudo",
+  "dd if=",
+  "mkfs.",
+  "chmod -R 777",
+  "chown -R",
+]);
+
 async function explainCommand(
   command: string,
   modelSpec: string,
@@ -209,22 +218,13 @@ function findDangerousMatch(
 
   // When structural parsing succeeds, skip raw substring fallback for built-in
   // keyword patterns to avoid false positives in quoted args/messages.
-  const builtInKeywordPatterns = new Set([
-    "rm -rf",
-    "sudo",
-    "dd if=",
-    "mkfs.",
-    "chmod -R 777",
-    "chown -R",
-  ]);
-
   for (const cp of compiledPatterns) {
     const src = cp.source as DangerousPattern;
     if (
       useBuiltinMatchers &&
       parsedSuccessfully &&
       !src.regex &&
-      builtInKeywordPatterns.has(src.pattern)
+      BUILTIN_KEYWORD_PATTERNS.has(src.pattern)
     ) {
       continue;
     }
