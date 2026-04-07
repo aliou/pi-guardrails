@@ -1,7 +1,7 @@
 /**
  * Shared confirmation UI components for guardrails.
  *
- * Used by both permissionGate and policies "ask" protection.
+ * Used by permissionGate and policies with askConfirmation enabled.
  */
 
 import {

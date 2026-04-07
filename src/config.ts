@@ -27,7 +27,7 @@ export interface DangerousPattern extends PatternConfig {
 /**
  * Protection level for a policy rule.
  */
-export type Protection = "none" | "readOnly" | "noAccess" | "ask";
+export type Protection = "none" | "readOnly" | "noAccess";
 
 /**
  * A named policy rule. Matches files by patterns and enforces a protection level.
@@ -45,6 +45,8 @@ export interface PolicyRule {
   allowedPatterns?: PatternConfig[];
   /** Protection level. */
   protection: Protection;
+  /** When true, shows a confirmation dialog before allowing access if access was denied by a rule. */
+  askConfirmation?: boolean;
   /** Block only when file exists on disk. Default true. */
   onlyIfExists?: boolean;
   /** Message shown when blocked; supports {file} placeholder. */

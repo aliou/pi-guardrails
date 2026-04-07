@@ -432,6 +432,7 @@ interface NewPolicyDraft {
   name: string;
   id: string;
   protection: PolicyRule["protection"];
+  askConfirmation: boolean;
   patterns: PatternConfig[];
 }
 
@@ -608,6 +609,7 @@ class AddRuleSubmenu implements Component {
       name: "",
       id: "",
       protection: "readOnly",
+      askConfirmation: false,
       patterns: [],
     };
 

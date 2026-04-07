@@ -24,20 +24,19 @@ const DEFAULT_BLOCK_MESSAGES: Record<Protection, string> = {
     "Accessing {file} is not allowed. This file is protected. Ask the user if changes are needed.",
   readOnly:
     "Writing to {file} is not allowed. This file is read-only. Use the read tool to inspect it instead of bash commands like cat or ls.",
-  ask: "Accessing {file} requires confirmation. This file is protected and needs explicit permission.",
   none: "",
 };
 
 const BLOCKED_TOOLS: Record<Protection, Set<string>> = {
   noAccess: new Set(["read", "write", "edit", "bash", "grep", "find", "ls"]),
   readOnly: new Set(["write", "edit", "bash"]),
-  ask: new Set(["read", "write", "edit", "bash", "grep", "find", "ls"]),
   none: new Set(),
 };
 
 interface CompiledRule {
   id: string;
   protection: Protection;
+  askConfirmation: boolean;
   patterns: CompiledPattern[];
   allowedPatterns: CompiledPattern[];
   onlyIfExists: boolean;
@@ -58,12 +57,10 @@ function protectionRank(protection: Protection): number {
   switch (protection) {
     case "none":
       return 0;
-    case "ask":
-      return 1;
     case "readOnly":
-      return 2;
+      return 1;
     case "noAccess":
-      return 3;
+      return 2;
   }
 }
 
@@ -80,8 +77,7 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
     if (
       rule.protection !== "none" &&
       rule.protection !== "readOnly" &&
-      rule.protection !== "noAccess" &&
-      rule.protection !== "ask"
+      rule.protection !== "noAccess"
     ) {
       pendingWarnings.push(
         `[guardrails] skipping policy rule "${id}": invalid protection.`,
@@ -106,6 +102,7 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
     compiled.push({
       id,
       protection: rule.protection,
+      askConfirmation: rule.askConfirmation ?? false,
       patterns: compileFilePatterns(normalizedPatterns),
       allowedPatterns: compileFilePatterns(normalizedAllowedPatterns),
       onlyIfExists: rule.onlyIfExists ?? true,
@@ -241,11 +238,13 @@ async function getEffectiveProtection(
   cwd: string,
 ): Promise<{
   protection: Protection;
+  askConfirmation: boolean;
   blockMessage: string;
   ruleId: string;
 } | null> {
   let bestMatch: {
     protection: Protection;
+    askConfirmation: boolean;
     blockMessage: string;
     ruleId: string;
     rank: number;
@@ -268,6 +267,7 @@ async function getEffectiveProtection(
     if (!bestMatch || rank > bestMatch.rank) {
       bestMatch = {
         protection: rule.protection,
+        askConfirmation: rule.askConfirmation,
         blockMessage: rule.blockMessage,
         ruleId: rule.id,
         rank,
@@ -279,6 +279,7 @@ async function getEffectiveProtection(
 
   return {
     protection: bestMatch.protection,
+    askConfirmation: bestMatch.askConfirmation,
     blockMessage: bestMatch.blockMessage,
     ruleId: bestMatch.ruleId,
   };
@@ -320,8 +321,8 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
       const blockedTools = BLOCKED_TOOLS[effective.protection];
       if (!blockedTools.has(toolName)) continue;
 
-      // Handle "ask" protection with confirmation dialog
-      if (effective.protection === "ask") {
+      // Handle confirmation dialog for rules with askConfirmation enabled
+      if (effective.askConfirmation) {
         // In print/RPC mode, block by default (safe fallback)
         if (!ctx.hasUI) {
           const reason = `Access to ${normalizedTarget} blocked (no UI to confirm): ${effective.blockMessage}`;

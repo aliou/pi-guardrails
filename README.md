@@ -103,14 +103,14 @@ Each rule has:
 - `protection`:
   - `noAccess`: block `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`
   - `readOnly`: block `write`, `edit`, `bash`
-  - `ask`: prompt user for confirmation before allowing access
   - `none`: explicit no protection
+- `askConfirmation`: when true, prompt user for confirmation before allowing access if blocked by this rule
 - `onlyIfExists` (default true)
 - `blockMessage` with `{file}` placeholder
 - `enabled` (default true)
 
 When multiple rules match the same file, strongest protection wins:
-`noAccess > readOnly > ask > none`.
+`noAccess > readOnly > none`.
 
 ### Add rule with AI
 
@@ -156,7 +156,7 @@ When a dangerous command or protected file access is detected, guardrails shows 
 - **y/Enter**: Allow once
 - **a**: Allow for the rest of this session (both policies and permission gate)
 - **n/Esc**: Deny
-- **↑/↓ or j/k**: Scroll long commands (permission gate) or multi-line file content (policies with `ask`)
+- **↑/↓ or j/k**: Scroll long commands (permission gate) or multi-line file content (policies with `askConfirmation`)
 
 ## Migration notes
 
