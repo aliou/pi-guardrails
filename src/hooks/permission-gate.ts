@@ -580,9 +580,33 @@ export function setupPermissionGateHook(
 
       type ConfirmResult = "allow" | "allow-session" | "deny";
 
-      const result = await ctx.ui.custom<ConfirmResult>(
+      // Fallback select options for RPC mode (ctx.ui.custom is unimplemented).
+      const SELECT_ALLOW_ONCE = "Allow once";
+      const SELECT_ALLOW_SESSION = "Allow for session";
+      const SELECT_DENY = "Deny";
+      const SELECT_OPTIONS = [
+        SELECT_ALLOW_ONCE,
+        SELECT_ALLOW_SESSION,
+        SELECT_DENY,
+      ] as const;
+
+      let result = await ctx.ui.custom<ConfirmResult>(
         createPermissionGateConfirmComponent(command, description, explanation),
       );
+
+      // Fallback: ctx.ui.custom() returns undefined in RPC/headless mode
+      // (Pi's RPC runtime stubs it as `async custom() { return undefined; }`).
+      // Fall back to ctx.ui.select() which works over the RPC protocol.
+      // If select() also returns undefined/malformed, deny by default.
+      if (result === undefined) {
+        const selection = await ctx.ui.select(
+          `Dangerous command: ${description}`,
+          [...SELECT_OPTIONS],
+        );
+        if (selection === SELECT_ALLOW_ONCE) result = "allow";
+        else if (selection === SELECT_ALLOW_SESSION) result = "allow-session";
+        else result = "deny";
+      }
 
       if (result === "allow-session") {
         // Save command as allowed in memory scope (session-only).

@@ -7,7 +7,30 @@ import { createEventBus } from "@mariozechner/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEventContext } from "../../tests/utils/pi-context";
 import type { ResolvedConfig } from "../config";
+import { configLoader } from "../config";
 import { setupPermissionGateHook } from "./permission-gate";
+
+// Mock configLoader so allow-session path doesn't throw.
+vi.mock("../config", async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...original,
+    configLoader: {
+      getConfig: vi.fn(() => ({
+        permissionGate: { allowedPatterns: [] },
+      })),
+      save: vi.fn(async () => {}),
+    },
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Constants — must match the production code's SELECT_* constants
+// ---------------------------------------------------------------------------
+
+const SELECT_ALLOW_ONCE = "Allow once";
+const SELECT_ALLOW_SESSION = "Allow for session";
+const SELECT_DENY = "Deny";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -147,10 +170,14 @@ describe("permission gate", () => {
         custom: vi.fn(
           async () => undefined,
         ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["select"],
       },
     });
     const result = await handler(bashEvent("sudo rm -rf /"), ctx);
     expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(ctx.ui.select).toHaveBeenCalled();
   });
 
   it("blocks auto-deny patterns without prompting", async () => {
@@ -181,5 +208,124 @@ describe("permission gate", () => {
     const ctx = createEventContext({ hasUI: true });
     const result = await h(bashEvent("sudo echo hello"), ctx);
     expect(result).toBeUndefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // RPC mode: ctx.ui.select() fallback when ctx.ui.custom() returns undefined
+  // ---------------------------------------------------------------------------
+
+  it("falls back to select() when custom() returns undefined and allows on 'Allow once'", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => SELECT_ALLOW_ONCE,
+        ) as ExtensionContext["ui"]["select"],
+      },
+    });
+    const result = await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(result).toBeUndefined(); // not blocked → allowed
+    expect(ctx.ui.select).toHaveBeenCalled();
+  });
+
+  it("falls back to select() when custom() returns undefined and allows-session on 'Allow for session'", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => SELECT_ALLOW_SESSION,
+        ) as ExtensionContext["ui"]["select"],
+      },
+    });
+    const result = await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(result).toBeUndefined(); // not blocked → allowed with session grant
+    expect(ctx.ui.select).toHaveBeenCalled();
+  });
+
+  it("falls back to select() when custom() returns undefined and blocks on 'Deny'", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => SELECT_DENY,
+        ) as ExtensionContext["ui"]["select"],
+      },
+    });
+    const result = await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(result).toEqual({
+      block: true,
+      reason: "User denied dangerous command",
+    });
+  });
+
+  it("blocks when both custom() and select() return undefined", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["select"],
+      },
+    });
+    const result = await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+    expect(ctx.ui.select).toHaveBeenCalled();
+  });
+
+  it("does not call select() when custom() returns a valid result", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(async () => "deny") as ExtensionContext["ui"]["custom"],
+      },
+    });
+    await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(ctx.ui.select).not.toHaveBeenCalled();
+  });
+
+  it("blocks when select() returns an unrecognized string", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(async () => "maybe") as ExtensionContext["ui"]["select"],
+      },
+    });
+    const result = await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(result).toEqual(expect.objectContaining({ block: true }));
+  });
+
+  it("saves session grant via configLoader when select() returns 'Allow for session'", async () => {
+    const ctx = createEventContext({
+      hasUI: true,
+      ui: {
+        custom: vi.fn(
+          async () => undefined,
+        ) as ExtensionContext["ui"]["custom"],
+        select: vi.fn(
+          async () => SELECT_ALLOW_SESSION,
+        ) as ExtensionContext["ui"]["select"],
+      },
+    });
+    await handler(bashEvent("sudo rm -rf /"), ctx);
+    expect(configLoader.save).toHaveBeenCalledWith("memory", {
+      permissionGate: {
+        allowedPatterns: [{ pattern: "sudo rm -rf /" }],
+      },
+    });
   });
 });
