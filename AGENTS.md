@@ -8,12 +8,15 @@ Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extens
 
 - TypeScript (strict mode)
 - pnpm 10.26.1
+- Vitest for testing
 - Biome for linting/formatting
 - Changesets for versioning
 
 ## Scripts
 
 ```bash
+pnpm test         # Run tests
+pnpm test:watch   # Run tests in watch mode
 pnpm typecheck    # Type check
 pnpm lint         # Lint (runs on pre-commit)
 pnpm format       # Format
@@ -31,10 +34,19 @@ src/
   components/         # UI components (pattern editor)
   lib/                # Vendored subagent executor core (Phase 1)
   utils/              # Helpers (matching, glob expansion, migration, shell AST)
+tests/
+  utils/              # Test harness utilities (adapted from pi-harness)
+    pi-context.ts     # Spy-based ExtensionContext / UI context builders
+    pi-test-harness.ts # Full extension loader with emitEvent() for hook testing
+    load-extension.ts # Wrapper for Pi internal extension loader
+    matchers.ts       # Custom vitest matchers (toHaveRegisteredTool, etc.)
 ```
 
 ## Conventions
 
+- Tests live next to the code they test (`src/hooks/foo.test.ts`)
+- Hook tests use `setupXxxHook()` directly with a mock `pi` and spy contexts from `tests/utils/pi-context.ts`, rather than loading the full extension (avoids `configLoader` side effects)
+- The full `createPiTestHarness()` is available for testing commands and tools that go through the extension factory
 - New hooks: follow patterns in `src/hooks/`
 - Built-in dangerous command matching uses AST parsing via `@aliou/sh`; user-configured patterns use substring/regex matching
 - File protection is policy-based (`features.policies`, `policies.rules`), not legacy `envFiles`
