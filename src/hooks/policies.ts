@@ -444,18 +444,17 @@ export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
     ? compileRules(config.policies.rules)
     : [];
 
-  // directoryAccess boundary data
-  const boundaryMode = config.directoryAccess.mode;
-  const boundaryEnabled =
-    config.features.directoryAccess && boundaryMode !== "allow";
   pi.on("tool_call", async (event, ctx) => {
     const toolName = event.toolName;
 
     // Re-read directory access config on each invocation so settings changes take effect
     const liveConfig = configLoader.getConfig();
+    const boundaryMode = liveConfig.directoryAccess.mode;
+    const boundaryEnabled =
+      liveConfig.features.directoryAccess && boundaryMode !== "allow";
     const boundaryAdditionalDirs = (
       liveConfig.directoryAccess.additionalDirs ?? []
-    ).map((d) => resolveFromCwd(d, process.cwd()));
+    ).map((d) => resolveFromCwd(d, ctx.cwd));
 
     // Extract targets (shared between boundary and policy checks)
     let targets: string[] = [];
