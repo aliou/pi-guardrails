@@ -31,6 +31,12 @@ describe("expandHomePath", () => {
   it("leaves ~ in the middle unchanged", () => {
     expect(expandHomePath("/foo~/bar")).toBe("/foo~/bar");
   });
+
+  it("expands ~\\foo to homedir/foo (Windows backslash)", () => {
+    const result = expandHomePath("~\\foo");
+    expect(result).not.toContain("~");
+    expect(result).toMatch(/foo$/);
+  });
 });
 
 describe("resolveFromCwd", () => {

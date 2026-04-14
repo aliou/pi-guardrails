@@ -11,7 +11,7 @@ export function expandHomePath(input: string): string {
     return homedir();
   }
 
-  if (input.startsWith("~/")) {
+  if (input.startsWith("~/") || input.startsWith("~\\")) {
     return join(homedir(), input.slice(2));
   }
 
