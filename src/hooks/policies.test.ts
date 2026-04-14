@@ -98,6 +98,19 @@ describe("extractBashPathCandidates", () => {
     );
     expect(result.length).toBeGreaterThanOrEqual(0);
   });
+
+  it("extracts Windows absolute path with backslashes", async () => {
+    const result = await extractBashPathCandidates(
+      "type C:\\repo\\file.txt",
+      cwd,
+    );
+    expect(result.some((p) => p.includes("file.txt"))).toBe(true);
+  });
+
+  it("extracts Windows relative path with backslash (.\\)", async () => {
+    const result = await extractBashPathCandidates("cat .\\secrets.txt", cwd);
+    expect(result.some((p) => p.includes("secrets.txt"))).toBe(true);
+  });
 });
 
 describe("normalizeTargetForPolicy", () => {

@@ -121,10 +121,14 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
 function maybePathLike(token: string): boolean {
   return (
     token.includes("/") ||
+    token.includes("\\") ||
+    /^[A-Za-z]:[\\/]/.test(token) ||
     token.includes(".") ||
     token.startsWith("~") ||
     token.startsWith("./") ||
-    token.startsWith("../")
+    token.startsWith("../") ||
+    token.startsWith(".\\") ||
+    token.startsWith("..\\")
   );
 }
 
