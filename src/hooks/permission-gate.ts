@@ -488,25 +488,25 @@ export function setupPermissionGateHook(
 ) {
   if (!config.features.permissionGate) return;
 
-  // Compile all configured patterns for substring/regex matching.
-  // When useBuiltinMatchers is true (defaults), these act as a supplement
-  // to the structural matchers. When false (customPatterns), these are the
-  // only matching path.
+  // Compile dangerous patterns once (only change on customPatterns swap, which requires restart)
   const compiledPatterns = compileCommandPatterns(
     config.permissionGate.patterns,
   );
   const { useBuiltinMatchers } = config.permissionGate;
   const fallbackPatterns = config.permissionGate.patterns;
 
-  const allowedPatterns = compileCommandPatterns(
-    config.permissionGate.allowedPatterns,
-  );
-  const autoDenyPatterns = compileCommandPatterns(
-    config.permissionGate.autoDenyPatterns,
-  );
-
   pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;
+
+    // Re-read allowed/auto-deny patterns from config on each invocation
+    // so settings changes take effect immediately
+    const liveConfig = configLoader.getConfig();
+    const allowedPatterns = compileCommandPatterns(
+      liveConfig.permissionGate.allowedPatterns,
+    );
+    const autoDenyPatterns = compileCommandPatterns(
+      liveConfig.permissionGate.autoDenyPatterns,
+    );
 
     const command = event.input.command;
 
@@ -548,7 +548,7 @@ export function setupPermissionGateHook(
     // Emit dangerous event (presenter will play sound)
     emitDangerous(pi, { command, description, pattern: rawPattern });
 
-    if (config.permissionGate.requireConfirmation) {
+    if (liveConfig.permissionGate.requireConfirmation) {
       // In print/RPC mode, block by default (safe fallback)
       if (!ctx.hasUI) {
         const reason = `Dangerous command blocked (no UI to confirm): ${description}`;
@@ -563,13 +563,13 @@ export function setupPermissionGateHook(
 
       let explanation: CommandExplanation | null = null;
       if (
-        config.permissionGate.explainCommands &&
-        config.permissionGate.explainModel
+        liveConfig.permissionGate.explainCommands &&
+        liveConfig.permissionGate.explainModel
       ) {
         const explainResult = await explainCommand(
           command,
-          config.permissionGate.explainModel,
-          config.permissionGate.explainTimeout,
+          liveConfig.permissionGate.explainModel,
+          liveConfig.permissionGate.explainTimeout,
           ctx,
         );
         explanation = explainResult.explanation;
@@ -586,7 +586,6 @@ export function setupPermissionGateHook(
 
       if (result === "allow-session") {
         // Save command as allowed in memory scope (session-only).
-        // Spread the resolved allowed patterns and append the new one.
         const resolved = configLoader.getConfig();
         await configLoader.save("memory", {
           permissionGate: {
@@ -596,9 +595,6 @@ export function setupPermissionGateHook(
             ],
           },
         });
-
-        // Update the local cache so it takes effect immediately
-        allowedPatterns.push(...compileCommandPatterns([{ pattern: command }]));
       }
 
       if (result === "deny") {
