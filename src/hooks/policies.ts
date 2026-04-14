@@ -136,7 +136,11 @@ export function normalizeTargetForPolicy(
   filePath: string,
   cwd: string,
 ): string {
-  if (filePath === "~" || filePath.startsWith("~/")) {
+  if (
+    filePath === "~" ||
+    filePath.startsWith("~/") ||
+    filePath.startsWith("~\\")
+  ) {
     return normalizeFilePath(filePath);
   }
 
