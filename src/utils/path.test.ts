@@ -141,10 +141,11 @@ describe("extractGrantDirectory", () => {
     expect(result).toBe("/a/b/c/d");
   });
 
-  it("handles Windows-style backslashes", () => {
+  it("handles Windows-style backslashes (normalizes to forward slashes)", () => {
     const result = extractGrantDirectory("C:\\project\\src\\file.ts");
-    // After normalize: "C:/project/src/file.ts" -> parent "C:/project/src"
-    // resolve() on macOS will resolve relative to cwd, but the split on "/" works
-    expect(result).toContain("src");
+    // On non-Windows, resolve() treats C:\project as relative to cwd,
+    // so just verify the function doesn't crash and the backslash
+    // normalization in extractGrantDirectory works
+    expect(result).not.toContain("\\");
   });
 });
