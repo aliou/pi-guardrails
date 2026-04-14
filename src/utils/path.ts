@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
@@ -40,25 +41,33 @@ export function isWithinLexicalBoundary(
 
 /**
  * Extract the directory portion for a grant.
- * If the path looks like a file (has a dot that indicates an extension),
- * return its parent dir. Otherwise return the path as-is (assume directory).
- *
- * Handles dotfiles like .env correctly by treating them as files.
- * A segment is considered a file if it contains a dot after the first
- * character (e.g. "file.ts", ".env.local") or is a dotfile with no
- * further dots (e.g. ".env", ".gitignore").
+ * If the path exists on disk and is a directory, return it as-is.
+ * If it exists and is a file, return its parent dir.
+ * If it doesn't exist, fall back to a heuristic: paths with an extension
+ * dot (that is not a leading dot) are treated as files; everything else
+ * is assumed to be a directory.
  */
-export function extractGrantDirectory(absPath: string): string {
+export async function extractGrantDirectory(absPath: string): Promise<string> {
+  // Check the filesystem first — the ground truth
+  try {
+    const s = await stat(absPath);
+    return s.isDirectory() ? absPath : resolve(absPath, "..");
+  } catch {
+    // Path doesn't exist — fall back to heuristic
+  }
+
   const normalized = absPath.replace(/\\/g, "/");
   const lastSegment = normalized.split("/").pop() ?? "";
-  // Dotfile with no further dots (e.g. ".env") → file
-  if (lastSegment.startsWith(".") && !lastSegment.slice(1).includes(".")) {
+
+  // Has an extension dot that is not the leading dot: "file.ts", ".env.local"
+  // but NOT ".git", ".ssh", ".vscode" (single dot-prefix, no further dots)
+  const afterLeadingDot = lastSegment.startsWith(".")
+    ? lastSegment.slice(1)
+    : lastSegment;
+  if (afterLeadingDot.includes(".")) {
     return resolve(absPath, "..");
   }
-  // Has a dot anywhere → likely a file with extension (e.g. "file.ts", ".env.local")
-  if (lastSegment.includes(".")) {
-    return resolve(absPath, "..");
-  }
-  // No dot → assume directory
+
+  // No extension dot (or single dot-prefix with no further dots): assume directory
   return absPath;
 }

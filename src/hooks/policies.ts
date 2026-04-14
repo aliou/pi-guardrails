@@ -316,7 +316,7 @@ function getRawAdditionalDirs(
  * Merges with existing memory scope config instead of clobbering.
  */
 async function allowDirectoryForSession(absTarget: string): Promise<void> {
-  const grantDir = extractGrantDirectory(absTarget);
+  const grantDir = await extractGrantDirectory(absTarget);
   const rawMemory = (configLoader.getRawConfig("memory") ?? {}) as Record<
     string,
     unknown
@@ -338,7 +338,7 @@ async function allowDirectoryForSession(absTarget: string): Promise<void> {
  * Add a directory to the project grant list (local scope).
  */
 async function allowDirectoryForProject(absTarget: string): Promise<void> {
-  const grantDir = extractGrantDirectory(absTarget);
+  const grantDir = await extractGrantDirectory(absTarget);
   const rawLocal = (configLoader.getRawConfig("local") ?? {}) as Record<
     string,
     unknown
