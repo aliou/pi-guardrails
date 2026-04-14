@@ -17,6 +17,7 @@ Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extens
 pnpm typecheck    # Type check
 pnpm lint         # Lint (runs on pre-commit)
 pnpm format       # Format
+pnpm test         # Run unit tests
 pnpm changeset    # Create changeset for versioning
 ```
 
@@ -26,11 +27,11 @@ pnpm changeset    # Create changeset for versioning
 src/
   index.ts            # Extension entry, registers hooks and commands
   config.ts           # Configuration loading, schema, defaults, merge logic
-  hooks/              # Event hooks (policies + permission gate)
+  hooks/              # Event hooks (policies + permission gate + directory access)
   commands/           # Slash commands (settings UI, add-policy)
   components/         # UI components (pattern editor)
   lib/                # Vendored subagent executor core (Phase 1)
-  utils/              # Helpers (matching, glob expansion, migration, shell AST)
+  utils/              # Helpers (matching, glob expansion, migration, shell AST, path boundary)
 ```
 
 ## Conventions
@@ -41,6 +42,7 @@ src/
 - Config migrations are predicate-based (`shouldRun`) using structural checks; do not rely on lexicographic version string comparisons
 - `config.version` is a schema marker for debugging/inspection, not the package version
 - Events emitted on the pi event bus for inter-extension communication (`guardrails:blocked`, `guardrails:dangerous`)
+- Hook config (allowed patterns, additional dirs, etc.) is re-read from `configLoader.getConfig()` on each `tool_call` invocation so settings changes take effect immediately without restart
 
 ## Documentation
 

@@ -121,6 +121,35 @@ Use:
 
 This starts a subagent that helps build and save one policy rule.
 
+### Directory access
+
+Restrict file access to the current working directory and approved paths.
+
+```jsonc
+{
+  "features": { "directoryAccess": true },
+  "directoryAccess": {
+    "mode": "ask",
+    "additionalDirs": ["~/code/shared-libs"]
+  }
+}
+```
+
+**Modes:**
+- `block` — always deny access outside the working directory
+- `ask` — prompt with options: allow once, allow for session, allow for project, deny
+- `allow` — no directory restrictions (feature disabled)
+
+**additionalDirs:** Extra directory roots that are always allowed. Supports `~` for home directory.
+
+When `mode` is `ask` and the agent tries to access a file outside the working directory:
+- **y/Enter**: allow once (just this call)
+- **s**: allow for session (ephemeral, cleared on restart)
+- **p**: allow for project (saved to `.pi/extensions/guardrails.json`)
+- **n/Esc**: deny
+
+The directory access check runs before policy checks. A file inside the working directory can still be blocked by policy rules.
+
 ## Permission gate
 
 Detects dangerous bash commands and prompts user confirmation.
@@ -169,7 +198,7 @@ Guardrails emits events for other extensions:
 
 ```ts
 interface GuardrailsBlockedEvent {
-  feature: "policies" | "permissionGate";
+  feature: "policies" | "permissionGate" | "directoryAccess";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;

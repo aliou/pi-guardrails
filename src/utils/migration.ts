@@ -21,7 +21,7 @@ import { pendingWarnings } from "./warnings";
  * Keep this independent from package.json version.
  * Bump only when config schema/default migration markers change.
  */
-export const CURRENT_VERSION = "0.9.0-20260327";
+export const CURRENT_VERSION = "0.11.0-20260413";
 
 /**
  * Check if a config needs migration (no version field = v0).
@@ -269,6 +269,30 @@ function migrateDangerousPatterns(
     }
     return { ...item, regex: true };
   });
+}
+
+export function needsDirectoryAccessMigration(
+  config: GuardrailsConfig,
+): boolean {
+  return (
+    config.directoryAccess === undefined &&
+    config.onboarding?.completed === true
+  );
+}
+
+export function migrateDirectoryAccess(
+  config: GuardrailsConfig,
+): GuardrailsConfig {
+  const migrated = structuredClone(config);
+  migrated.features = { ...migrated.features, directoryAccess: false };
+  migrated.directoryAccess = { mode: "allow", additionalDirs: [] };
+  migrated.version = CURRENT_VERSION;
+  pendingWarnings.push(
+    "[Guardrails] New `directoryAccess` feature available. Restricts file access " +
+      "to the current working directory. Currently disabled to preserve existing behavior. " +
+      "Enable it in /guardrails:settings.",
+  );
+  return migrated;
 }
 
 /**

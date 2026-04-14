@@ -6,16 +6,18 @@ import {
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { Box, Key, Markdown, matchesKey, Text } from "@mariozechner/pi-tui";
-import type { GuardrailsConfig } from "../config";
+import type { DirectoryAccessMode, GuardrailsConfig } from "../config";
 import { CURRENT_VERSION } from "../utils/migration";
 
 interface OnboardingState {
   applyBuiltinDefaults: boolean | null;
+  directoryAccessMode: DirectoryAccessMode | null;
 }
 
 export interface OnboardingResult {
   completed: boolean;
   applyBuiltinDefaults: boolean | null;
+  directoryAccessMode: DirectoryAccessMode | null;
 }
 
 class IntroStep implements Component {
@@ -29,7 +31,7 @@ class IntroStep implements Component {
 
   render(width: number): string[] {
     this.introText.setText(
-      "Guardrails helps prevent accidental exposure of secrets and risky actions.\n\nIt gives you two protections:\n- Policies: file access rules (`noAccess` or `readOnly`)\n- Permission gate: confirmation before dangerous commands run\n\nYou are choosing the starting defaults now. You can change them later in `/guardrails:settings`.",
+      "Guardrails helps prevent accidental exposure of secrets and risky actions.\n\nIt gives you three protections:\n- Policies: file access rules (`noAccess` or `readOnly`)\n- Permission gate: confirmation before dangerous commands run\n- Directory access: restrict file access to the current working directory\n\nYou are choosing the starting defaults now. You can change them later in `/guardrails:settings`.",
     );
 
     return [
@@ -69,6 +71,7 @@ class DefaultsChoiceStep implements Component {
         "- Protect secret files like `.env`, `.env.local`, `.env.production`, and `.dev.vars`",
         "- Keep safe exceptions like `.env.example` and `*.sample.env`",
         "- Require confirmation before running dangerous commands like `rm -rf`, `sudo`, and `dd if=`",
+        "- Restrict file access to the current working directory (ask mode)",
       ].join("\n"),
       [
         "Start with no built-in file policy defaults.",
@@ -124,7 +127,64 @@ class DefaultsChoiceStep implements Component {
 
     if (matchesKey(data, Key.enter)) {
       this.state.applyBuiltinDefaults = this.selectedIndex === 0;
+      // Pre-set directory access mode based on defaults choice
+      this.state.directoryAccessMode =
+        this.selectedIndex === 0 ? "ask" : "allow";
       this.onSelect();
+    }
+  }
+}
+
+class DirectoryAccessStep implements Component {
+  private selectedIndex = 1; // "Ask" pre-selected
+
+  constructor(
+    private readonly theme: Theme,
+    private readonly state: OnboardingState,
+    private readonly onSelect: () => void,
+  ) {}
+
+  invalidate() {}
+
+  render(_width: number): string[] {
+    const options = ["Block", "Ask", "Allow"];
+    const descriptions = [
+      "Always deny access outside the working directory",
+      "Prompt you each time (recommended)",
+      "No directory restrictions",
+    ];
+
+    const lines = [
+      "  Restrict file access to the current working directory?",
+      "",
+      "  When the agent tries to access a file outside this project:",
+      "",
+    ];
+
+    for (let i = 0; i < options.length; i++) {
+      const selected = i === this.selectedIndex;
+      const prefix = selected ? "\u25b8 " : "  ";
+      const label = selected
+        ? this.theme.fg("accent", this.theme.bold(` ${options[i]}`))
+        : ` ${options[i]}`;
+      lines.push(`${prefix}${label} \u2014 ${descriptions[i]}`);
+    }
+
+    return lines;
+  }
+
+  handleInput(data: string): void {
+    if (matchesKey(data, Key.up) || data === "k") {
+      this.selectedIndex = (this.selectedIndex + 2) % 3;
+    } else if (matchesKey(data, Key.down) || data === "j") {
+      this.selectedIndex = (this.selectedIndex + 1) % 3;
+    } else if (matchesKey(data, Key.enter)) {
+      const modes: DirectoryAccessMode[] = ["block", "ask", "allow"];
+      const mode = modes[this.selectedIndex];
+      if (mode) {
+        this.state.directoryAccessMode = mode;
+        this.onSelect();
+      }
     }
   }
 }
@@ -142,25 +202,39 @@ class FinishStep implements Component {
   }
 
   render(width: number): string[] {
-    const content =
-      this.state.applyBuiltinDefaults === true
-        ? [
-            "You selected **Recommended defaults**.",
-            "",
-            "Guardrails will start with built-in protection, including:",
-            "- secret files like `.env`, `.env.local`, `.env.production`, `.dev.vars`",
-            "- safe exceptions like `.env.example` and `*.sample.env`",
-            "- confirmation before running dangerous commands like `rm -rf`, `sudo`, `dd if=`",
-          ].join("\n")
-        : [
-            "You selected **Minimal setup**.",
-            "",
-            "No built-in file policy defaults will be applied.",
-            "",
-            "You can configure policies later with `/guardrails:settings`.",
-          ].join("\n");
+    const parts: string[] = [];
 
-    this.recapMarkdown.setText(content);
+    if (this.state.applyBuiltinDefaults === true) {
+      parts.push(
+        "You selected **Recommended defaults**.",
+        "",
+        "Guardrails will start with built-in protection, including:",
+        "- secret files like `.env`, `.env.local`, `.env.production`, `.dev.vars`",
+        "- safe exceptions like `.env.example` and `*.sample.env`",
+        "- confirmation before running dangerous commands like `rm -rf`, `sudo`, `dd if=`",
+      );
+    } else {
+      parts.push(
+        "You selected **Minimal setup**.",
+        "",
+        "No built-in file policy defaults will be applied.",
+        "",
+        "You can configure policies later with `/guardrails:settings`.",
+      );
+    }
+
+    if (this.state.directoryAccessMode) {
+      parts.push("");
+      const modeLabel =
+        this.state.directoryAccessMode === "block"
+          ? "Block"
+          : this.state.directoryAccessMode === "ask"
+            ? "Ask"
+            : "Allow";
+      parts.push(`Directory access: **${modeLabel}**`);
+    }
+
+    this.recapMarkdown.setText(parts.join("\n"));
     return [...this.recapMarkdown.render(Math.max(1, width)), ""];
   }
 
@@ -177,6 +251,7 @@ export function createOnboardingWizard(
 ): Component {
   const state: OnboardingState = {
     applyBuiltinDefaults: null,
+    directoryAccessMode: null,
   };
 
   let markWelcomeComplete: (() => void) | null = null;
@@ -211,6 +286,14 @@ export function createOnboardingWizard(
           }),
       },
       {
+        label: "Directory",
+        build: (ctx) =>
+          new DirectoryAccessStep(theme, state, () => {
+            ctx.markComplete();
+            ctx.goNext();
+          }),
+      },
+      {
         label: "Recap",
         build: (ctx) =>
           new FinishStep(state, () => {
@@ -219,21 +302,32 @@ export function createOnboardingWizard(
             finalize({
               completed: true,
               applyBuiltinDefaults: state.applyBuiltinDefaults,
+              directoryAccessMode: state.directoryAccessMode ?? "allow",
             });
           }),
       },
     ],
     onComplete: () => {
       if (state.applyBuiltinDefaults === null) {
-        finalize({ completed: false, applyBuiltinDefaults: null });
+        finalize({
+          completed: false,
+          applyBuiltinDefaults: null,
+          directoryAccessMode: null,
+        });
         return;
       }
       finalize({
         completed: true,
         applyBuiltinDefaults: state.applyBuiltinDefaults,
+        directoryAccessMode: state.directoryAccessMode ?? "allow",
       });
     },
-    onCancel: () => finalize({ completed: false, applyBuiltinDefaults: null }),
+    onCancel: () =>
+      finalize({
+        completed: false,
+        applyBuiltinDefaults: null,
+        directoryAccessMode: null,
+      }),
     hintSuffix: "Enter select/continue",
     minContentHeight: 12,
   });
@@ -256,10 +350,18 @@ export function createOnboardingWizard(
 
 export function buildOnboardedConfig(
   applyBuiltinDefaults: boolean,
+  directoryAccessMode: DirectoryAccessMode,
 ): GuardrailsConfig {
   return {
     version: CURRENT_VERSION,
     applyBuiltinDefaults,
+    features: {
+      directoryAccess: directoryAccessMode !== "allow",
+    },
+    directoryAccess: {
+      mode: directoryAccessMode,
+      additionalDirs: [],
+    },
     onboarding: {
       completed: true,
       completedAt: new Date().toISOString(),

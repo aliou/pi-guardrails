@@ -1,8 +1,13 @@
 import { stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parse } from "@aliou/sh";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import {
+  DynamicBorder,
+  type ExtensionAPI,
+} from "@mariozechner/pi-coding-agent";
+import { Container, Key, matchesKey, Spacer, Text } from "@mariozechner/pi-tui";
 import type { PolicyRule, Protection, ResolvedConfig } from "../config";
+import { configLoader } from "../config";
 import { emitBlocked } from "../utils/events";
 import { expandGlob, hasGlobChars } from "../utils/glob-expander";
 import {
@@ -10,7 +15,12 @@ import {
   compileFilePatterns,
   normalizeFilePath,
 } from "../utils/matching";
-import { expandHomePath } from "../utils/path";
+import {
+  expandHomePath,
+  extractGrantDirectory,
+  isWithinLexicalBoundary,
+  resolveFromCwd,
+} from "../utils/path";
 import { walkCommands, wordToString } from "../utils/shell-utils";
 import { pendingWarnings } from "../utils/warnings";
 
@@ -118,7 +128,10 @@ function maybePathLike(token: string): boolean {
   );
 }
 
-function normalizeTargetForPolicy(filePath: string, cwd: string): string {
+export function normalizeTargetForPolicy(
+  filePath: string,
+  cwd: string,
+): string {
   if (filePath === "~" || filePath.startsWith("~/")) {
     return normalizeFilePath(filePath);
   }
@@ -143,41 +156,37 @@ function resolvePolicyPath(filePath: string, cwd: string): string {
   return resolve(cwd, expandHomePath(filePath));
 }
 
-function matchesAnyPolicyPattern(
-  filePath: string,
-  rules: CompiledRule[],
-): boolean {
-  return rules.some(
-    (rule) =>
-      rule.enabled && rule.patterns.some((pattern) => pattern.test(filePath)),
-  );
-}
-
-async function expandCandidate(candidate: string): Promise<string[]> {
+async function expandCandidate(
+  candidate: string,
+  cwd: string,
+): Promise<string[]> {
   if (!hasGlobChars(candidate)) return [candidate];
 
-  const matches = await expandGlob(candidate);
+  const matches = await expandGlob(candidate, { cwd });
   if (matches.length > 0) return matches;
 
   return [candidate];
 }
 
-async function extractBashFileTargets(
+/**
+ * Extract path-like candidates from a bash command string.
+ * Returns ALL path-like arguments (no policy filtering).
+ * Used by both directoryAccess boundary checks and policy checks.
+ */
+export async function extractBashPathCandidates(
   command: string,
-  rules: CompiledRule[],
   cwd: string,
 ): Promise<string[]> {
   const targets = new Set<string>();
 
   const maybeAddTarget = async (candidate: string): Promise<void> => {
     if (!candidate || candidate.startsWith("-")) return;
+    if (!maybePathLike(candidate)) return;
 
-    const expanded = await expandCandidate(candidate);
+    const expanded = await expandCandidate(candidate, cwd);
     for (const file of expanded) {
       const normalized = normalizeTargetForPolicy(file, cwd);
-      if (matchesAnyPolicyPattern(normalized, rules)) {
-        targets.add(normalized);
-      }
+      targets.add(normalized);
     }
   };
 
@@ -212,12 +221,10 @@ async function extractBashFileTargets(
         continue;
       }
 
-      const expanded = await expandCandidate(token);
+      const expanded = await expandCandidate(token, cwd);
       for (const file of expanded) {
         const normalized = normalizeTargetForPolicy(file, cwd);
-        if (matchesAnyPolicyPattern(normalized, rules)) {
-          targets.add(normalized);
-        }
+        targets.add(normalized);
       }
     }
 
@@ -279,24 +286,263 @@ function extractPathTarget(input: Record<string, unknown>): string[] {
   return target ? [target] : [];
 }
 
+// ---- directoryAccess helpers ----
+
+export function isBoundaryAllowed(
+  target: string,
+  cwd: string,
+  additionalDirs: string[],
+): boolean {
+  if (isWithinLexicalBoundary(target, cwd)) return true;
+
+  for (const dir of additionalDirs) {
+    if (isWithinLexicalBoundary(target, dir)) return true;
+  }
+
+  return false;
+}
+
+function getRawAdditionalDirs(
+  rawConfig: Record<string, unknown> | null,
+): string[] {
+  const da = rawConfig?.directoryAccess as Record<string, unknown> | undefined;
+  return Array.isArray(da?.additionalDirs)
+    ? (da?.additionalDirs as string[])
+    : [];
+}
+
+/**
+ * Add a directory to the session grant list (memory scope).
+ * Merges with existing memory scope config instead of clobbering.
+ */
+async function allowDirectoryForSession(absTarget: string): Promise<void> {
+  const grantDir = extractGrantDirectory(absTarget);
+  const rawMemory = (configLoader.getRawConfig("memory") ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const existingDirs = getRawAdditionalDirs(rawMemory);
+
+  if (existingDirs.includes(grantDir)) return;
+
+  await configLoader.save("memory", {
+    ...rawMemory,
+    directoryAccess: {
+      ...(rawMemory.directoryAccess as Record<string, unknown> | undefined),
+      additionalDirs: [...existingDirs, grantDir],
+    },
+  });
+}
+
+/**
+ * Add a directory to the project grant list (local scope).
+ */
+async function allowDirectoryForProject(absTarget: string): Promise<void> {
+  const grantDir = extractGrantDirectory(absTarget);
+  const rawLocal = (configLoader.getRawConfig("local") ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const existingDirs = getRawAdditionalDirs(rawLocal);
+
+  if (existingDirs.includes(grantDir)) return;
+
+  await configLoader.save("local", {
+    ...rawLocal,
+    directoryAccess: {
+      ...(rawLocal.directoryAccess as Record<string, unknown> | undefined),
+      additionalDirs: [...existingDirs, grantDir],
+    },
+  });
+}
+
+function createDirectoryAccessConfirmComponent(
+  toolName: string,
+  targetPath: string,
+  cwd: string,
+) {
+  return (
+    _tui: { terminal: { columns: number }; requestRender(): void },
+    theme: {
+      fg(color: string, text: string): string;
+      bg(color: string, text: string): string;
+      bold(text: string): string;
+    },
+    _kb: unknown,
+    done: (
+      result: "allow-once" | "allow-session" | "allow-project" | "deny",
+    ) => void,
+  ) => {
+    const container = new Container();
+    const border = (s: string) => theme.fg("warning", s);
+
+    container.addChild(new DynamicBorder(border));
+    container.addChild(
+      new Text(
+        theme.fg("warning", theme.bold("Outside Workspace Access")),
+        1,
+        0,
+      ),
+    );
+    container.addChild(new Spacer(1));
+    container.addChild(
+      new Text(
+        theme.fg(
+          "text",
+          `This ${toolName} targets a path outside the current working directory.`,
+        ),
+        1,
+        0,
+      ),
+    );
+    container.addChild(new Spacer(1));
+    container.addChild(
+      new Text(theme.fg("dim", `  Path: ${targetPath}`), 1, 0),
+    );
+    container.addChild(new Text(theme.fg("dim", `  Cwd:  ${cwd}`), 1, 0));
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("text", "Allow access?"), 1, 0));
+    container.addChild(new Spacer(1));
+    container.addChild(
+      new Text(
+        theme.fg(
+          "dim",
+          "y/enter: allow once \u2022 s: session \u2022 p: project \u2022 n/esc: deny",
+        ),
+        1,
+        0,
+      ),
+    );
+    container.addChild(new DynamicBorder(border));
+
+    return {
+      render: (width: number) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data: string) => {
+        if (matchesKey(data, Key.enter) || data === "y" || data === "Y") {
+          done("allow-once");
+        } else if (data === "s" || data === "S") {
+          done("allow-session");
+        } else if (data === "p" || data === "P") {
+          done("allow-project");
+        } else if (
+          matchesKey(data, Key.escape) ||
+          data === "n" ||
+          data === "N"
+        ) {
+          done("deny");
+        }
+      },
+    };
+  };
+}
+
 export function setupPoliciesHook(pi: ExtensionAPI, config: ResolvedConfig) {
-  if (!config.features.policies) return;
+  if (!config.features.policies && !config.features.directoryAccess) return;
 
-  const compiledRules = compileRules(config.policies.rules);
+  const compiledRules = config.features.policies
+    ? compileRules(config.policies.rules)
+    : [];
 
+  // directoryAccess boundary data
+  const boundaryMode = config.directoryAccess.mode;
+  const boundaryEnabled =
+    config.features.directoryAccess && boundaryMode !== "allow";
   pi.on("tool_call", async (event, ctx) => {
     const toolName = event.toolName;
-    let targets: string[] = [];
 
+    // Re-read directory access config on each invocation so settings changes take effect
+    const liveConfig = configLoader.getConfig();
+    const boundaryAdditionalDirs = (
+      liveConfig.directoryAccess.additionalDirs ?? []
+    ).map((d) => resolveFromCwd(d, process.cwd()));
+
+    // Extract targets (shared between boundary and policy checks)
+    let targets: string[] = [];
     if (["read", "write", "edit", "grep", "find", "ls"].includes(toolName)) {
       targets = extractPathTarget(event.input);
     } else if (toolName === "bash") {
       const command = String(event.input.command ?? "");
-      targets = await extractBashFileTargets(command, compiledRules, ctx.cwd);
+      targets = await extractBashPathCandidates(command, ctx.cwd);
     } else {
       return;
     }
 
+    // ---- directoryAccess boundary check (before policies) ----
+    if (boundaryEnabled) {
+      for (const target of targets) {
+        const normalizedTarget = normalizeTargetForPolicy(target, ctx.cwd);
+        const absTarget = resolveFromCwd(normalizedTarget, ctx.cwd);
+
+        if (isBoundaryAllowed(absTarget, ctx.cwd, boundaryAdditionalDirs)) {
+          continue;
+        }
+
+        // Mode: block (or no UI fallback)
+        if (boundaryMode === "block" || !ctx.hasUI) {
+          const reason =
+            boundaryMode === "block"
+              ? `Access to ${normalizedTarget} is outside the current working directory and is blocked.`
+              : `Access to ${normalizedTarget} is outside the current working directory and was blocked (no UI to confirm).`;
+          emitBlocked(pi, {
+            feature: "directoryAccess",
+            toolName,
+            input: event.input,
+            reason,
+          });
+          return { block: true, reason };
+        }
+
+        // Mode: ask (has UI)
+        type BoundaryResult =
+          | "allow-once"
+          | "allow-session"
+          | "allow-project"
+          | "deny";
+        const result = await ctx.ui.custom<BoundaryResult>(
+          createDirectoryAccessConfirmComponent(
+            toolName,
+            normalizedTarget,
+            ctx.cwd,
+          ),
+        );
+
+        if (result === "allow-session") {
+          await allowDirectoryForSession(absTarget);
+          continue;
+        }
+
+        if (result === "allow-project") {
+          await allowDirectoryForProject(absTarget);
+          continue;
+        }
+
+        // Default to deny: "allow-once" is explicit; anything else (undefined, cancel) blocks
+        if (result !== "allow-once") {
+          emitBlocked(pi, {
+            feature: "directoryAccess",
+            toolName,
+            input: event.input,
+            reason:
+              result === "deny"
+                ? "User denied access outside the current working directory"
+                : "Access outside the current working directory was not confirmed",
+            userDenied: result === "deny",
+          });
+          return {
+            block: true,
+            reason:
+              result === "deny"
+                ? "User denied access outside the current working directory"
+                : "Access outside the current working directory was not confirmed",
+          };
+        }
+
+        // "allow-once" -- continue without persistence
+      }
+    }
+
+    // ---- existing policy checks (unchanged) ----
     for (const target of targets) {
       const normalizedTarget = normalizeTargetForPolicy(target, ctx.cwd);
 

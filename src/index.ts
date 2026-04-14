@@ -6,8 +6,10 @@ import { configLoader } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
 import {
   migrateApplyBuiltinDefaults,
+  migrateDirectoryAccess,
   migrateMarkOnboardingDone,
   needsApplyBuiltinDefaultsMigration,
+  needsDirectoryAccessMigration,
   needsOnboardingDoneMigration,
 } from "./utils/migration";
 import { pendingWarnings } from "./utils/warnings";
@@ -46,6 +48,11 @@ export default async function (pi: ExtensionAPI) {
 
       if (needsOnboardingDoneMigration(migrated)) {
         migrated = migrateMarkOnboardingDone(migrated);
+        changed = true;
+      }
+
+      if (needsDirectoryAccessMigration(migrated)) {
+        migrated = migrateDirectoryAccess(migrated);
         changed = true;
       }
 

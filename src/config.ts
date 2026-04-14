@@ -53,6 +53,14 @@ export interface PolicyRule {
   enabled?: boolean;
 }
 
+export type DirectoryAccessMode = "block" | "ask" | "allow";
+
+export interface DirectoryAccessConfig {
+  mode?: DirectoryAccessMode;
+  /** Directory roots that are always allowed (absolute or ~-expanded paths). Merged across scopes. */
+  additionalDirs?: string[];
+}
+
 export interface GuardrailsConfig {
   version?: string;
   enabled?: boolean;
@@ -66,12 +74,14 @@ export interface GuardrailsConfig {
   features?: {
     policies?: boolean;
     permissionGate?: boolean;
+    directoryAccess?: boolean;
     // Deprecated. Kept only for migration.
     protectEnvFiles?: boolean;
   };
   policies?: {
     rules?: PolicyRule[];
   };
+  directoryAccess?: DirectoryAccessConfig;
   // Deprecated. Kept only for migration.
   envFiles?: {
     protectedPatterns?: PatternConfig[];
@@ -101,9 +111,14 @@ export interface ResolvedConfig {
   features: {
     policies: boolean;
     permissionGate: boolean;
+    directoryAccess: boolean;
   };
   policies: {
     rules: PolicyRule[];
+  };
+  directoryAccess: {
+    mode: DirectoryAccessMode;
+    additionalDirs: string[];
   };
   permissionGate: {
     patterns: DangerousPattern[];
@@ -123,8 +138,10 @@ import { ConfigLoader, type Migration } from "@aliou/pi-utils-settings";
 import {
   backupConfig,
   CURRENT_VERSION,
+  migrateDirectoryAccess,
   migrateEnvFilesToPolicies,
   migrateV0,
+  needsDirectoryAccessMigration,
   needsEnvFilesToPoliciesMigration,
   needsMigration,
 } from "./utils/migration";
@@ -190,6 +207,11 @@ const migrations: Migration<GuardrailsConfig>[] = [
     shouldRun: (config) => needsEnvFilesToPoliciesMigration(config),
     run: (config) => migrateEnvFilesToPolicies(config),
   },
+  {
+    name: "directory-access-migration",
+    shouldRun: (config) => needsDirectoryAccessMigration(config),
+    run: (config) => migrateDirectoryAccess(config),
+  },
 ];
 
 const DEFAULT_CONFIG: ResolvedConfig = {
@@ -199,6 +221,11 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   features: {
     policies: true,
     permissionGate: true,
+    directoryAccess: false,
+  },
+  directoryAccess: {
+    mode: "ask",
+    additionalDirs: [],
   },
   policies: {
     rules: [
@@ -337,6 +364,23 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         resolved.permissionGate.patterns = customPatterns;
         resolved.permissionGate.useBuiltinMatchers = false;
       }
+
+      // Merge additionalDirs across scopes: global + local + memory (all additive)
+      const mergedDirs = new Set<string>();
+      for (const dirs of [
+        resolved.directoryAccess.additionalDirs,
+        global?.directoryAccess?.additionalDirs,
+        local?.directoryAccess?.additionalDirs,
+        memory?.directoryAccess?.additionalDirs,
+      ]) {
+        if (dirs) {
+          for (const d of dirs) {
+            mergedDirs.add(d);
+          }
+        }
+      }
+      resolved.directoryAccess.additionalDirs = [...mergedDirs];
+
       return resolved;
     },
   },

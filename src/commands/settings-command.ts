@@ -40,6 +40,10 @@ const FEATURE_UI: Record<FeatureKey, { label: string; description: string }> = {
     description:
       "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
   },
+  directoryAccess: {
+    label: "Directory access",
+    description: "Restrict file access to the current working directory",
+  },
 };
 
 const POLICY_EXAMPLES: Array<{
@@ -1339,6 +1343,62 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
                     },
                   ],
                 }),
+            },
+          ],
+        },
+        {
+          label: "Directory Access",
+          items: [
+            {
+              id: "features.directoryAccess",
+              label: "Enabled",
+              description: FEATURE_UI.directoryAccess.description,
+              currentValue:
+                scopedConfig.features?.directoryAccess === undefined
+                  ? "(inherited)"
+                  : scopedConfig.features.directoryAccess
+                    ? "enabled"
+                    : "disabled",
+              values: ["enabled", "disabled"],
+            },
+            {
+              id: "directoryAccess.mode",
+              label: "Mode",
+              description:
+                "block: always deny \u2022 ask: prompt each time \u2022 allow: no restriction",
+              currentValue:
+                scopedConfig.directoryAccess?.mode === undefined
+                  ? "(inherited)"
+                  : scopedConfig.directoryAccess.mode,
+              values: ["block", "ask", "allow"],
+            },
+            {
+              id: "directoryAccess.additionalDirs",
+              label: "Additional directories",
+              description: "Extra directory roots that are always allowed",
+              currentValue: count("directoryAccess.additionalDirs"),
+              submenu: (_val: string, submenuDone: (v?: string) => void) => {
+                const dirs = scopedConfig.directoryAccess?.additionalDirs ?? [];
+                const items = dirs.map((d) => ({
+                  pattern: d,
+                  description: d,
+                }));
+                let latestCount = dirs.length;
+                return new PatternEditor({
+                  label: "Additional Directories",
+                  items,
+                  theme: settingsTheme,
+                  context: "file",
+                  onSave: (newItems) => {
+                    latestCount = newItems.length;
+                    const newDirs: string[] = newItems
+                      .map((item) => item.pattern.trim())
+                      .filter(Boolean);
+                    applyDraft("directoryAccess.additionalDirs", newDirs);
+                  },
+                  onDone: () => submenuDone(`${latestCount} dirs`),
+                });
+              },
             },
           ],
         },

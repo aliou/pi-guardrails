@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { configLoader, type GuardrailsConfig } from "../config";
+import type { DirectoryAccessMode, GuardrailsConfig } from "../config";
+import { configLoader } from "../config";
 import {
   buildOnboardedConfig,
   createOnboardingWizard,
@@ -10,12 +11,24 @@ import {
 function mergeOnboarding(
   base: GuardrailsConfig | null,
   applyBuiltinDefaults: boolean,
+  directoryAccessMode: DirectoryAccessMode,
 ): GuardrailsConfig {
   const next = structuredClone(base ?? {});
-  const onboarded = buildOnboardedConfig(applyBuiltinDefaults);
+  const onboarded = buildOnboardedConfig(
+    applyBuiltinDefaults,
+    directoryAccessMode,
+  );
   next.applyBuiltinDefaults = onboarded.applyBuiltinDefaults;
   next.version = onboarded.version;
   next.onboarding = onboarded.onboarding;
+  next.features = {
+    ...next.features,
+    ...onboarded.features,
+  };
+  next.directoryAccess = {
+    ...next.directoryAccess,
+    ...onboarded.directoryAccess,
+  };
   return next;
 }
 
@@ -43,12 +56,20 @@ export function registerGuardrailsOnboardingCommand(
         { overlay: true },
       );
 
-      if (!result.completed || result.applyBuiltinDefaults === null) {
+      if (
+        !result.completed ||
+        result.applyBuiltinDefaults === null ||
+        result.directoryAccessMode === null
+      ) {
         ctx.ui.notify("[Guardrails] onboarding cancelled.", "warning");
         return;
       }
 
-      const merged = mergeOnboarding(globalConfig, result.applyBuiltinDefaults);
+      const merged = mergeOnboarding(
+        globalConfig,
+        result.applyBuiltinDefaults,
+        result.directoryAccessMode,
+      );
       await configLoader.save("global", merged);
       await configLoader.load();
 

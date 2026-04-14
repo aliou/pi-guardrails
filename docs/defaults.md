@@ -113,3 +113,14 @@ These commands are detected using AST-based structural matching for accuracy.
 | `mkfs.`         | Filesystem format              |
 | `chmod -R 777`  | Insecure recursive permissions |
 | `chown -R`      | Recursive ownership change     |
+
+## Default Directory Access
+
+Directory access is **disabled by default** for existing users. New users who
+complete onboarding with recommended defaults get `mode: "ask"`.
+
+| Field             | Default |
+|-------------------|---------|
+| `features.directoryAccess` | `false` |
+| `mode`            | `"ask"` |
+| `additionalDirs`  | `[]`    |
