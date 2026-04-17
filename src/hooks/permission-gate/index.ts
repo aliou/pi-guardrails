@@ -18,15 +18,19 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
-import type { DangerousPattern, ResolvedConfig } from "../config";
-import { configLoader } from "../config";
-import { executeSubagent, resolveModel } from "../lib";
-import { emitBlocked, emitDangerous } from "../utils/events";
+import type { DangerousPattern, ResolvedConfig } from "../../config";
+import { configLoader } from "../../config";
+import { executeSubagent, resolveModel } from "../../lib";
+import { emitBlocked, emitDangerous } from "../../utils/events";
 import {
   type CompiledPattern,
   compileCommandPatterns,
-} from "../utils/matching";
-import { walkCommands, wordToString } from "../utils/shell-utils";
+} from "../../utils/matching";
+import { walkCommands, wordToString } from "../../utils/shell-utils";
+import {
+  BUILTIN_KEYWORD_PATTERNS,
+  BUILTIN_MATCHERS,
+} from "./dangerous-commands";
 
 /**
  * Permission gate that prompts user confirmation for dangerous commands.
@@ -35,53 +39,6 @@ import { walkCommands, wordToString } from "../utils/shell-utils";
  * User custom patterns use substring/regex matching on the raw string.
  * Allowed/auto-deny patterns match against the raw command string.
  */
-
-/**
- * Structural matcher for a built-in dangerous command.
- * Returns a description if matched, undefined otherwise.
- */
-type StructuralMatcher = (words: string[]) => string | undefined;
-
-/**
- * Built-in dangerous command matchers. These check the parsed command
- * structure instead of regex against the raw string.
- */
-const BUILTIN_MATCHERS: StructuralMatcher[] = [
-  // rm -rf
-  (words) => {
-    if (words[0] !== "rm") return undefined;
-    const hasRF = words.some(
-      (w) =>
-        w === "-rf" ||
-        w === "-fr" ||
-        (w.startsWith("-") && w.includes("r") && w.includes("f")),
-    );
-    return hasRF ? "recursive force delete" : undefined;
-  },
-  // sudo
-  (words) => (words[0] === "sudo" ? "superuser command" : undefined),
-  // dd if=
-  (words) => {
-    if (words[0] !== "dd") return undefined;
-    return words.some((w) => w.startsWith("if="))
-      ? "disk write operation"
-      : undefined;
-  },
-  // mkfs.*
-  (words) => (words[0]?.startsWith("mkfs.") ? "filesystem format" : undefined),
-  // chmod -R 777
-  (words) => {
-    if (words[0] !== "chmod") return undefined;
-    return words.includes("-R") && words.includes("777")
-      ? "insecure recursive permissions"
-      : undefined;
-  },
-  // chown -R
-  (words) => {
-    if (words[0] !== "chown") return undefined;
-    return words.includes("-R") ? "recursive ownership change" : undefined;
-  },
-];
 
 interface DangerMatch {
   description: string;
@@ -117,14 +74,6 @@ interface CommandViewportState {
 }
 
 const COMMAND_VIEWPORT_LINES = 12;
-const BUILTIN_KEYWORD_PATTERNS = new Set([
-  "rm -rf",
-  "sudo",
-  "dd if=",
-  "mkfs.",
-  "chmod -R 777",
-  "chown -R",
-]);
 
 function buildNumberedWrappedLines(
   command: string,

@@ -134,7 +134,7 @@ These commands are detected using AST-based structural matching for accuracy.
 |-----------------|--------------------------------|
 | `rm -rf`        | Recursive force delete         |
 | `sudo`          | Superuser command              |
-| `dd if=`        | Disk write operation           |
+| `dd of=`        | Disk write operation           |
 | `mkfs.`         | Filesystem format              |
 | `chmod -R 777`  | Insecure recursive permissions |
 | `chown -R`      | Recursive ownership change     |

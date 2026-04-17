@@ -70,7 +70,7 @@ class DefaultsChoiceStep implements Component {
         "",
         "- Protect secret files like `.env`, `.env.local`, `.env.production`, and `.dev.vars`",
         "- Keep safe exceptions like `.env.example` and `*.sample.env`",
-        "- Require confirmation before running dangerous commands like `rm -rf`, `sudo`, and `dd if=`",
+        "- Require confirmation before running dangerous commands like `rm -rf`, `sudo`, and `dd of=`",
       ].join("\n"),
       [
         "Start with no built-in file policy defaults.",
@@ -234,7 +234,7 @@ class FinishStep implements Component {
             "Guardrails will start with built-in protection, including:",
             "- secret files like `.env`, `.env.local`, `.env.production`, `.dev.vars`",
             "- safe exceptions like `.env.example` and `*.sample.env`",
-            "- confirmation before running dangerous commands like `rm -rf`, `sudo`, `dd if=`",
+            "- confirmation before running dangerous commands like `rm -rf`, `sudo`, `dd of=`",
           ].join("\n")
         : [
             "You selected **Minimal setup**.",
