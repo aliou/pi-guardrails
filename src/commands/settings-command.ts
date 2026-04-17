@@ -40,6 +40,10 @@ const FEATURE_UI: Record<FeatureKey, { label: string; description: string }> = {
     description:
       "Prompt for confirmation on dangerous commands (rm -rf, sudo, etc.)",
   },
+  pathAccess: {
+    label: "Path access",
+    description: "Restrict tool access to the current working directory",
+  },
 };
 
 const POLICY_EXAMPLES: Array<{
@@ -1209,6 +1213,31 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
         {
           label: `Policies (${policyRules.length})`,
           items: policyItems,
+        },
+        {
+          label: "Path Access",
+          items: [
+            {
+              id: "pathAccess.mode",
+              label: "Mode",
+              description:
+                "allow: no restrictions, ask: prompt for outside paths, block: deny all outside paths",
+              currentValue: scopedConfig.pathAccess?.mode ?? "(inherited)",
+              values: ["allow", "ask", "block"],
+            },
+            {
+              id: "pathAccess.allowedPaths",
+              label: "Allowed paths",
+              description:
+                "Paths always allowed (trailing / for directories). Supports ~/",
+              currentValue: count("pathAccess.allowedPaths"),
+              submenu: patternConfigSubmenu(
+                "pathAccess.allowedPaths",
+                "Allowed Paths",
+                "file",
+              ),
+            },
+          ],
         },
         {
           label: "Permission Gate",

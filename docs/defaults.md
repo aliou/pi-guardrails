@@ -101,6 +101,31 @@ Blocks access to GPG/GnuPG private keys, keyrings, and configuration. Disabled b
 
 ---
 
+## Path Access
+
+| Setting | Default |
+|---|---|
+| `features.pathAccess` | `false` |
+| `pathAccess.mode` | `"ask"` |
+| `pathAccess.allowedPaths` | `[]` |
+
+Modes:
+- `allow` — no path restrictions
+- `ask` — prompt when accessing paths outside working directory
+- `block` — deny all access outside working directory
+
+Allowed paths use trailing-slash convention:
+- `/path/to/file` — exact file match
+- `/path/to/dir/` — directory and all descendants
+- Supports `~/` for home directory
+
+Limitations:
+- Bash path extraction is best-effort (AST-based heuristics). Tokens like `application/json` may trigger false-positive prompts.
+- Symlinks are not resolved. Lexical path comparison only.
+- In non-interactive mode (--print), `ask` mode degrades to `block`.
+
+---
+
 ## Default Permission Gate Patterns
 
 These commands are detected using AST-based structural matching for accuracy.

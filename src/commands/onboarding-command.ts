@@ -10,12 +10,25 @@ import {
 function mergeOnboarding(
   base: GuardrailsConfig | null,
   applyBuiltinDefaults: boolean,
+  pathAccessEnabled?: boolean | null,
 ): GuardrailsConfig {
   const next = structuredClone(base ?? {});
-  const onboarded = buildOnboardedConfig(applyBuiltinDefaults);
+  const onboarded = buildOnboardedConfig(
+    applyBuiltinDefaults,
+    pathAccessEnabled,
+  );
   next.applyBuiltinDefaults = onboarded.applyBuiltinDefaults;
   next.version = onboarded.version;
   next.onboarding = onboarded.onboarding;
+  if (onboarded.features?.pathAccess !== undefined) {
+    next.features = {
+      ...next.features,
+      pathAccess: onboarded.features.pathAccess,
+    };
+  }
+  if (onboarded.pathAccess) {
+    next.pathAccess = onboarded.pathAccess;
+  }
   return next;
 }
 
@@ -48,7 +61,11 @@ export function registerGuardrailsOnboardingCommand(
         return;
       }
 
-      const merged = mergeOnboarding(globalConfig, result.applyBuiltinDefaults);
+      const merged = mergeOnboarding(
+        globalConfig,
+        result.applyBuiltinDefaults,
+        result.pathAccessEnabled,
+      );
       await configLoader.save("global", merged);
       await configLoader.load();
 

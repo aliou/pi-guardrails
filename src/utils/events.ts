@@ -4,7 +4,7 @@ export const GUARDRAILS_BLOCKED_EVENT = "guardrails:blocked";
 export const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous";
 
 export interface GuardrailsBlockedEvent {
-  feature: "policies" | "permissionGate";
+  feature: "policies" | "permissionGate" | "pathAccess";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;

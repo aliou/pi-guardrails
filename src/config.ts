@@ -53,6 +53,13 @@ export interface PolicyRule {
   enabled?: boolean;
 }
 
+export type PathAccessMode = "allow" | "ask" | "block";
+
+export interface PathAccessConfig {
+  mode?: PathAccessMode;
+  allowedPaths?: string[];
+}
+
 export interface GuardrailsConfig {
   version?: string;
   enabled?: boolean;
@@ -66,12 +73,14 @@ export interface GuardrailsConfig {
   features?: {
     policies?: boolean;
     permissionGate?: boolean;
+    pathAccess?: boolean;
     // Deprecated. Kept only for migration.
     protectEnvFiles?: boolean;
   };
   policies?: {
     rules?: PolicyRule[];
   };
+  pathAccess?: PathAccessConfig;
   // Deprecated. Kept only for migration.
   envFiles?: {
     protectedPatterns?: PatternConfig[];
@@ -101,9 +110,14 @@ export interface ResolvedConfig {
   features: {
     policies: boolean;
     permissionGate: boolean;
+    pathAccess: boolean;
   };
   policies: {
     rules: PolicyRule[];
+  };
+  pathAccess: {
+    mode: PathAccessMode;
+    allowedPaths: string[];
   };
   permissionGate: {
     patterns: DangerousPattern[];
@@ -199,6 +213,11 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   features: {
     policies: true,
     permissionGate: true,
+    pathAccess: false,
+  },
+  pathAccess: {
+    mode: "ask",
+    allowedPaths: [],
   },
   policies: {
     rules: [
@@ -337,6 +356,19 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         resolved.permissionGate.patterns = customPatterns;
         resolved.permissionGate.useBuiltinMatchers = false;
       }
+      // Merge allowedPaths across scopes (additive)
+      const mergedPaths = new Set<string>();
+      for (const paths of [
+        global?.pathAccess?.allowedPaths,
+        local?.pathAccess?.allowedPaths,
+        memory?.pathAccess?.allowedPaths,
+      ]) {
+        if (paths) {
+          for (const p of paths) mergedPaths.add(p);
+        }
+      }
+      resolved.pathAccess.allowedPaths = [...mergedPaths];
+
       return resolved;
     },
   },

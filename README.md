@@ -27,6 +27,7 @@ pi install git:github.com/aliou/pi-guardrails
 
 - **policies**: named file-protection rules with per-rule protection levels.
 - **permission-gate**: detects dangerous bash commands and asks for confirmation.
+- **path-access**: restricts tool access to the current working directory with allow/ask/block modes.
 - **optional command explainer**: can call a small LLM to explain a dangerous command inline in the confirmation dialog.
 
 ## Config locations
@@ -48,7 +49,12 @@ Use `/guardrails:settings` to edit config interactively.
   "enabled": true,
   "features": {
     "policies": true,
-    "permissionGate": true
+    "permissionGate": true,
+    "pathAccess": false
+  },
+  "pathAccess": {
+    "mode": "ask",
+    "allowedPaths": []
   },
   "policies": {
     "rules": [
@@ -121,6 +127,31 @@ Use:
 
 This starts a subagent that helps build and save one policy rule.
 
+## Path access
+
+Restrict tool access to the current working directory. When enabled, any tool call targeting a path outside `cwd` is checked against the configured mode:
+
+- **allow**: no restrictions
+- **ask**: prompt with options to grant access (file or directory, for session or always)
+- **block**: deny all outside access
+
+```jsonc
+{
+  "features": { "pathAccess": true },
+  "pathAccess": {
+    "mode": "ask",
+    "allowedPaths": ["~/code/shared-libs/", "~/.config/myapp"]
+  }
+}
+```
+
+Grants are stored in project config (always) or session memory (session). The `allowedPaths` array is merged across all config scopes.
+
+Limitations:
+- Symlinks are not resolved (lexical path comparison only).
+- Bash path extraction is best-effort (AST-based heuristics).
+- In non-interactive mode, `ask` mode degrades to `block`.
+
 ## Permission gate
 
 Detects dangerous bash commands and prompts user confirmation.
@@ -169,7 +200,7 @@ Guardrails emits events for other extensions:
 
 ```ts
 interface GuardrailsBlockedEvent {
-  feature: "policies" | "permissionGate";
+  feature: "policies" | "permissionGate" | "pathAccess";
   toolName: string;
   input: Record<string, unknown>;
   reason: string;

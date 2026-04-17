@@ -11,11 +11,13 @@ import { CURRENT_VERSION } from "../utils/migration";
 
 interface OnboardingState {
   applyBuiltinDefaults: boolean | null;
+  pathAccessEnabled: boolean | null;
 }
 
 export interface OnboardingResult {
   completed: boolean;
   applyBuiltinDefaults: boolean | null;
+  pathAccessEnabled: boolean | null;
 }
 
 class IntroStep implements Component {
@@ -129,6 +131,88 @@ class DefaultsChoiceStep implements Component {
   }
 }
 
+class PathAccessStep implements Component {
+  private selectedIndex = 0;
+  private readonly settingsTheme: SettingsTheme;
+
+  constructor(
+    private readonly theme: Theme,
+    private readonly state: OnboardingState,
+    private readonly onSelect: () => void,
+  ) {
+    this.settingsTheme = getSettingsTheme(theme);
+  }
+
+  invalidate() {}
+
+  render(width: number): string[] {
+    const options = ["Ask before accessing outside files", "No restrictions"];
+    const explanations = [
+      [
+        "When enabled, guardrails will prompt you before the agent accesses files outside the current working directory.",
+        "",
+        "- You can grant access per-file or per-directory",
+        "- Grants can be session-only or permanent",
+        "- In non-interactive mode, outside access is blocked",
+      ].join("\n"),
+      [
+        "The agent can access any path on your system without prompting.",
+        "",
+        "- You can enable path access later in `/guardrails:settings`",
+      ].join("\n"),
+    ];
+
+    const lines: string[] = [
+      "  Restrict access to your project directory?",
+      "",
+    ];
+
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      if (!option) continue;
+      const selected = i === this.selectedIndex;
+      const prefix = selected ? this.settingsTheme.cursor : "  ";
+      const label = this.settingsTheme.value(` ${option}`, selected);
+      lines.push(`${prefix}${label}`);
+    }
+
+    lines.push("");
+
+    const explanationBox = new Box(1, 0, (s: string) => s);
+    explanationBox.addChild(
+      new Markdown(
+        explanations[this.selectedIndex] ?? "",
+        0,
+        0,
+        getMarkdownTheme(),
+        {
+          color: (s: string) => this.theme.fg("text", s),
+        },
+      ),
+    );
+
+    lines.push(...explanationBox.render(Math.max(1, width)));
+
+    return lines;
+  }
+
+  handleInput(data: string): void {
+    if (matchesKey(data, Key.up) || data === "k") {
+      this.selectedIndex = this.selectedIndex === 0 ? 1 : 0;
+      return;
+    }
+    if (matchesKey(data, Key.down) || data === "j") {
+      this.selectedIndex = this.selectedIndex === 1 ? 0 : 1;
+      return;
+    }
+
+    if (matchesKey(data, Key.enter)) {
+      this.state.pathAccessEnabled = this.selectedIndex === 0;
+      this.onSelect();
+    }
+  }
+}
+
 class FinishStep implements Component {
   private readonly recapMarkdown = new Markdown("", 2, 0, getMarkdownTheme());
 
@@ -142,7 +226,7 @@ class FinishStep implements Component {
   }
 
   render(width: number): string[] {
-    const content =
+    const defaultsPart =
       this.state.applyBuiltinDefaults === true
         ? [
             "You selected **Recommended defaults**.",
@@ -159,6 +243,12 @@ class FinishStep implements Component {
             "",
             "You can configure policies later with `/guardrails:settings`.",
           ].join("\n");
+
+    const pathAccessPart = this.state.pathAccessEnabled
+      ? "\n\n**Path access**: enabled (ask mode). The agent will prompt before accessing files outside the working directory."
+      : "\n\n**Path access**: disabled. No path restrictions.";
+
+    const content = defaultsPart + pathAccessPart;
 
     this.recapMarkdown.setText(content);
     return [...this.recapMarkdown.render(Math.max(1, width)), ""];
@@ -177,6 +267,7 @@ export function createOnboardingWizard(
 ): Component {
   const state: OnboardingState = {
     applyBuiltinDefaults: null,
+    pathAccessEnabled: null,
   };
 
   let markWelcomeComplete: (() => void) | null = null;
@@ -211,6 +302,14 @@ export function createOnboardingWizard(
           }),
       },
       {
+        label: "Path access",
+        build: (ctx) =>
+          new PathAccessStep(theme, state, () => {
+            ctx.markComplete();
+            ctx.goNext();
+          }),
+      },
+      {
         label: "Recap",
         build: (ctx) =>
           new FinishStep(state, () => {
@@ -219,21 +318,32 @@ export function createOnboardingWizard(
             finalize({
               completed: true,
               applyBuiltinDefaults: state.applyBuiltinDefaults,
+              pathAccessEnabled: state.pathAccessEnabled,
             });
           }),
       },
     ],
     onComplete: () => {
       if (state.applyBuiltinDefaults === null) {
-        finalize({ completed: false, applyBuiltinDefaults: null });
+        finalize({
+          completed: false,
+          applyBuiltinDefaults: null,
+          pathAccessEnabled: null,
+        });
         return;
       }
       finalize({
         completed: true,
         applyBuiltinDefaults: state.applyBuiltinDefaults,
+        pathAccessEnabled: state.pathAccessEnabled,
       });
     },
-    onCancel: () => finalize({ completed: false, applyBuiltinDefaults: null }),
+    onCancel: () =>
+      finalize({
+        completed: false,
+        applyBuiltinDefaults: null,
+        pathAccessEnabled: null,
+      }),
     hintSuffix: "Enter select/continue",
     minContentHeight: 12,
   });
@@ -256,8 +366,9 @@ export function createOnboardingWizard(
 
 export function buildOnboardedConfig(
   applyBuiltinDefaults: boolean,
+  pathAccessEnabled?: boolean | null,
 ): GuardrailsConfig {
-  return {
+  const config: GuardrailsConfig = {
     version: CURRENT_VERSION,
     applyBuiltinDefaults,
     onboarding: {
@@ -266,6 +377,11 @@ export function buildOnboardedConfig(
       version: CURRENT_VERSION,
     },
   };
+  if (pathAccessEnabled) {
+    config.features = { ...config.features, pathAccess: true };
+    config.pathAccess = { mode: "ask" };
+  }
+  return config;
 }
 
 export function isOnboardingPending(config: GuardrailsConfig | null): boolean {
