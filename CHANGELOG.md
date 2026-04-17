@@ -1,5 +1,32 @@
 # @aliou/pi-guardrails
 
+## 0.11.0
+
+### Minor Changes
+
+- 11e88c0: Fix dd pattern (if= to of=) and expand dangerous command detection
+
+  Fixed the dd pattern to check for of= (output file) instead of if= (input file),
+  as of= is the actual dangerous write operation. Also extracted dangerous command
+  matchers to a separate module and added new patterns for:
+
+  - Privilege escalation: doas, pkexec
+  - Secure destruction: shred, wipefs, blkdiscard
+  - Disk partitioning: fdisk, sfdisk, cfdisk, parted, sgdisk
+  - Container escapes: docker/podman run with --privileged, --pid=host,
+    --network=host, --userns=host, root mounts, docker socket mounts
+
+  Improved existing matchers to handle long options like --recursive,
+  --force, etc.
+
+  Fixes #22
+
+- ba06d72: Add path access feature: restrict tool access to current working directory with allow/ask/block modes. Grants can be file-level (exact match) or directory-level (trailing slash convention). Session grants persist in memory, project grants persist in local config.
+
+### Patch Changes
+
+- 2db56c2: Fix permission gate bypass in RPC mode: deny-by-default when `ctx.ui.custom()` returns undefined, with fallback to `ctx.ui.select()`.
+
 ## 0.10.0
 
 ### Minor Changes
