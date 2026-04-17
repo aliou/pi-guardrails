@@ -192,6 +192,16 @@ Also note:
 
 - `preventBrew`, `preventPython`, `enforcePackageManager`, `packageManager` were removed from guardrails and moved to `@aliou/pi-toolchain`.
 
+## Development
+
+```bash
+pnpm test         # Run tests
+pnpm test:watch   # Run tests in watch mode
+pnpm typecheck    # Type check
+pnpm lint         # Lint
+pnpm format       # Format
+```
+
 ## Events
 
 Guardrails emits events for other extensions:
