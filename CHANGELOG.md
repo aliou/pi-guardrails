@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.11.1
+
+### Patch Changes
+
+- 562e90f: Fix path access allowed paths settings to read and write string arrays, and migrate configs written with pattern objects.
+
 ## 0.11.0
 
 ### Minor Changes
