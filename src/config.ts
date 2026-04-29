@@ -137,10 +137,13 @@ import { ConfigLoader, type Migration } from "@aliou/pi-utils-settings";
 import {
   backupConfig,
   CURRENT_VERSION,
+  migrateAllowedPaths,
   migrateEnvFilesToPolicies,
   migrateV0,
+  needsAllowedPathsMigration,
   needsEnvFilesToPoliciesMigration,
   needsMigration,
+  normalizeAllowedPaths,
 } from "./utils/migration";
 import { pendingWarnings } from "./utils/warnings";
 
@@ -203,6 +206,11 @@ const migrations: Migration<GuardrailsConfig>[] = [
     name: "envFiles-to-policies",
     shouldRun: (config) => needsEnvFilesToPoliciesMigration(config),
     run: (config) => migrateEnvFilesToPolicies(config),
+  },
+  {
+    name: "normalize-allowed-paths",
+    shouldRun: (config) => needsAllowedPathsMigration(config),
+    run: (config) => migrateAllowedPaths(config),
   },
 ];
 
@@ -374,9 +382,7 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         local?.pathAccess?.allowedPaths,
         memory?.pathAccess?.allowedPaths,
       ]) {
-        if (paths) {
-          for (const p of paths) mergedPaths.add(p);
-        }
+        for (const p of normalizeAllowedPaths(paths)) mergedPaths.add(p);
       }
       resolved.pathAccess.allowedPaths = [...mergedPaths];
 

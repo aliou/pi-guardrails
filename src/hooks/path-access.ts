@@ -12,6 +12,7 @@ import {
 import { configLoader } from "../config";
 import { extractBashPathCandidates } from "../utils/bash-paths";
 import { emitBlocked } from "../utils/events";
+import { normalizeAllowedPaths } from "../utils/migration";
 import {
   normalizeForDisplay,
   resolveFromCwd,
@@ -246,9 +247,7 @@ async function persistGrant(
     unknown
   >;
   const pa = (raw.pathAccess ?? {}) as Record<string, unknown>;
-  const existing = Array.isArray(pa.allowedPaths)
-    ? (pa.allowedPaths as string[])
-    : [];
+  const existing = normalizeAllowedPaths(pa.allowedPaths);
 
   if (existing.includes(storagePath)) return;
 
