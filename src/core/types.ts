@@ -21,6 +21,12 @@ export type Safety =
       key: string;
     };
 
+export type Rule = {
+  key: string;
+  reason: string;
+  check: (action: Action) => boolean | Promise<boolean>;
+};
+
 export type PermissionState = "granted" | "prompt" | "denied";
 
 export type Grant = "once" | "always" | "never";

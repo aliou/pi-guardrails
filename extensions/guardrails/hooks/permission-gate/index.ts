@@ -1,4 +1,3 @@
-import { parse } from "@aliou/sh";
 import {
   DynamicBorder,
   type ExtensionAPI,
@@ -14,18 +13,11 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
-import { walkCommands, wordToString } from "../../../../src/utils/shell-utils";
-import type { DangerousPattern, ResolvedConfig } from "../../config";
+import { checkDangerousCommand } from "../../../../src/core/commands";
+import type { ResolvedConfig } from "../../config";
 import { configLoader } from "../../config";
 import { emitBlocked, emitDangerous } from "../../utils/events";
-import {
-  type CompiledPattern,
-  compileCommandPatterns,
-} from "../../utils/matching";
-import {
-  BUILTIN_KEYWORD_PATTERNS,
-  BUILTIN_MATCHERS,
-} from "./dangerous-commands";
+import { compileCommandPatterns } from "../../utils/matching";
 
 /**
  * Permission gate that prompts user confirmation for dangerous commands.
@@ -34,11 +26,6 @@ import {
  * User custom patterns use substring/regex matching on the raw string.
  * Allowed/auto-deny patterns match against the raw command string.
  */
-
-interface DangerMatch {
-  description: string;
-  pattern: string;
-}
 
 interface MinimalTheme {
   fg(color: string, text: string): string;
@@ -251,84 +238,6 @@ function createPermissionGateConfirmComponent(
   };
 }
 
-/**
- * Check a parsed command against built-in structural matchers.
- */
-function checkBuiltinDangerous(words: string[]): DangerMatch | undefined {
-  if (words.length === 0) return undefined;
-  for (const matcher of BUILTIN_MATCHERS) {
-    const desc = matcher(words);
-    if (desc) return { description: desc, pattern: "(structural)" };
-  }
-  return undefined;
-}
-
-/**
- * Check a command string against dangerous patterns.
- *
- * When useBuiltinMatchers is true (default patterns): tries structural AST
- * matching first, falls back to substring match on parse failure.
- *
- * When useBuiltinMatchers is false (customPatterns replaced defaults): skips
- * structural matchers entirely, uses compiled patterns (substring/regex)
- * against the raw command string.
- */
-function findDangerousMatch(
-  command: string,
-  compiledPatterns: CompiledPattern[],
-  useBuiltinMatchers: boolean,
-  fallbackPatterns: DangerousPattern[],
-): DangerMatch | undefined {
-  let parsedSuccessfully = false;
-
-  if (useBuiltinMatchers) {
-    // Try structural matching first
-    try {
-      const { ast } = parse(command);
-      parsedSuccessfully = true;
-      let match: DangerMatch | undefined;
-      walkCommands(ast, (cmd) => {
-        const words = (cmd.words ?? []).map(wordToString);
-        const result = checkBuiltinDangerous(words);
-        if (result) {
-          match = result;
-          return true;
-        }
-        return false;
-      });
-      if (match) return match;
-    } catch {
-      // Parse failed -- fall back to raw substring matching of configured
-      // patterns to preserve previous behavior.
-      for (const p of fallbackPatterns) {
-        if (command.includes(p.pattern)) {
-          return { description: p.description, pattern: p.pattern };
-        }
-      }
-    }
-  }
-
-  // When structural parsing succeeds, skip raw substring fallback for built-in
-  // keyword patterns to avoid false positives in quoted args/messages.
-  for (const cp of compiledPatterns) {
-    const src = cp.source as DangerousPattern;
-    if (
-      useBuiltinMatchers &&
-      parsedSuccessfully &&
-      !src.regex &&
-      BUILTIN_KEYWORD_PATTERNS.has(src.pattern)
-    ) {
-      continue;
-    }
-
-    if (cp.test(command)) {
-      return { description: src.description, pattern: src.pattern };
-    }
-  }
-
-  return undefined;
-}
-
 export function setupPermissionGateHook(
   pi: ExtensionAPI,
   config: ResolvedConfig,
@@ -382,12 +291,12 @@ export function setupPermissionGateHook(
     }
 
     // Check dangerous patterns (structural + compiled)
-    const match = findDangerousMatch(
+    const match = checkDangerousCommand({
       command,
-      compiledPatterns,
+      patterns: compiledPatterns,
       useBuiltinMatchers,
       fallbackPatterns,
-    );
+    });
     if (!match) return;
 
     const { description, pattern: rawPattern } = match;

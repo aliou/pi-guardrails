@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_MATCHERS, matchDangerousCommand } from "./dangerous-commands";
+import {
+  BUILTIN_MATCHERS,
+  checkDangerousCommand,
+  compileCommandPatterns,
+  matchDangerousCommand,
+} from "./dangerous";
 
 /**
  * Helper to run all matchers against a command string.
@@ -311,6 +316,106 @@ describe("container matcher (docker/podman)", () => {
       expect(findMatch(["podman", "create", "--privileged", "alpine"])).toBe(
         "container with privileged mode",
       );
+    });
+  });
+});
+
+describe("checkDangerousCommand", () => {
+  it("matches built-in dangerous commands structurally", () => {
+    const result = checkDangerousCommand({
+      command: "rm -rf /tmp/example",
+      patterns: compileCommandPatterns([
+        { pattern: "rm -rf", description: "recursive force delete" },
+      ]),
+      useBuiltinMatchers: true,
+      fallbackPatterns: [
+        { pattern: "rm -rf", description: "recursive force delete" },
+      ],
+    });
+
+    expect(result).toEqual({
+      description: "recursive force delete",
+      pattern: "(structural)",
+    });
+  });
+
+  it("skips built-in substring matches after a successful parse", () => {
+    const result = checkDangerousCommand({
+      command: "echo 'rm -rf /tmp/example'",
+      patterns: compileCommandPatterns([
+        { pattern: "rm -rf", description: "recursive force delete" },
+      ]),
+      useBuiltinMatchers: true,
+      fallbackPatterns: [
+        { pattern: "rm -rf", description: "recursive force delete" },
+      ],
+    });
+
+    expect(result).toBeUndefined();
+  });
+
+  it("uses configured regex patterns", () => {
+    const result = checkDangerousCommand({
+      command: "terraform apply -auto-approve",
+      patterns: compileCommandPatterns([
+        {
+          pattern: "terraform\\s+apply",
+          description: "terraform apply",
+          regex: true,
+        },
+      ]),
+      useBuiltinMatchers: false,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toEqual({
+      description: "terraform apply",
+      pattern: "terraform\\s+apply",
+    });
+  });
+
+  it("ignores invalid regex patterns", () => {
+    const result = checkDangerousCommand({
+      command: "anything",
+      patterns: compileCommandPatterns([
+        { pattern: "[", description: "invalid", regex: true },
+      ]),
+      useBuiltinMatchers: false,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toBeUndefined();
+  });
+
+  it("uses configured patterns when built-in matchers are disabled", () => {
+    const result = checkDangerousCommand({
+      command: "deploy production",
+      patterns: compileCommandPatterns([
+        { pattern: "deploy production", description: "production deploy" },
+      ]),
+      useBuiltinMatchers: false,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toEqual({
+      description: "production deploy",
+      pattern: "deploy production",
+    });
+  });
+
+  it("falls back to raw patterns when parsing fails", () => {
+    const result = checkDangerousCommand({
+      command: "if then rm -rf /tmp/example",
+      patterns: [],
+      useBuiltinMatchers: true,
+      fallbackPatterns: [
+        { pattern: "rm -rf", description: "recursive force delete" },
+      ],
+    });
+
+    expect(result).toEqual({
+      description: "recursive force delete",
+      pattern: "rm -rf",
     });
   });
 });

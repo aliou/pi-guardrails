@@ -1,3 +1,6 @@
+import { parse } from "@aliou/sh";
+import { walkCommands, wordToString } from "../../utils/shell-utils";
+
 /**
  * Dangerous command matchers for the permission gate.
  *
@@ -7,6 +10,29 @@
  */
 
 export type StructuralMatcher = (words: string[]) => string | undefined;
+
+export interface CommandPattern {
+  pattern: string;
+  description?: string;
+  regex?: boolean;
+}
+
+export interface CompiledCommandPattern {
+  test: (input: string) => boolean;
+  source: CommandPattern;
+}
+
+export interface DangerousCommandMatch {
+  description: string;
+  pattern: string;
+}
+
+export interface DangerousCommandCheckOptions {
+  command: string;
+  patterns: readonly CompiledCommandPattern[];
+  useBuiltinMatchers: boolean;
+  fallbackPatterns: readonly CommandPattern[];
+}
 
 /**
  * Helper to check if any word starts with a given prefix.
@@ -332,7 +358,7 @@ export const BUILTIN_KEYWORD_PATTERNS = new Set([
  */
 export function matchDangerousCommand(
   words: string[],
-): { description: string; pattern: string } | undefined {
+): DangerousCommandMatch | undefined {
   for (const matcher of BUILTIN_MATCHERS) {
     const description = matcher(words);
     if (description) {
@@ -341,5 +367,97 @@ export function matchDangerousCommand(
       return { description, pattern };
     }
   }
+  return undefined;
+}
+
+export function compileCommandPattern(
+  config: CommandPattern,
+): CompiledCommandPattern {
+  if (config.regex) {
+    try {
+      const re = new RegExp(config.pattern);
+      return { test: (input) => re.test(input), source: config };
+    } catch {
+      return { test: () => false, source: config };
+    }
+  }
+
+  return {
+    test: (input) => input.includes(config.pattern),
+    source: config,
+  };
+}
+
+export function compileCommandPatterns(
+  configs: readonly CommandPattern[],
+): CompiledCommandPattern[] {
+  return configs.map(compileCommandPattern);
+}
+
+function matchBuiltinDangerous(
+  words: string[],
+): DangerousCommandMatch | undefined {
+  if (words.length === 0) return undefined;
+  for (const matcher of BUILTIN_MATCHERS) {
+    const description = matcher(words);
+    if (description) return { description, pattern: "(structural)" };
+  }
+  return undefined;
+}
+
+export function checkDangerousCommand({
+  command,
+  patterns,
+  useBuiltinMatchers,
+  fallbackPatterns,
+}: DangerousCommandCheckOptions): DangerousCommandMatch | undefined {
+  let parsedSuccessfully = false;
+
+  if (useBuiltinMatchers) {
+    try {
+      const { ast } = parse(command);
+      parsedSuccessfully = true;
+      let match: DangerousCommandMatch | undefined;
+      walkCommands(ast, (cmd) => {
+        const words = (cmd.words ?? []).map(wordToString);
+        const result = matchBuiltinDangerous(words);
+        if (result) {
+          match = result;
+          return true;
+        }
+        return false;
+      });
+      if (match) return match;
+    } catch {
+      for (const pattern of fallbackPatterns) {
+        if (command.includes(pattern.pattern)) {
+          return {
+            description: pattern.description ?? pattern.pattern,
+            pattern: pattern.pattern,
+          };
+        }
+      }
+    }
+  }
+
+  for (const compiled of patterns) {
+    const source = compiled.source;
+    if (
+      useBuiltinMatchers &&
+      parsedSuccessfully &&
+      !source.regex &&
+      BUILTIN_KEYWORD_PATTERNS.has(source.pattern)
+    ) {
+      continue;
+    }
+
+    if (compiled.test(command)) {
+      return {
+        description: source.description ?? source.pattern,
+        pattern: source.pattern,
+      };
+    }
+  }
+
   return undefined;
 }
