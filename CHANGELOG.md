@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.11.2
+
+### Patch Changes
+
+- 3a37eab: Avoid treating regex-like command arguments as filesystem paths in shell guardrails.
+
 ## 0.11.1
 
 ### Patch Changes
