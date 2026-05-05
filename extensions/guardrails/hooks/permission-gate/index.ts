@@ -18,6 +18,7 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
+import { walkCommands, wordToString } from "../../../../src/utils/shell-utils";
 import type { DangerousPattern, ResolvedConfig } from "../../config";
 import { configLoader } from "../../config";
 import { executeSubagent, resolveModel } from "../../lib";
@@ -26,7 +27,6 @@ import {
   type CompiledPattern,
   compileCommandPatterns,
 } from "../../utils/matching";
-import { walkCommands, wordToString } from "../../utils/shell-utils";
 import {
   BUILTIN_KEYWORD_PATTERNS,
   BUILTIN_MATCHERS,

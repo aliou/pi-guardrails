@@ -9,16 +9,19 @@ import {
   Text,
   visibleWidth,
 } from "@mariozechner/pi-tui";
-import { configLoader } from "../config";
-import { extractBashPathCandidates } from "../utils/bash-paths";
-import { emitBlocked } from "../utils/events";
-import { normalizeAllowedPaths } from "../utils/migration";
+import { extractBashPathCandidates } from "../../../src/utils/bash-paths";
 import {
   normalizeForDisplay,
   resolveFromCwd,
   toStorageForm,
-} from "../utils/path";
-import { checkPathAccess, type PathAccessState } from "../utils/path-access";
+} from "../../../src/utils/path";
+import {
+  checkPathAccess,
+  type PathAccessState,
+} from "../../../src/utils/path-access";
+import { configLoader } from "../config";
+import { emitBlocked } from "../utils/events";
+import { normalizeAllowedPaths } from "../utils/migration";
 
 // Grant result type from the UI prompt
 type PromptResult =

@@ -5,9 +5,9 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { createEventBus } from "@mariozechner/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createEventContext } from "../../../tests/utils/pi-context";
 import type { ResolvedConfig } from "../../config";
 import { configLoader } from "../../config";
+import { createEventContext } from "../../test-utils/pi-context";
 import { setupPermissionGateHook } from "./index";
 
 // Mock configLoader so allow-session path doesn't throw.

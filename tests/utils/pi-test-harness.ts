@@ -36,14 +36,14 @@ import {
   SessionManager as SessionManagerClass,
 } from "@mariozechner/pi-coding-agent";
 import { vi } from "vitest";
-import { loadExtensionFromFactory } from "./load-extension";
 import {
   type CommandContextOverrides,
   createCommandContext,
   createEventContext,
   createToolContext,
   type EventContextOverrides,
-} from "./pi-context";
+} from "../../extensions/guardrails/test-utils/pi-context";
+import { loadExtensionFromFactory } from "./load-extension";
 
 export interface PiTestHarness {
   /** Working directory used by the harness. */

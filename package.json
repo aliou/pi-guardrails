@@ -17,7 +17,7 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./extensions/guardrails"
     ],
     "video": "https://assets.aliou.me/pi-extensions/demos/pi-guardrails.mp4"
   },
@@ -26,6 +26,7 @@
   },
   "files": [
     "src",
+    "extensions",
     "docs",
     "README.md"
   ],

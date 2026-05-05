@@ -2,16 +2,16 @@ import { stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { expandGlob, hasGlobChars } from "../../../src/utils/glob-expander";
+import { expandHomePath, maybePathLike } from "../../../src/utils/path";
+import { walkCommands, wordToString } from "../../../src/utils/shell-utils";
 import type { PolicyRule, Protection, ResolvedConfig } from "../config";
 import { emitBlocked } from "../utils/events";
-import { expandGlob, hasGlobChars } from "../utils/glob-expander";
 import {
   type CompiledPattern,
   compileFilePatterns,
   normalizeFilePath,
 } from "../utils/matching";
-import { expandHomePath, maybePathLike } from "../utils/path";
-import { walkCommands, wordToString } from "../utils/shell-utils";
 import { pendingWarnings } from "../utils/warnings";
 
 const DEFAULT_BLOCK_MESSAGES: Record<Protection, string> = {
