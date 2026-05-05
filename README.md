@@ -30,7 +30,6 @@ pi install git:github.com/aliou/pi-guardrails
 - **policies**: named file-protection rules with per-rule protection levels.
 - **permission-gate**: detects dangerous bash commands and asks for confirmation.
 - **path-access**: restricts tool access to the current working directory with allow/ask/block modes.
-- **optional command explainer**: can call a small LLM to explain a dangerous command inline in the confirmation dialog.
 
 ## Config locations
 
@@ -91,10 +90,7 @@ Use `/guardrails:settings` to edit config interactively.
     "customPatterns": [],
     "requireConfirmation": true,
     "allowedPatterns": [],
-    "autoDenyPatterns": [],
-    "explainCommands": false,
-    "explainModel": null,
-    "explainTimeout": 5000
+    "autoDenyPatterns": []
   }
 }
 ```
@@ -118,16 +114,6 @@ Each rule has:
 
 When multiple rules match the same file, strongest protection wins:
 `noAccess > readOnly > none`.
-
-### Add rule with AI
-
-Use:
-
-```text
-/guardrails:add-policy
-```
-
-This starts a subagent that helps build and save one policy rule.
 
 ## Path access
 
@@ -168,18 +154,6 @@ Built-in dangerous patterns are matched structurally (AST-based) for better accu
 - `chown -R`
 
 You can also add custom dangerous patterns.
-
-### Explain commands (opt-in)
-
-If enabled, guardrails calls an LLM before showing the confirmation dialog and displays a short explanation.
-
-Config fields:
-
-- `permissionGate.explainCommands` (boolean)
-- `permissionGate.explainModel` (`provider/model-id`)
-- `permissionGate.explainTimeout` (ms)
-
-Failures/timeouts degrade gracefully: dialog still shows without explanation.
 
 ## Migration notes
 

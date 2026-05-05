@@ -35,8 +35,6 @@
     "@aliou/sh": "^0.1.0"
   },
   "peerDependencies": {
-    "@mariozechner/pi-agent-core": "0.61.0",
-    "@mariozechner/pi-ai": "0.61.0",
     "@mariozechner/pi-coding-agent": "0.61.0",
     "@mariozechner/pi-tui": "0.61.0"
   },
@@ -44,8 +42,6 @@
     "@aliou/biome-plugins": "^0.3.2",
     "@biomejs/biome": "^2.3.13",
     "@changesets/cli": "^2.27.11",
-    "@mariozechner/pi-agent-core": "0.61.0",
-    "@mariozechner/pi-ai": "0.61.0",
     "@mariozechner/pi-coding-agent": "0.61.0",
     "@sinclair/typebox": "^0.34.48",
     "@types/node": "^25.0.10",
@@ -55,7 +51,6 @@
   },
   "pnpm": {
     "overrides": {
-      "@mariozechner/pi-ai": "$@mariozechner/pi-coding-agent",
       "@mariozechner/pi-tui": "$@mariozechner/pi-coding-agent"
     }
   },
@@ -73,12 +68,6 @@
   },
   "packageManager": "pnpm@10.26.1",
   "peerDependenciesMeta": {
-    "@mariozechner/pi-agent-core": {
-      "optional": true
-    },
-    "@mariozechner/pi-ai": {
-      "optional": true
-    },
     "@mariozechner/pi-coding-agent": {
       "optional": true
     },

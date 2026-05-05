@@ -56,9 +56,6 @@ function makeConfig(
       requireConfirmation: true,
       allowedPatterns: [],
       autoDenyPatterns: [],
-      explainCommands: false,
-      explainModel: null,
-      explainTimeout: 5000,
       ...overrides,
     },
   };

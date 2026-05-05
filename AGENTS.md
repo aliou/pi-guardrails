@@ -27,16 +27,16 @@ pnpm changeset    # Create changeset for versioning
 
 ```
 src/
-  index.ts            # Extension entry, registers hooks and commands
-  config.ts           # Configuration loading, schema, defaults, merge logic
-  hooks/              # Event hooks (policies + permission gate)
-  commands/           # Slash commands (settings UI, add-policy)
-  components/         # UI components (pattern editor)
-  lib/                # Vendored subagent executor core (Phase 1)
-  utils/              # Helpers (matching, glob expansion, migration, shell AST)
+  core/               # Pure guardrail primitives and checks
+  utils/              # Shared generic helpers (paths, glob expansion, shell AST)
+extensions/
+  guardrails/         # Pi extension entry, hooks, commands, config, UI components
+    hooks/            # Event hooks (policies, path access, permission gate)
+    commands/         # Slash commands (settings UI, onboarding)
+    components/       # UI components (pattern editor)
+    utils/            # Guardrails extension helpers (events, migrations, matching)
 tests/
   utils/              # Test harness utilities (adapted from pi-harness)
-    pi-context.ts     # Spy-based ExtensionContext / UI context builders
     pi-test-harness.ts # Full extension loader with emitEvent() for hook testing
     load-extension.ts # Wrapper for Pi internal extension loader
     matchers.ts       # Custom vitest matchers (toHaveRegisteredTool, etc.)

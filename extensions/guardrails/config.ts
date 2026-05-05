@@ -97,9 +97,6 @@ export interface GuardrailsConfig {
     requireConfirmation?: boolean;
     allowedPatterns?: PatternConfig[];
     autoDenyPatterns?: PatternConfig[];
-    explainCommands?: boolean;
-    explainModel?: string;
-    explainTimeout?: number;
   };
 }
 
@@ -127,9 +124,6 @@ export interface ResolvedConfig {
     requireConfirmation: boolean;
     allowedPatterns: PatternConfig[];
     autoDenyPatterns: PatternConfig[];
-    explainCommands: boolean;
-    explainModel: string | null;
-    explainTimeout: number;
   };
 }
 
@@ -181,6 +175,42 @@ function stripRemovedFields(config: GuardrailsConfig): GuardrailsConfig {
   return cleaned as GuardrailsConfig;
 }
 
+const REMOVED_PERMISSION_GATE_KEYS = [
+  "explainCommands",
+  "explainModel",
+  "explainTimeout",
+] as const;
+
+function hasRemovedPermissionGateFields(config: GuardrailsConfig): boolean {
+  const raw = config as Record<string, unknown>;
+  const permissionGate = raw.permissionGate as
+    | Record<string, unknown>
+    | undefined;
+  if (!permissionGate) return false;
+
+  for (const key of REMOVED_PERMISSION_GATE_KEYS) {
+    if (key in permissionGate) return true;
+  }
+
+  return false;
+}
+
+function stripRemovedPermissionGateFields(
+  config: GuardrailsConfig,
+): GuardrailsConfig {
+  const cleaned = structuredClone(config) as Record<string, unknown>;
+  const permissionGate = cleaned.permissionGate as
+    | Record<string, unknown>
+    | undefined;
+  if (permissionGate) {
+    for (const key of REMOVED_PERMISSION_GATE_KEYS) {
+      delete permissionGate[key];
+    }
+  }
+  cleaned.version = CURRENT_VERSION;
+  return cleaned as GuardrailsConfig;
+}
+
 const migrations: Migration<GuardrailsConfig>[] = [
   {
     name: "v0-format-upgrade",
@@ -200,6 +230,17 @@ const migrations: Migration<GuardrailsConfig>[] = [
           "These fields will be stripped from your config.",
       );
       return stripRemovedFields(config);
+    },
+  },
+  {
+    name: "strip-command-explainer-fields",
+    shouldRun: (config) => hasRemovedPermissionGateFields(config),
+    run: (config) => {
+      pendingWarnings.push(
+        "[guardrails] permissionGate.explainCommands, explainModel, and explainTimeout " +
+          "have been removed. These fields will be stripped from your config.",
+      );
+      return stripRemovedPermissionGateFields(config);
     },
   },
   {
@@ -327,9 +368,6 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     requireConfirmation: true,
     allowedPatterns: [],
     autoDenyPatterns: [],
-    explainCommands: false,
-    explainModel: null,
-    explainTimeout: 5000,
   },
 };
 
