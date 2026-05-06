@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.13.0
-        version: 0.13.0(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))
+        specifier: ^0.14.1
+        version: 0.14.1(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.61.0)
       '@aliou/sh':
         specifier: ^0.1.0
         version: 0.1.0
@@ -56,12 +56,23 @@ packages:
     peerDependencies:
       '@biomejs/biome': '>=2.0.0'
 
-  '@aliou/pi-utils-settings@0.13.0':
-    resolution: {integrity: sha512-oIpmvHUmeu21NIONURly2bRVERzRSVz+y54C+UL/EY7kus59s4tGvLvrjvA5hdkLyjxUvgpySva0CokvijZdSw==}
+  '@aliou/pi-utils-settings@0.14.1':
+    resolution: {integrity: sha512-6LqFSar22FHQ6PmjIh93AwCylQVZL+IHpMKSjA2Tr8hmuZa52pcyRYiEykgx4DdHHUJdxPwQ9Jmu+VnTd8yckw==}
     peerDependencies:
       '@mariozechner/pi-coding-agent': '>=0.61.0 <1'
     peerDependenciesMeta:
       '@mariozechner/pi-coding-agent':
+        optional: true
+
+  '@aliou/pi-utils-ui@0.3.0':
+    resolution: {integrity: sha512-KZEOSRzXBZg9bz/C7owXsehIHfiZ4iep4ync0wp6QwRqQh04lTuNGqSw7I6QH89xbwE7ipULN0uQanyqm6wVqg==}
+    peerDependencies:
+      '@mariozechner/pi-coding-agent': '>=0.61.0 <1'
+      '@mariozechner/pi-tui': 0.61.0
+    peerDependenciesMeta:
+      '@mariozechner/pi-coding-agent':
+        optional: true
+      '@mariozechner/pi-tui':
         optional: true
 
   '@aliou/sh@0.1.0':
@@ -2008,9 +2019,18 @@ snapshots:
     dependencies:
       '@biomejs/biome': 2.4.2
 
-  '@aliou/pi-utils-settings@0.13.0(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))':
+  '@aliou/pi-utils-settings@0.14.1(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.61.0)':
+    dependencies:
+      '@aliou/pi-utils-ui': 0.3.0(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.61.0)
     optionalDependencies:
       '@mariozechner/pi-coding-agent': 0.61.0(ws@8.19.0)(zod@3.25.76)
+    transitivePeerDependencies:
+      - '@mariozechner/pi-tui'
+
+  '@aliou/pi-utils-ui@0.3.0(@mariozechner/pi-coding-agent@0.61.0(ws@8.19.0)(zod@3.25.76))(@mariozechner/pi-tui@0.61.0)':
+    optionalDependencies:
+      '@mariozechner/pi-coding-agent': 0.61.0(ws@8.19.0)(zod@3.25.76)
+      '@mariozechner/pi-tui': 0.61.0
 
   '@aliou/sh@0.1.0': {}
 
