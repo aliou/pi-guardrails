@@ -14,10 +14,10 @@ import {
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
 import { checkDangerousCommand } from "../../../../src/core/commands";
+import { emitBlocked, emitDangerous } from "../../../../src/shared/events";
+import { compileCommandPatterns } from "../../../../src/shared/matching";
 import type { ResolvedConfig } from "../../config";
 import { configLoader } from "../../config";
-import { emitBlocked, emitDangerous } from "../../utils/events";
-import { compileCommandPatterns } from "../../utils/matching";
 
 /**
  * Permission gate that prompts user confirmation for dangerous commands.

@@ -27,7 +27,6 @@ import type {
   ResolvedConfig,
 } from "../config";
 import { configLoader } from "../config";
-import { normalizeAllowedPaths } from "../utils/migration";
 
 type FeatureKey = keyof ResolvedConfig["features"];
 
@@ -1221,7 +1220,10 @@ export function registerGuardrailsSettings(pi: ExtensionAPI): void {
 
       function pathListSubmenu(id: string, label: string) {
         return (_val: string, submenuDone: (v?: string) => void) => {
-          const items = normalizeAllowedPaths(getNestedValue(scopedConfig, id));
+          const value = getNestedValue(scopedConfig, id);
+          const items = Array.isArray(value)
+            ? value.filter((path): path is string => typeof path === "string")
+            : [];
           let latestCount = items.length;
           return new PathListEditor({
             label,

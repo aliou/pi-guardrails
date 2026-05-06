@@ -51,6 +51,7 @@ tests/
 - Built-in dangerous command matching uses AST parsing via `@aliou/sh`; user-configured patterns use substring/regex matching
 - File protection is policy-based (`features.policies`, `policies.rules`), not legacy `envFiles`
 - Config migrations are predicate-based (`shouldRun`) using structural checks; do not rely on lexicographic version string comparisons
+- Runtime code must only handle current config/core shapes. Old config shapes belong exclusively in migrations; do not add runtime compatibility branches for legacy config.
 - `config.version` is a schema marker for debugging/inspection, not the package version
 - Events emitted on the pi event bus for inter-extension communication (`guardrails:blocked`, `guardrails:dangerous`)
 

@@ -14,5 +14,4 @@ export {
   DEFAULT_CONFIG,
   globalConfigMigrations,
   migrations,
-  normalizeAllowedPaths,
 } from "../../src/shared/config";

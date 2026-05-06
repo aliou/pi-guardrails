@@ -9,8 +9,9 @@
  */
 
 import { matchesGlob } from "node:path";
-import type { PatternConfig } from "../config";
+import type { PatternConfig } from "./config";
 import { addPendingWarning } from "./warnings";
+
 export interface CompiledPattern {
   test: (input: string) => boolean;
   source: PatternConfig;

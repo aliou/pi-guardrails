@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { drainPendingWarnings } from "../../src/shared/warnings";
 import { registerGuardrailsOnboardingCommand } from "./commands/onboarding-command";
 import { registerGuardrailsSettings } from "./commands/settings-command";
 import { configLoader, globalConfigMigrations } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
-import { drainPendingWarnings } from "./utils/warnings";
 
 /**
  * Guardrails Extension

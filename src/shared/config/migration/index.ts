@@ -8,7 +8,6 @@ import * as normalizeAllowedPaths from "./005-normalize-allowed-paths";
 import * as applyBuiltinDefaults from "./006-apply-builtin-defaults";
 import * as markOnboardingDone from "./007-mark-onboarding-done";
 
-export { normalizeAllowedPaths } from "./005-normalize-allowed-paths";
 export { CURRENT_VERSION } from "./version";
 
 export const migrations: Migration<GuardrailsConfig>[] = [

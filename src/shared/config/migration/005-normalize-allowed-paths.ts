@@ -22,7 +22,7 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
   return migrated as GuardrailsConfig;
 }
 
-export function normalizeAllowedPaths(items: unknown): string[] {
+function normalizeAllowedPaths(items: unknown): string[] {
   if (!Array.isArray(items)) return [];
 
   const paths = new Set<string>();

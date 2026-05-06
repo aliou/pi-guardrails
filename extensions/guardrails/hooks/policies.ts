@@ -2,17 +2,17 @@ import { stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { expandGlob, hasGlobChars } from "../../../src/utils/glob-expander";
-import { expandHomePath, maybePathLike } from "../../../src/utils/path";
-import { walkCommands, wordToString } from "../../../src/utils/shell-utils";
-import type { PolicyRule, Protection, ResolvedConfig } from "../config";
-import { emitBlocked } from "../utils/events";
+import { emitBlocked } from "../../../src/shared/events";
 import {
   type CompiledPattern,
   compileFilePatterns,
   normalizeFilePath,
-} from "../utils/matching";
-import { addPendingWarning } from "../utils/warnings";
+} from "../../../src/shared/matching";
+import { addPendingWarning } from "../../../src/shared/warnings";
+import { expandGlob, hasGlobChars } from "../../../src/utils/glob-expander";
+import { expandHomePath, maybePathLike } from "../../../src/utils/path";
+import { walkCommands, wordToString } from "../../../src/utils/shell-utils";
+import type { PolicyRule, Protection, ResolvedConfig } from "../config";
 
 const DEFAULT_BLOCK_MESSAGES: Record<Protection, string> = {
   noAccess:

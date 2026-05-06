@@ -4,7 +4,6 @@ export {
   CURRENT_VERSION,
   globalConfigMigrations,
   migrations,
-  normalizeAllowedPaths,
 } from "./migration";
 export type {
   DangerousPattern,

@@ -9,6 +9,7 @@ import {
   Text,
   visibleWidth,
 } from "@mariozechner/pi-tui";
+import { emitBlocked } from "../../../src/shared/events";
 import { extractBashPathCandidates } from "../../../src/utils/bash-paths";
 import {
   normalizeForDisplay,
@@ -20,8 +21,6 @@ import {
   type PathAccessState,
 } from "../../../src/utils/path-access";
 import { configLoader } from "../config";
-import { emitBlocked } from "../utils/events";
-import { normalizeAllowedPaths } from "../utils/migration";
 
 // Grant result type from the UI prompt
 type PromptResult =
@@ -250,7 +249,9 @@ async function persistGrant(
     unknown
   >;
   const pa = (raw.pathAccess ?? {}) as Record<string, unknown>;
-  const existing = normalizeAllowedPaths(pa.allowedPaths);
+  const existing = Array.isArray(pa.allowedPaths)
+    ? pa.allowedPaths.filter((path): path is string => typeof path === "string")
+    : [];
 
   if (existing.includes(storagePath)) return;
 

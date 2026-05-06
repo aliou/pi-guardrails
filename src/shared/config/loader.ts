@@ -1,6 +1,6 @@
 import { ConfigLoader } from "@aliou/pi-utils-settings";
 import { DEFAULT_CONFIG } from "./defaults";
-import { migrations, normalizeAllowedPaths } from "./migration";
+import { migrations } from "./migration";
 import type { GuardrailsConfig, PolicyRule, ResolvedConfig } from "./types";
 
 export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
@@ -49,7 +49,10 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         local?.pathAccess?.allowedPaths,
         memory?.pathAccess?.allowedPaths,
       ]) {
-        for (const p of normalizeAllowedPaths(paths)) mergedPaths.add(p);
+        for (const path of paths ?? []) {
+          const trimmed = path.trim();
+          if (trimmed) mergedPaths.add(trimmed);
+        }
       }
       resolved.pathAccess.allowedPaths = [...mergedPaths];
 

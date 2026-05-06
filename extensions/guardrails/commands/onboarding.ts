@@ -6,8 +6,8 @@ import {
 import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { Box, Key, Markdown, matchesKey, Text } from "@mariozechner/pi-tui";
+import { CURRENT_VERSION } from "../../../src/shared/config/migration";
 import type { GuardrailsConfig } from "../config";
-import { CURRENT_VERSION } from "../utils/migration";
 
 interface OnboardingState {
   applyBuiltinDefaults: boolean | null;
