@@ -1,16 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { isOnboardingPending } from "./commands/onboarding";
 import { registerGuardrailsOnboardingCommand } from "./commands/onboarding-command";
 import { registerGuardrailsSettings } from "./commands/settings-command";
-import { configLoader } from "./config";
+import { configLoader, globalConfigMigrations } from "./config";
 import { setupGuardrailsHooks } from "./hooks";
-import {
-  migrateApplyBuiltinDefaults,
-  migrateMarkOnboardingDone,
-  needsApplyBuiltinDefaultsMigration,
-  needsOnboardingDoneMigration,
-} from "./utils/migration";
-import { pendingWarnings } from "./utils/warnings";
+import { drainPendingWarnings } from "./utils/warnings";
 
 /**
  * Guardrails Extension
@@ -39,14 +32,11 @@ export default async function (pi: ExtensionAPI) {
       let migrated = globalConfig;
       let changed = false;
 
-      if (needsApplyBuiltinDefaultsMigration(migrated)) {
-        migrated = migrateApplyBuiltinDefaults(migrated);
-        changed = true;
-      }
-
-      if (needsOnboardingDoneMigration(migrated)) {
-        migrated = migrateMarkOnboardingDone(migrated);
-        changed = true;
+      for (const migration of globalConfigMigrations) {
+        if (migration.shouldRun(migrated)) {
+          migrated = migration.run(migrated);
+          changed = true;
+        }
       }
 
       if (changed) {
@@ -60,6 +50,9 @@ export default async function (pi: ExtensionAPI) {
 
   registerGuardrailsSettings(pi);
 
+  const isSetupMissing = () =>
+    !configLoader.hasConfig("global") && !configLoader.hasConfig("local");
+
   const maybeRegisterHooks = () => {
     if (hooksRegistered) return;
     const config = configLoader.getConfig();
@@ -68,22 +61,31 @@ export default async function (pi: ExtensionAPI) {
     hooksRegistered = true;
   };
 
-  if (isOnboardingPending(configLoader.getRawConfig("global"))) {
+  if (isSetupMissing()) {
     registerGuardrailsOnboardingCommand(pi, maybeRegisterHooks);
   } else {
     maybeRegisterHooks();
   }
 
   pi.on("session_start", (_event, ctx) => {
-    for (const warning of pendingWarnings.splice(0)) {
-      ctx.ui.notify(warning, "warning");
+    const warnings = drainPendingWarnings();
+    if (warnings.length === 1) {
+      ctx.ui.notify(warnings[0] as string, "warning");
+    } else if (warnings.length > 1) {
+      ctx.ui.notify(
+        [
+          "Guardrails warnings:",
+          ...warnings.map((warning) => `- ${warning}`),
+        ].join("\n"),
+        "warning",
+      );
     }
 
     if (!ctx.hasUI) {
       return;
     }
 
-    if (isOnboardingPending(configLoader.getRawConfig("global"))) {
+    if (isSetupMissing()) {
       ctx.ui.notify(
         "[Guardrails] setup pending. Run `/guardrails:onboarding` to choose recommended or minimal protection defaults.",
         "info",

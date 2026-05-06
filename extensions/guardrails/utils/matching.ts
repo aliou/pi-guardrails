@@ -10,8 +10,7 @@
 
 import { matchesGlob } from "node:path";
 import type { PatternConfig } from "../config";
-import { pendingWarnings } from "./warnings";
-
+import { addPendingWarning } from "./warnings";
 export interface CompiledPattern {
   test: (input: string) => boolean;
   source: PatternConfig;
@@ -47,7 +46,7 @@ export function compileFilePattern(config: PatternConfig): CompiledPattern {
         source: config,
       };
     } catch {
-      pendingWarnings.push(
+      addPendingWarning(
         `Invalid regex in guardrails config: ${config.pattern}`,
       );
       return { test: () => false, source: config };
@@ -80,7 +79,7 @@ export function compileCommandPattern(config: PatternConfig): CompiledPattern {
       const re = new RegExp(config.pattern);
       return { test: (input) => re.test(input), source: config };
     } catch {
-      pendingWarnings.push(
+      addPendingWarning(
         `Invalid regex in guardrails config: ${config.pattern}`,
       );
       return { test: () => false, source: config };

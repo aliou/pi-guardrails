@@ -12,7 +12,7 @@ import {
   compileFilePatterns,
   normalizeFilePath,
 } from "../utils/matching";
-import { pendingWarnings } from "../utils/warnings";
+import { addPendingWarning } from "../utils/warnings";
 
 const DEFAULT_BLOCK_MESSAGES: Record<Protection, string> = {
   noAccess:
@@ -64,7 +64,7 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
   for (const rule of rules) {
     const id = rule.id?.trim();
     if (!id) {
-      pendingWarnings.push("[guardrails] skipping policy rule without id.");
+      addPendingWarning("[guardrails] skipping policy rule without id.");
       continue;
     }
 
@@ -73,7 +73,7 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
       rule.protection !== "readOnly" &&
       rule.protection !== "noAccess"
     ) {
-      pendingWarnings.push(
+      addPendingWarning(
         `[guardrails] skipping policy rule "${id}": invalid protection.`,
       );
       continue;
@@ -83,7 +83,7 @@ function compileRules(rules: PolicyRule[]): CompiledRule[] {
       (pattern) => pattern.pattern.trim().length > 0,
     );
     if (normalizedPatterns.length === 0) {
-      pendingWarnings.push(
+      addPendingWarning(
         `[guardrails] skipping policy rule "${id}": missing non-empty patterns.`,
       );
       continue;
