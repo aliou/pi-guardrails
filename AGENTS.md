@@ -27,14 +27,13 @@ pnpm changeset    # Create changeset for versioning
 
 ```
 src/
-  core/               # Pure guardrail primitives and checks
-  utils/              # Shared generic helpers (paths, glob expansion, shell AST)
+  core/               # Pure guardrail primitives, checks, path rules, shell parsing helpers
+  shared/             # Pi-extension shared infra and adapters (config, events, matching, filesystem-backed helpers)
 extensions/
-  guardrails/         # Pi extension entry, hooks, commands, config, UI components
+  guardrails/         # Legacy Pi extension entry, hooks, commands, config, UI components
     hooks/            # Event hooks (policies, path access, permission gate)
     commands/         # Slash commands (settings UI, onboarding)
     components/       # UI components (pattern editor)
-    utils/            # Guardrails extension helpers (events, migrations, matching)
 tests/
   utils/              # Test harness utilities (adapted from pi-harness)
     pi-test-harness.ts # Full extension loader with emitEvent() for hook testing

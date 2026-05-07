@@ -1,9 +1,5 @@
 import { assert, describe, expect, it } from "vitest";
-import {
-  checkPathAccess,
-  isPathAllowed,
-  type PathAccessState,
-} from "./path-access";
+import { checkPathAccess, isPathAllowed, type PathAccessState } from "./access";
 
 describe("isPathAllowed", () => {
   describe("when allowedPaths is empty", () => {

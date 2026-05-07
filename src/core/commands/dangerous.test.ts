@@ -113,7 +113,7 @@ describe("dd matcher", () => {
     ).toBe("disk write operation");
   });
 
-  it("does not match dd with only if= (input only)", () => {
+  it("matches dd writing to /dev/null", () => {
     expect(findMatch(["dd", "if=/dev/sda", "of=/dev/null"])).toBe(
       "disk write operation",
     );
@@ -274,6 +274,18 @@ describe("container matcher (docker/podman)", () => {
       );
     });
 
+    it("matches docker run --uts=host", () => {
+      expect(findMatch(["docker", "run", "--uts=host", "alpine"])).toBe(
+        "container with host UTS namespace",
+      );
+    });
+
+    it("matches docker run --ipc=host", () => {
+      expect(findMatch(["docker", "run", "--ipc=host", "alpine"])).toBe(
+        "container with host IPC",
+      );
+    });
+
     it("matches docker run with root mount", () => {
       expect(findMatch(["docker", "run", "-v/:/host", "alpine"])).toBe(
         "container with root filesystem mount",
@@ -417,6 +429,21 @@ describe("checkDangerousCommand", () => {
       description: "recursive force delete",
       pattern: "rm -rf",
     });
+  });
+
+  it.each([
+    ["logical command", "echo ok && sudo true", "superuser command"],
+    ["pipeline", "echo ok | sudo tee /tmp/out", "superuser command"],
+    ["subshell", "(sudo true)", "superuser command"],
+  ])("matches dangerous commands nested in a %s", (_label, command, description) => {
+    const result = checkDangerousCommand({
+      command,
+      patterns: [],
+      useBuiltinMatchers: true,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toEqual({ description, pattern: "(structural)" });
   });
 });
 

@@ -1,5 +1,5 @@
 import { parse } from "@aliou/sh";
-import { walkCommands, wordToString } from "../../utils/shell-utils";
+import { walkCommands, wordToString } from "../shell/ast";
 
 /**
  * Dangerous command matchers for the permission gate.

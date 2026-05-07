@@ -1,9 +1,9 @@
 import { resolve } from "node:path";
 import { parse } from "@aliou/sh";
-import { classifyCommandArgs } from "./command-args";
-import { expandGlob, hasGlobChars } from "./glob-expander";
-import { expandHomePath, maybePathLike } from "./path";
-import { walkCommands, wordToString } from "./shell-utils";
+import { expandHomePath, maybePathLike } from "../../core/paths/path";
+import { walkCommands, wordToString } from "../../core/shell/ast";
+import { classifyCommandArgs } from "../../core/shell/command-args";
+import { expandGlob, hasGlobChars } from "../glob";
 
 async function expandCandidate(
   candidate: string,

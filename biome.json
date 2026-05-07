@@ -11,7 +11,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.json"],
+    "includes": ["src/**/*.ts", "*.json"],
     "ignoreUnknown": true
   },
   "assist": {

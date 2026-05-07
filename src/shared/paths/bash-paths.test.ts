@@ -84,8 +84,8 @@ describe("extractBashPathCandidates", () => {
 
     it("detects Windows-style paths", async () => {
       const result = await extractBashPathCandidates("type C:\\foo\\bar", CWD);
-      expect(result.length).toBeGreaterThan(0);
-      // On POSIX, resolve() treats backslash path as a single component under cwd
+
+      expect(result).toHaveLength(1);
       expect(result[0]).toContain("C:\\foo\\bar");
     });
   });
@@ -101,6 +101,15 @@ describe("extractBashPathCandidates", () => {
       expect(
         await extractBashPathCandidates("echo foo > /tmp/out", CWD),
       ).toEqual(["/tmp/out"]);
+    });
+
+    it("extracts paths from multiple commands and redirects", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "cat ./input && grep needle /tmp/log > ./out",
+          CWD,
+        ),
+      ).toEqual(["/work/project/input", "/tmp/log", "/work/project/out"]);
     });
   });
 

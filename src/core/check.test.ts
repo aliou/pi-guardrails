@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { checkAction, resolveDecision } from "./check";
 import type { Action, Rule, Safety } from "./types";
 
@@ -20,6 +20,7 @@ describe("checkAction", () => {
   });
 
   it("returns dangerous for the first matching rule", async () => {
+    const secondCheck = vi.fn(() => true);
     const rules: Rule[] = [
       {
         key: "first",
@@ -29,7 +30,7 @@ describe("checkAction", () => {
       {
         key: "second",
         reason: "second match",
-        check: () => true,
+        check: secondCheck,
       },
     ];
 
@@ -39,6 +40,7 @@ describe("checkAction", () => {
       key: "first",
       reason: "first match",
     });
+    expect(secondCheck).not.toHaveBeenCalled();
   });
 
   it("supports async rules", async () => {
@@ -55,6 +57,36 @@ describe("checkAction", () => {
       key: "async",
       reason: "async match",
     });
+  });
+
+  it("propagates rule errors", async () => {
+    const error = new Error("rule failed");
+    const rules: Rule[] = [
+      {
+        key: "broken",
+        reason: "broken rule",
+        check: () => {
+          throw error;
+        },
+      },
+    ];
+
+    await expect(checkAction(commandAction, rules)).rejects.toThrow(error);
+  });
+
+  it("propagates async rule rejections", async () => {
+    const error = new Error("async rule failed");
+    const rules: Rule[] = [
+      {
+        key: "broken-async",
+        reason: "broken async rule",
+        check: async () => {
+          throw error;
+        },
+      },
+    ];
+
+    await expect(checkAction(commandAction, rules)).rejects.toThrow(error);
   });
 });
 
