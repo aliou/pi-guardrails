@@ -8,5 +8,6 @@ export type {
   Grant,
   PermissionState,
   Rule,
+  RuleResult,
   Safety,
 } from "./types";

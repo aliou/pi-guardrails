@@ -1,16 +1,19 @@
 import type { Action, Decision, PermissionState, Rule, Safety } from "./types";
 
-export async function checkAction(
+export async function checkAction<TMeta = null>(
   action: Action,
-  rules: readonly Rule[],
-): Promise<Safety> {
+  rules: readonly Rule<TMeta>[],
+): Promise<Safety<TMeta>> {
   for (const rule of rules) {
-    if (await rule.check(action)) {
+    const result = await rule.check(action);
+
+    if (result.kind === "match") {
       return {
         kind: "dangerous",
         action,
         key: rule.key,
-        reason: rule.reason,
+        reason: result.reason,
+        metadata: result.metadata,
       };
     }
   }
@@ -18,10 +21,10 @@ export async function checkAction(
   return { kind: "safe" };
 }
 
-export function resolveDecision(
-  safety: Safety,
+export function resolveDecision<TMeta = null>(
+  safety: Safety<TMeta>,
   permissionState: PermissionState,
-): Decision {
+): Decision<TMeta> {
   if (safety.kind === "safe") return { kind: "allow" };
 
   switch (permissionState) {

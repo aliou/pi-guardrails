@@ -10,28 +10,38 @@ export type Action =
       origin?: string;
     };
 
-export type Safety =
+export type RuleResult<TMeta = null> =
+  | {
+      kind: "pass";
+    }
+  | {
+      kind: "match";
+      reason: string;
+      metadata: TMeta;
+    };
+
+export type Safety<TMeta = null> =
   | {
       kind: "safe";
     }
   | {
       kind: "dangerous";
       action: Action;
-      reason: string;
       key: string;
+      reason: string;
+      metadata: TMeta;
     };
 
-export type Rule = {
+export type Rule<TMeta = null> = {
   key: string;
-  reason: string;
-  check: (action: Action) => boolean | Promise<boolean>;
+  check: (action: Action) => RuleResult<TMeta> | Promise<RuleResult<TMeta>>;
 };
 
 export type PermissionState = "granted" | "prompt" | "denied";
 
 export type Grant = "once" | "always" | "never";
 
-export type Decision =
+export type Decision<TMeta = null> =
   | {
       kind: "allow";
     }
@@ -41,5 +51,5 @@ export type Decision =
     }
   | {
       kind: "prompt";
-      risk: Safety & { kind: "dangerous" };
+      risk: Safety<TMeta> & { kind: "dangerous" };
     };

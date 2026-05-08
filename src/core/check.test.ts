@@ -4,13 +4,16 @@ import type { Action, Rule, Safety } from "./types";
 
 const commandAction: Action = { kind: "command", command: "rm -rf /tmp/test" };
 
+type TestMeta = { pattern: string; source: "test" };
+
+const testMetadata: TestMeta = { pattern: "rm -rf", source: "test" };
+
 describe("checkAction", () => {
   it("returns safe when no rules match", async () => {
     const rules: Rule[] = [
       {
         key: "sudo",
-        reason: "superuser command",
-        check: () => false,
+        check: () => ({ kind: "pass" }),
       },
     ];
 
@@ -20,16 +23,22 @@ describe("checkAction", () => {
   });
 
   it("returns dangerous for the first matching rule", async () => {
-    const secondCheck = vi.fn(() => true);
-    const rules: Rule[] = [
+    const secondCheck = vi.fn(() => ({
+      kind: "match" as const,
+      reason: "second match",
+      metadata: testMetadata,
+    }));
+    const rules: Rule<TestMeta>[] = [
       {
         key: "first",
-        reason: "first match",
-        check: () => true,
+        check: () => ({
+          kind: "match",
+          reason: "first match",
+          metadata: testMetadata,
+        }),
       },
       {
         key: "second",
-        reason: "second match",
         check: secondCheck,
       },
     ];
@@ -39,6 +48,7 @@ describe("checkAction", () => {
       action: commandAction,
       key: "first",
       reason: "first match",
+      metadata: testMetadata,
     });
     expect(secondCheck).not.toHaveBeenCalled();
   });
@@ -47,8 +57,14 @@ describe("checkAction", () => {
     const rules: Rule[] = [
       {
         key: "async",
-        reason: "async match",
-        check: async (action) => action.kind === "command",
+        check: async (action) =>
+          action.kind === "command"
+            ? {
+                kind: "match",
+                reason: "async match",
+                metadata: null,
+              }
+            : { kind: "pass" },
       },
     ];
 
@@ -56,6 +72,7 @@ describe("checkAction", () => {
       kind: "dangerous",
       key: "async",
       reason: "async match",
+      metadata: null,
     });
   });
 
@@ -64,7 +81,6 @@ describe("checkAction", () => {
     const rules: Rule[] = [
       {
         key: "broken",
-        reason: "broken rule",
         check: () => {
           throw error;
         },
@@ -79,7 +95,6 @@ describe("checkAction", () => {
     const rules: Rule[] = [
       {
         key: "broken-async",
-        reason: "broken async rule",
         check: async () => {
           throw error;
         },
@@ -87,6 +102,35 @@ describe("checkAction", () => {
     ];
 
     await expect(checkAction(commandAction, rules)).rejects.toThrow(error);
+  });
+
+  it("preserves typed match metadata", async () => {
+    const rules: Rule<TestMeta>[] = [
+      {
+        key: "typed",
+        check: () => ({
+          kind: "match",
+          reason: "typed match",
+          metadata: testMetadata,
+        }),
+      },
+    ];
+
+    const safety = await checkAction(commandAction, rules);
+
+    if (safety.kind !== "dangerous") {
+      throw new Error("expected dangerous safety");
+    }
+
+    expect(safety.metadata.pattern).toBe("rm -rf");
+
+    const decision = resolveDecision(safety, "prompt");
+
+    if (decision.kind !== "prompt") {
+      throw new Error("expected prompt decision");
+    }
+
+    expect(decision.risk.metadata.pattern).toBe("rm -rf");
   });
 });
 
@@ -96,6 +140,7 @@ describe("resolveDecision", () => {
     action: commandAction,
     key: "rm-rf",
     reason: "recursive force delete",
+    metadata: null,
   };
 
   it("allows safe actions", () => {
