@@ -48,6 +48,7 @@
     "@sinclair/typebox": "^0.34.48",
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
+    "memfs": "^4.57.2",
     "typescript": "^5.9.3",
     "vitest": "^4.1.4"
   },
