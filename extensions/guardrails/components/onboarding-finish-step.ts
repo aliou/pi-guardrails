@@ -1,6 +1,6 @@
-import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
-import { Key, Markdown, matchesKey } from "@mariozechner/pi-tui";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { Key, Markdown, matchesKey } from "@earendil-works/pi-tui";
 import type { OnboardingState } from "./onboarding-types";
 
 export class OnboardingFinishStep implements Component {

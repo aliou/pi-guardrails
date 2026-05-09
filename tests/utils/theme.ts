@@ -4,7 +4,7 @@
  * without pulling in a real terminal theme.
  */
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 
 const identity = (_color: string, text: string) => text;
 

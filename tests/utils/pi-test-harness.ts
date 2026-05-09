@@ -29,12 +29,12 @@ import type {
   RegisteredCommand,
   SessionManager,
   ToolDefinition,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   createEventBus,
   createExtensionRuntime,
   SessionManager as SessionManagerClass,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 import {
   type CommandContextOverrides,

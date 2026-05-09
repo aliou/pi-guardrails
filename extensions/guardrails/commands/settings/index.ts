@@ -1,16 +1,18 @@
 import {
+  type ConfigStore,
   getNestedValue,
   registerSettingsCommand,
+  type Scope,
   SettingsDetailEditor,
   type SettingsDetailField,
   type SettingsSection,
 } from "@aliou/pi-utils-settings";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type {
   Component,
   SettingItem,
   SettingsListTheme,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import type {
   DangerousPattern,
   GuardrailsConfig,
@@ -22,14 +24,7 @@ import { configLoader } from "../../../../src/shared/config";
 import type { GuardrailsFeatureId } from "../../../../src/shared/events";
 import { PatternEditor } from "../../components/pattern-editor";
 import { AddRuleSubmenu } from "./add-rule-wizard";
-import {
-  appendDangerousPattern,
-  appendPolicyRule,
-  COMMAND_EXAMPLES,
-  POLICY_EXAMPLES,
-} from "./examples";
 import { PathListEditor } from "./path-list-editor";
-import { ScopePickerSubmenu } from "./scope-picker-submenu";
 import {
   addPolicyRuleDraft,
   countItems,
@@ -262,6 +257,25 @@ export interface RegisterGuardrailsSettingsOptions {
   getLoadedFeatures?: () => ReadonlySet<GuardrailsFeatureId>;
 }
 
+function createSettingsConfigStore(): ConfigStore<
+  GuardrailsConfig,
+  ResolvedConfig
+> {
+  return {
+    save: (scope, config) => configLoader.save(scope, config),
+    getConfig: () => configLoader.getConfig(),
+    getRawConfig: (scope) => configLoader.getRawConfig(scope),
+    hasScope: (scope) => configLoader.hasScope(scope),
+    hasConfig: (scope) => configLoader.hasConfig(scope),
+    getEnabledScopes: () => {
+      const enabled = new Set(configLoader.getEnabledScopes());
+      return (["memory", "local", "global"] as Scope[]).filter((scope) =>
+        enabled.has(scope),
+      );
+    },
+  };
+}
+
 export function registerGuardrailsSettings(
   pi: ExtensionAPI,
   options: RegisterGuardrailsSettingsOptions = {},
@@ -269,10 +283,10 @@ export function registerGuardrailsSettings(
   registerSettingsCommand<GuardrailsConfig, ResolvedConfig>(pi, {
     commandName: "guardrails:settings",
     title: "Guardrails Settings",
-    configStore: configLoader,
+    configStore: createSettingsConfigStore(),
     buildSections: (
       tabConfig: GuardrailsConfig | null,
-      _resolved: ResolvedConfig,
+      resolved: ResolvedConfig,
       { setDraft, theme, scope },
     ): SettingsSection[] => {
       const settingsTheme = theme;
@@ -402,6 +416,7 @@ export function registerGuardrailsSettings(
         .filter((key) => key !== "policies")
         .map((key): SettingItem => {
           const scopedValue = scopedConfig.features?.[key];
+          const effectiveValue = resolved.features[key];
           const loaded = loadedFeatures?.has(key) ?? true;
           return {
             id: `features.${key}`,
@@ -411,7 +426,7 @@ export function registerGuardrailsSettings(
               : `${FEATURE_UI[key].description} (Not loaded by Pi)`,
             currentValue: loaded
               ? scopedValue === undefined
-                ? "(inherited)"
+                ? `inherited: ${effectiveValue ? "enabled" : "disabled"}`
                 : scopedValue
                   ? "enabled"
                   : "disabled"
@@ -454,7 +469,7 @@ export function registerGuardrailsSettings(
           description: FEATURE_UI.policies.description,
           currentValue:
             scopedConfig.features?.policies === undefined
-              ? "(inherited)"
+              ? `inherited: ${resolved.features.policies ? "enabled" : "disabled"}`
               : scopedConfig.features.policies
                 ? "enabled"
                 : "disabled",
@@ -501,7 +516,9 @@ export function registerGuardrailsSettings(
               label: "Mode",
               description:
                 "allow: no restrictions, ask: prompt for outside paths, block: deny all outside paths",
-              currentValue: scopedConfig.pathAccess?.mode ?? "(inherited)",
+              currentValue:
+                scopedConfig.pathAccess?.mode ??
+                `inherited: ${resolved.pathAccess.mode}`,
               values: ["allow", "ask", "block"],
             },
             {
@@ -527,7 +544,7 @@ export function registerGuardrailsSettings(
                 "Show confirmation dialog for dangerous commands (if off, just warns)",
               currentValue:
                 scopedConfig.permissionGate?.requireConfirmation === undefined
-                  ? "(inherited)"
+                  ? `inherited: ${resolved.permissionGate.requireConfirmation ? "on" : "off"}`
                   : scopedConfig.permissionGate.requireConfirmation
                     ? "on"
                     : "off",
@@ -571,76 +588,5 @@ export function registerGuardrailsSettings(
         },
       ];
     },
-    extraTabs: [
-      {
-        id: "examples",
-        label: "Examples",
-        buildSections: ({
-          enabledScopes,
-          getDraftForScope,
-          getRawForScope,
-          setDraftForScope,
-          theme,
-        }): SettingsSection[] => {
-          const policyItems: SettingItem[] = POLICY_EXAMPLES.map((example) => ({
-            id: `examples.${example.rule.id}`,
-            label: `  ${example.label}`,
-            description: example.description,
-            currentValue: "apply",
-            submenu: (_val: string, submenuDone: (v?: string) => void) =>
-              new ScopePickerSubmenu(
-                theme,
-                enabledScopes,
-                (targetScope) => {
-                  const baseConfig =
-                    getDraftForScope(targetScope) ??
-                    getRawForScope(targetScope) ??
-                    null;
-                  const updated = appendPolicyRule(baseConfig, example.rule);
-                  setDraftForScope(targetScope, updated);
-                },
-                submenuDone,
-              ),
-          }));
-
-          const commandItems: SettingItem[] = COMMAND_EXAMPLES.map(
-            (example) => ({
-              id: `examples.cmd.${example.pattern.pattern}`,
-              label: `  ${example.label}`,
-              description: example.description,
-              currentValue: "add",
-              submenu: (_val: string, submenuDone: (v?: string) => void) =>
-                new ScopePickerSubmenu(
-                  theme,
-                  enabledScopes,
-                  (targetScope) => {
-                    const baseConfig =
-                      getDraftForScope(targetScope) ??
-                      getRawForScope(targetScope) ??
-                      null;
-                    const updated = appendDangerousPattern(
-                      baseConfig,
-                      example.pattern,
-                    );
-                    setDraftForScope(targetScope, updated);
-                  },
-                  submenuDone,
-                ),
-            }),
-          );
-
-          return [
-            {
-              label: "File policy presets",
-              items: policyItems,
-            },
-            {
-              label: "Dangerous command presets",
-              items: commandItems,
-            },
-          ];
-        },
-      },
-    ],
   });
 }

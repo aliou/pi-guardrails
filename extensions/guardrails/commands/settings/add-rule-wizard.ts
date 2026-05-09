@@ -7,7 +7,7 @@ import {
   type Component,
   Input,
   type SettingsListTheme,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import type { PatternConfig } from "../../../../src/shared/config";
 import { PatternEditor } from "../../components/pattern-editor";
 import { type NewPolicyRuleDraft, toKebabCase } from "./utils";

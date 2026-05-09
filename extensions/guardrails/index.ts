@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {
@@ -9,6 +9,7 @@ import {
   type GuardrailsFeatureId,
 } from "../../src/shared/events";
 import { drainPendingWarnings } from "../../src/shared/warnings";
+import { registerGuardrailsExamplesCommand } from "./commands/examples";
 import { registerGuardrailsOnboardingCommand } from "./commands/onboarding";
 import { registerGuardrailsSettings } from "./commands/settings";
 import {
@@ -71,6 +72,7 @@ export default async function guardrails(pi: ExtensionAPI) {
     getLoadedFeatures: () => loadedFeatures,
   });
 
+  registerGuardrailsExamplesCommand(pi);
   registerGuardrailsOnboardingCommand(pi);
   setupPolicyHook(pi);
 

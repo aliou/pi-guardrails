@@ -1,4 +1,4 @@
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Key,
@@ -8,7 +8,7 @@ import {
   truncateToWidth,
   visibleWidth,
   wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 interface MinimalTheme {
   fg(color: string, text: string): string;

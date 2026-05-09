@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // TODO: we need to harmonize the format of the events with similar scoping as the ext registration events from the registry.
 export const GUARDRAILS_BLOCKED_EVENT = "guardrails:blocked";

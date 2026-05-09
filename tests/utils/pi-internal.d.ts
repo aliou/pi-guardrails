@@ -1,7 +1,7 @@
 /**
  * Type declarations for the internal pi-coding-agent module aliased via
  * vitest.config.ts. This mirrors the exports of
- * `@mariozechner/pi-coding-agent/dist/core/extensions/loader.js`.
+ * `@earendil-works/pi-coding-agent/dist/core/extensions/loader.js`.
  */
 declare module "#pi-internal/extensions-loader" {
   import type {
@@ -9,7 +9,7 @@ declare module "#pi-internal/extensions-loader" {
     Extension,
     ExtensionFactory,
     ExtensionRuntime,
-  } from "@mariozechner/pi-coding-agent";
+  } from "@earendil-works/pi-coding-agent";
 
   export function loadExtensionFromFactory(
     factory: ExtensionFactory,

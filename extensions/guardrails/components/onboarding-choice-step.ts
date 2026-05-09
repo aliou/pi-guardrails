@@ -1,7 +1,7 @@
 import { getSettingsTheme, type SettingsTheme } from "@aliou/pi-utils-settings";
-import { getMarkdownTheme, type Theme } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
-import { Box, Key, Markdown, matchesKey } from "@mariozechner/pi-tui";
+import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { Box, Key, Markdown, matchesKey } from "@earendil-works/pi-tui";
 import type { OnboardingState } from "./onboarding-types";
 
 abstract class OnboardingChoiceStep implements Component {

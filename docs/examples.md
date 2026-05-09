@@ -1,6 +1,6 @@
 # Example presets
 
-Example presets are currently shown in the `/guardrails:settings` Examples tab. They are defined in [`extensions/guardrails/commands/settings/examples.ts`](../extensions/guardrails/commands/settings/examples.ts).
+Example presets are available from `/guardrails:examples`. They are defined in [`extensions/guardrails/commands/settings/examples.ts`](../extensions/guardrails/commands/settings/examples.ts).
 
 These presets append rules or command patterns to a selected config scope. They do not replace existing config.
 

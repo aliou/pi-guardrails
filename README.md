@@ -23,7 +23,7 @@ pi install git:github.com/aliou/pi-guardrails
 ## Documentation
 
 - [Default configuration](docs/defaults.md) — built-in policy rules and permission gate patterns
-- [Example presets](docs/examples.md) — pre-configured presets available in settings
+- [Example presets](docs/examples.md) — pre-configured presets available with `/guardrails:examples`
 
 ## What it does
 
@@ -41,7 +41,7 @@ Guardrails reads and merges config from:
 
 Priority: `memory > local > global > defaults`.
 
-Use `/guardrails:settings` to edit config interactively.
+Use `/guardrails:settings` to edit config interactively. Use `/guardrails:examples` to apply example policy and command presets.
 
 ## Current schema
 

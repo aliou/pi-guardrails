@@ -4,7 +4,7 @@ import {
   Key,
   matchesKey,
   type SettingsListTheme,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 export class PathListEditor implements Component {
   private readonly input = new Input();

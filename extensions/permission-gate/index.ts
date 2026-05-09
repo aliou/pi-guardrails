@@ -1,7 +1,7 @@
 import {
   type ExtensionAPI,
   isToolCallEventType,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {

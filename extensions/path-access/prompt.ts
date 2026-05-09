@@ -6,7 +6,7 @@ import {
   Spacer,
   Text,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 // Grant result type from the UI prompt
 export type PromptResult =

@@ -1,5 +1,5 @@
-import type { Component } from "@mariozechner/pi-tui";
-import { Key, matchesKey, Text } from "@mariozechner/pi-tui";
+import type { Component } from "@earendil-works/pi-tui";
+import { Key, matchesKey, Text } from "@earendil-works/pi-tui";
 
 export class OnboardingIntroStep implements Component {
   private readonly introText = new Text("", 2, 0);
