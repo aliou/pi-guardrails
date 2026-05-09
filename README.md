@@ -148,7 +148,7 @@ Built-in dangerous patterns are matched structurally (AST-based) for better accu
 
 - `rm -rf`
 - `sudo`
-- `dd if=`
+- `dd of=`
 - `mkfs.`
 - `chmod -R 777`
 - `chown -R`
