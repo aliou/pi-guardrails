@@ -12,7 +12,8 @@ export const POLICY_EXAMPLES: Array<{
 }> = [
   {
     label: "Secrets (.env)",
-    description: "Block dotenv-like files (glob)",
+    description:
+      "Blocks common dotenv files that usually contain secrets, while allowing sample and example env files.",
     rule: {
       id: "example-secret-env-files",
       name: "Secret env files",
@@ -29,7 +30,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "Logs (*.log)",
-    description: "Mark log files read-only (glob)",
+    description:
+      "Makes log and output files read-only so the agent can inspect them without accidentally rewriting them.",
     rule: {
       id: "example-log-files",
       name: "Log files",
@@ -42,7 +44,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "Regex env",
-    description: "Regex match for .env and .env.*",
+    description:
+      "Shows how to use regex patterns to protect .env and .env.* files with a precise exception for .env.example.",
     rule: {
       id: "example-regex-env",
       name: "Regex env files",
@@ -56,7 +59,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "SSH keys",
-    description: "Block access to SSH private keys",
+    description:
+      "Blocks common SSH private key formats while allowing public key files.",
     rule: {
       id: "example-ssh-keys",
       name: "SSH keys",
@@ -74,7 +78,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "AWS credentials",
-    description: "Block AWS CLI credentials file",
+    description:
+      "Blocks AWS CLI credential and config files that may contain access keys, profiles, and account details.",
     rule: {
       id: "example-aws-credentials",
       name: "AWS credentials",
@@ -87,7 +92,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "Database files",
-    description: "Mark SQLite/DB files read-only",
+    description:
+      "Makes SQLite and database files read-only to avoid accidental data changes.",
     rule: {
       id: "example-database-files",
       name: "Database files",
@@ -104,7 +110,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "Kubernetes secrets",
-    description: "Block kubeconfig and k8s secrets",
+    description:
+      "Blocks kubeconfig-style files that can contain cluster credentials and sensitive Kubernetes access details.",
     rule: {
       id: "example-k8s-secrets",
       name: "Kubernetes secrets",
@@ -117,7 +124,8 @@ export const POLICY_EXAMPLES: Array<{
   },
   {
     label: "Certificates",
-    description: "Block SSL/TLS certificate files",
+    description:
+      "Blocks certificate and private key files while allowing certificate signing requests.",
     rule: {
       id: "example-certificates",
       name: "Certificates",
@@ -142,12 +150,14 @@ export const COMMAND_EXAMPLES: Array<{
 }> = [
   {
     label: "Homebrew",
-    description: "Block brew commands (use Nix instead)",
+    description:
+      "Prompts before Homebrew commands, useful on machines where package installs should go through Nix.",
     pattern: { pattern: "brew", description: "Homebrew package manager" },
   },
   {
     label: "Docker secrets",
-    description: "Block docker commands that may expose environment secrets",
+    description:
+      "Prompts before docker inspect because container metadata can expose environment variables and mounted secrets.",
     pattern: {
       pattern: "docker inspect",
       description: "Docker inspect (may expose env vars)",
@@ -155,7 +165,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "Terraform apply",
-    description: "Require confirmation for infrastructure changes",
+    description: "Prompts before Terraform applies infrastructure changes.",
     pattern: {
       pattern: "terraform apply",
       description: "Terraform infrastructure changes",
@@ -163,7 +173,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "Terraform destroy",
-    description: "Require confirmation for infrastructure destruction",
+    description: "Prompts before Terraform destroys infrastructure resources.",
     pattern: {
       pattern: "terraform destroy",
       description: "Terraform infrastructure destruction",
@@ -171,7 +181,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "kubectl delete",
-    description: "Require confirmation for k8s resource deletion",
+    description: "Prompts before deleting Kubernetes resources.",
     pattern: {
       pattern: "kubectl delete",
       description: "Kubernetes resource deletion",
@@ -179,7 +189,8 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "docker system prune",
-    description: "Require confirmation for Docker cleanup",
+    description:
+      "Prompts before Docker cleanup commands that can remove images, containers, volumes, or build cache.",
     pattern: {
       pattern: "docker system prune",
       description: "Docker system cleanup",
@@ -187,17 +198,17 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "git push --force",
-    description: "Require confirmation for force push",
+    description: "Prompts before force-pushing Git history.",
     pattern: { pattern: "git push --force", description: "Git force push" },
   },
   {
     label: "npm publish",
-    description: "Require confirmation for package publishing",
+    description: "Prompts before publishing npm packages.",
     pattern: { pattern: "npm publish", description: "NPM package publishing" },
   },
   {
     label: "yarn publish",
-    description: "Require confirmation for package publishing",
+    description: "Prompts before publishing Yarn packages.",
     pattern: {
       pattern: "yarn publish",
       description: "Yarn package publishing",
@@ -205,7 +216,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "pnpm publish",
-    description: "Require confirmation for package publishing",
+    description: "Prompts before publishing pnpm packages.",
     pattern: {
       pattern: "pnpm publish",
       description: "PNPM package publishing",
@@ -213,17 +224,18 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "drop database",
-    description: "Require confirmation for database drops",
+    description: "Prompts before SQL statements that drop an entire database.",
     pattern: { pattern: "DROP DATABASE", description: "SQL database drop" },
   },
   {
     label: "drop table",
-    description: "Require confirmation for table drops",
+    description: "Prompts before SQL statements that drop tables.",
     pattern: { pattern: "DROP TABLE", description: "SQL table drop" },
   },
   {
     label: "dbt run",
-    description: "Require confirmation for dbt model runs",
+    description:
+      "Prompts before running dbt models that may transform warehouse data.",
     pattern: {
       pattern: "dbt run",
       description: "dbt model execution",
@@ -231,7 +243,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "dbt seed",
-    description: "Require confirmation for dbt seed data loading",
+    description: "Prompts before loading dbt seed data into a warehouse.",
     pattern: {
       pattern: "dbt seed",
       description: "dbt seed data loading",
@@ -239,7 +251,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "aws s3 rm",
-    description: "Require confirmation for AWS S3 deletions",
+    description: "Prompts before deleting AWS S3 objects.",
     pattern: {
       pattern: "aws s3 rm",
       description: "AWS S3 object deletion",
@@ -247,7 +259,8 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "aws iam",
-    description: "Require confirmation for AWS IAM changes",
+    description:
+      "Prompts before AWS IAM commands that may change identities or permissions.",
     pattern: {
       pattern: "aws iam",
       description: "AWS IAM permission changes",
@@ -255,7 +268,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "aws ec2 terminate",
-    description: "Require confirmation for EC2 instance termination",
+    description: "Prompts before terminating AWS EC2 instances.",
     pattern: {
       pattern: "aws ec2 terminate-instances",
       description: "AWS EC2 instance termination",
@@ -263,7 +276,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "kubectl apply",
-    description: "Require confirmation for k8s resource application",
+    description: "Prompts before applying Kubernetes resource changes.",
     pattern: {
       pattern: "kubectl apply",
       description: "Kubernetes resource application",
@@ -271,7 +284,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "kubectl scale",
-    description: "Require confirmation for k8s scaling operations",
+    description: "Prompts before scaling Kubernetes workloads.",
     pattern: {
       pattern: "kubectl scale",
       description: "Kubernetes scaling operation",
@@ -279,7 +292,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "docker rm",
-    description: "Require confirmation for Docker container removal",
+    description: "Prompts before removing Docker containers.",
     pattern: {
       pattern: "docker rm",
       description: "Docker container removal",
@@ -287,7 +300,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "docker rmi",
-    description: "Require confirmation for Docker image removal",
+    description: "Prompts before removing Docker images.",
     pattern: {
       pattern: "docker rmi",
       description: "Docker image removal",
@@ -295,7 +308,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "docker compose down",
-    description: "Require confirmation for Docker Compose teardown",
+    description: "Prompts before tearing down Docker Compose services.",
     pattern: {
       pattern: "docker compose down",
       description: "Docker Compose service teardown",
@@ -303,7 +316,8 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "terraform import",
-    description: "Require confirmation for Terraform resource import",
+    description:
+      "Prompts before importing existing infrastructure into Terraform state.",
     pattern: {
       pattern: "terraform import",
       description: "Terraform resource import",
@@ -311,7 +325,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "gcloud compute delete",
-    description: "Require confirmation for GCP compute instance deletion",
+    description: "Prompts before deleting Google Cloud compute instances.",
     pattern: {
       pattern: "gcloud compute instances delete",
       description: "GCP compute instance deletion",
@@ -319,7 +333,8 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "gcloud iam",
-    description: "Require confirmation for GCP IAM changes",
+    description:
+      "Prompts before Google Cloud IAM commands that may change permissions.",
     pattern: {
       pattern: "gcloud iam",
       description: "GCP IAM permission changes",
@@ -327,7 +342,7 @@ export const COMMAND_EXAMPLES: Array<{
   },
   {
     label: "gcloud sql delete",
-    description: "Require confirmation for GCP SQL instance deletion",
+    description: "Prompts before deleting Google Cloud SQL instances.",
     pattern: {
       pattern: "gcloud sql instances delete",
       description: "GCP Cloud SQL instance deletion",
