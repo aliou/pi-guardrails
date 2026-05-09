@@ -18,7 +18,7 @@
   "pi": {
     "extensions": [
       "./extensions/path-access/index.ts",
-      "./extensions/policies/index.ts",
+      "./extensions/guardrails/index.ts",
       "./extensions/permission-gate/index.ts"
     ],
     "video": "https://assets.aliou.me/pi-extensions/demos/pi-guardrails.mp4"
