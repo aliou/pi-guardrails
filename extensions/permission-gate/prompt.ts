@@ -1,8 +1,4 @@
-import {
-  DynamicBorder,
-  type ExtensionAPI,
-  isToolCallEventType,
-} from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import {
   Container,
   Key,
@@ -13,19 +9,6 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
-import { checkDangerousCommand } from "../../../../src/core/commands";
-import { emitBlocked, emitDangerous } from "../../../../src/shared/events";
-import { compileCommandPatterns } from "../../../../src/shared/matching";
-import type { ResolvedConfig } from "../../config";
-import { configLoader } from "../../config";
-
-/**
- * Permission gate that prompts user confirmation for dangerous commands.
- *
- * Built-in dangerous patterns are matched structurally via AST parsing.
- * User custom patterns use substring/regex matching on the raw string.
- * Allowed/auto-deny patterns match against the raw command string.
- */
 
 interface MinimalTheme {
   fg(color: string, text: string): string;
@@ -112,7 +95,7 @@ function buildRightAlignedBorder(
   return themeLine("─".repeat(Math.max(0, remaining)) + truncatedLabel);
 }
 
-function createPermissionGateConfirmComponent(
+export function createPermissionGateConfirmComponent(
   command: string,
   description: string,
 ) {
@@ -236,150 +219,4 @@ function createPermissionGateConfirmComponent(
       },
     };
   };
-}
-
-export function setupPermissionGateHook(
-  pi: ExtensionAPI,
-  config: ResolvedConfig,
-) {
-  if (!config.features.permissionGate) return;
-
-  // Compile all configured patterns for substring/regex matching.
-  // When useBuiltinMatchers is true (defaults), these act as a supplement
-  // to the structural matchers. When false (customPatterns), these are the
-  // only matching path.
-  const compiledPatterns = compileCommandPatterns(
-    config.permissionGate.patterns,
-  );
-  const { useBuiltinMatchers } = config.permissionGate;
-  const fallbackPatterns = config.permissionGate.patterns;
-
-  const allowedPatterns = compileCommandPatterns(
-    config.permissionGate.allowedPatterns,
-  );
-  const autoDenyPatterns = compileCommandPatterns(
-    config.permissionGate.autoDenyPatterns,
-  );
-
-  pi.on("tool_call", async (event, ctx) => {
-    if (!isToolCallEventType("bash", event)) return;
-
-    const command = event.input.command;
-
-    // Check allowed patterns first (bypass)
-    for (const pattern of allowedPatterns) {
-      if (pattern.test(command)) return;
-    }
-
-    // Check auto-deny patterns
-    for (const pattern of autoDenyPatterns) {
-      if (pattern.test(command)) {
-        ctx.ui.notify("Blocked dangerous command (auto-deny)", "error");
-
-        const reason =
-          "Command matched auto-deny pattern and was blocked automatically.";
-
-        emitBlocked(pi, {
-          feature: "permissionGate",
-          toolName: "bash",
-          input: event.input,
-          reason,
-        });
-
-        return { block: true, reason };
-      }
-    }
-
-    // Check dangerous patterns (structural + compiled)
-    const match = checkDangerousCommand({
-      command,
-      patterns: compiledPatterns,
-      useBuiltinMatchers,
-      fallbackPatterns,
-    });
-    if (!match) return;
-
-    const { description, pattern: rawPattern } = match;
-
-    // Emit dangerous event (presenter will play sound)
-    emitDangerous(pi, { command, description, pattern: rawPattern });
-
-    if (config.permissionGate.requireConfirmation) {
-      // In print/RPC mode, block by default (safe fallback)
-      if (!ctx.hasUI) {
-        const reason = `Dangerous command blocked (no UI to confirm): ${description}`;
-        emitBlocked(pi, {
-          feature: "permissionGate",
-          toolName: "bash",
-          input: event.input,
-          reason,
-        });
-        return { block: true, reason };
-      }
-
-      type ConfirmResult = "allow" | "allow-session" | "deny";
-
-      // Fallback select options for RPC mode (ctx.ui.custom is unimplemented).
-      const SELECT_ALLOW_ONCE = "Allow once";
-      const SELECT_ALLOW_SESSION = "Allow for session";
-      const SELECT_DENY = "Deny";
-      const SELECT_OPTIONS = [
-        SELECT_ALLOW_ONCE,
-        SELECT_ALLOW_SESSION,
-        SELECT_DENY,
-      ] as const;
-
-      let result = await ctx.ui.custom<ConfirmResult>(
-        createPermissionGateConfirmComponent(command, description),
-      );
-
-      // Fallback: ctx.ui.custom() returns undefined in RPC/headless mode
-      // (Pi's RPC runtime stubs it as `async custom() { return undefined; }`).
-      // Fall back to ctx.ui.select() which works over the RPC protocol.
-      // If select() also returns undefined/malformed, deny by default.
-      if (result === undefined) {
-        const selection = await ctx.ui.select(
-          `Dangerous command: ${description}`,
-          [...SELECT_OPTIONS],
-        );
-        if (selection === SELECT_ALLOW_ONCE) result = "allow";
-        else if (selection === SELECT_ALLOW_SESSION) result = "allow-session";
-        else result = "deny";
-      }
-
-      if (result === "allow-session") {
-        // Save command as allowed in memory scope (session-only).
-        // Spread the resolved allowed patterns and append the new one.
-        const resolved = configLoader.getConfig();
-        await configLoader.save("memory", {
-          permissionGate: {
-            allowedPatterns: [
-              ...resolved.permissionGate.allowedPatterns,
-              { pattern: command },
-            ],
-          },
-        });
-
-        // Update the local cache so it takes effect immediately
-        allowedPatterns.push(...compileCommandPatterns([{ pattern: command }]));
-      }
-
-      if (result === "deny") {
-        emitBlocked(pi, {
-          feature: "permissionGate",
-          toolName: "bash",
-          input: event.input,
-          reason: "User denied dangerous command",
-          userDenied: true,
-        });
-
-        return { block: true, reason: "User denied dangerous command" };
-      }
-    } else {
-      // No confirmation required - just notify and allow
-      ctx.ui.notify(`Dangerous command detected: ${description}`, "warning");
-    }
-
-    return;
-  });
 }
