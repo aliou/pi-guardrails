@@ -49,7 +49,7 @@ function makeConfig(
     applyBuiltinDefaults: true,
     features: { policies: false, permissionGate: true, pathAccess: false },
     policies: { rules: [] },
-    pathAccess: { mode: "ask", allowedPaths: [] },
+    pathAccess: { mode: "ask", allowedPaths: [], alwaysScope: "local" },
     permissionGate: {
       patterns: [],
       useBuiltinMatchers: true,

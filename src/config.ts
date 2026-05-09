@@ -55,9 +55,19 @@ export interface PolicyRule {
 
 export type PathAccessMode = "allow" | "ask" | "block";
 
+/**
+ * Where "Allow … always" grants from the prompt are persisted.
+ * - `local`: project config (`{project}/.pi/extensions/guardrails.json`).
+ * - `global`: user-wide config (`~/.pi/agent/extensions/guardrails.json`),
+ *   so the same grant applies in every project.
+ */
+export type PathAccessAlwaysScope = "local" | "global";
+
 export interface PathAccessConfig {
   mode?: PathAccessMode;
   allowedPaths?: string[];
+  /** Default scope used when the user picks "Allow … always" in the prompt. */
+  alwaysScope?: PathAccessAlwaysScope;
 }
 
 export interface GuardrailsConfig {
@@ -118,6 +128,7 @@ export interface ResolvedConfig {
   pathAccess: {
     mode: PathAccessMode;
     allowedPaths: string[];
+    alwaysScope: PathAccessAlwaysScope;
   };
   permissionGate: {
     patterns: DangerousPattern[];
@@ -226,6 +237,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   pathAccess: {
     mode: "ask",
     allowedPaths: [],
+    alwaysScope: "local",
   },
   policies: {
     rules: [
@@ -385,6 +397,15 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         for (const p of normalizeAllowedPaths(paths)) mergedPaths.add(p);
       }
       resolved.pathAccess.allowedPaths = [...mergedPaths];
+
+      // alwaysScope: highest-priority scope wins (memory > local > global).
+      const alwaysScope =
+        memory?.pathAccess?.alwaysScope ??
+        local?.pathAccess?.alwaysScope ??
+        global?.pathAccess?.alwaysScope;
+      if (alwaysScope === "global" || alwaysScope === "local") {
+        resolved.pathAccess.alwaysScope = alwaysScope;
+      }
 
       return resolved;
     },

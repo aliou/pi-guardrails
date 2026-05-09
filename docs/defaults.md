@@ -108,6 +108,7 @@ Blocks access to GPG/GnuPG private keys, keyrings, and configuration. Disabled b
 | `features.pathAccess` | `false` |
 | `pathAccess.mode` | `"ask"` |
 | `pathAccess.allowedPaths` | `[]` |
+| `pathAccess.alwaysScope` | `"local"` |
 
 Modes:
 - `allow` — no path restrictions
@@ -118,6 +119,10 @@ Allowed paths use trailing-slash convention:
 - `/path/to/file` — exact file match
 - `/path/to/dir/` — directory and all descendants
 - Supports `~/` for home directory
+
+Always-scope:
+- `local` — "Allow … always" grants are saved to the project config (default; current behavior)
+- `global` — "Allow … always" grants are saved to the user-wide config and apply in every project
 
 Limitations:
 - Bash path extraction is best-effort (AST-based heuristics). Tokens like `application/json` may trigger false-positive prompts.
