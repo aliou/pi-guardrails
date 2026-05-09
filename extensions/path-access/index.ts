@@ -46,7 +46,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
     const targets = [
       ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
     ];
-    const pendingGrants: PendingPathGrant[] = [];
+    const acceptedGrants: PendingPathGrant[] = [];
 
     for (const absolutePath of targets) {
       const state: PathAccessState = {
@@ -54,7 +54,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
         mode: config.pathAccess.mode,
         allowedPaths: [
           ...resolveAllowedPaths(config.pathAccess.allowedPaths, ctx.cwd),
-          ...pendingAllowedPaths(pendingGrants),
+          ...pendingAllowedPaths(acceptedGrants),
         ],
         hasUI: ctx.hasUI,
       };
@@ -92,13 +92,13 @@ export default async function pathAccess(pi: ExtensionAPI) {
       }
 
       if (result === "allow-file-session" || result === "allow-file-always") {
-        pendingGrants.push(
-          createPendingGrant(
-            absolutePath,
-            false,
-            result === "allow-file-session" ? "memory" : "local",
-          ),
+        const grant = createPendingGrant(
+          absolutePath,
+          false,
+          result === "allow-file-session" ? "memory" : "local",
         );
+        acceptedGrants.push(grant);
+        await persistGrant(grant);
         continue;
       }
 
@@ -111,13 +111,13 @@ export default async function pathAccess(pi: ExtensionAPI) {
           );
           continue;
         }
-        pendingGrants.push(
-          createPendingGrant(
-            dirPath,
-            true,
-            result === "allow-dir-session" ? "memory" : "local",
-          ),
+        const grant = createPendingGrant(
+          dirPath,
+          true,
+          result === "allow-dir-session" ? "memory" : "local",
         );
+        acceptedGrants.push(grant);
+        await persistGrant(grant);
         continue;
       }
 
@@ -130,11 +130,6 @@ export default async function pathAccess(pi: ExtensionAPI) {
         userDenied: true,
       });
       return { block: true, reason };
-    }
-
-    // TODO: Does the persistance here work? on block we're returning early and not getting to here.
-    for (const grant of pendingGrants) {
-      await persistGrant(grant);
     }
   });
 }
