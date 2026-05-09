@@ -11,6 +11,7 @@ import {
 import { drainPendingWarnings } from "../../src/shared/warnings";
 import { registerGuardrailsExamplesCommand } from "./commands/examples";
 import { registerGuardrailsOnboardingCommand } from "./commands/onboarding";
+import { isOnboardingPending } from "./commands/onboarding/config";
 import { registerGuardrailsSettings } from "./commands/settings";
 import {
   BLOCKED_TOOLS,
@@ -73,7 +74,9 @@ export default async function guardrails(pi: ExtensionAPI) {
   });
 
   registerGuardrailsExamplesCommand(pi);
-  registerGuardrailsOnboardingCommand(pi);
+  if (isOnboardingPending(configLoader.getRawConfig("global"))) {
+    registerGuardrailsOnboardingCommand(pi);
+  }
   setupPolicyHook(pi);
 
   pi.on("session_start", (_event, ctx) => {
