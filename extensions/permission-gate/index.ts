@@ -4,13 +4,24 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
-import { emitBlocked, emitDangerous } from "../../src/shared/events";
+import {
+  emitBlocked,
+  emitDangerous,
+  GUARDRAILS_EXTENSIONS_REGISTER_EVENT,
+  GUARDRAILS_EXTENSIONS_REQUEST_EVENT,
+} from "../../src/shared/events";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
 import { createPermissionGateRule, matchesAnyCommandPattern } from "./rules";
 
 export default async function permissionGate(pi: ExtensionAPI) {
   await configLoader.load();
+
+  pi.events.on(GUARDRAILS_EXTENSIONS_REQUEST_EVENT, () => {
+    pi.events.emit(GUARDRAILS_EXTENSIONS_REGISTER_EVENT, {
+      feature: "permissionGate",
+    });
+  });
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();

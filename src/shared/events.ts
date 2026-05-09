@@ -1,8 +1,21 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+// TODO: we need to harmonize the format of the events with similar scoping as the ext registration events from the registry.
 export const GUARDRAILS_BLOCKED_EVENT = "guardrails:blocked";
 export const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous";
 
+export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
+
+export const GUARDRAILS_EXTENSIONS_REQUEST_EVENT =
+  "guardrails:extensions:request";
+export const GUARDRAILS_EXTENSIONS_REGISTER_EVENT =
+  "guardrails:extensions:register";
+
+export interface GuardrailsExtensionsRegisterPayload {
+  feature: GuardrailsFeatureId;
+}
+
+// TODO: this should use core types and not an additional abstraction here, imho
 export interface GuardrailsBlockedEvent {
   feature: "policies" | "permissionGate" | "pathAccess";
   toolName: string;

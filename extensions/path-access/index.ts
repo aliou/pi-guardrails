@@ -6,7 +6,11 @@ import {
   type PathAccessState,
 } from "../../src/core/paths";
 import { configLoader } from "../../src/shared/config";
-import { emitBlocked } from "../../src/shared/events";
+import {
+  emitBlocked,
+  GUARDRAILS_EXTENSIONS_REGISTER_EVENT,
+  GUARDRAILS_EXTENSIONS_REQUEST_EVENT,
+} from "../../src/shared/events";
 import {
   createPendingGrant,
   isGrantTooBroad,
@@ -21,6 +25,12 @@ import { targetsForTool } from "./targets";
 
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
+
+  pi.events.on(GUARDRAILS_EXTENSIONS_REQUEST_EVENT, () => {
+    pi.events.emit(GUARDRAILS_EXTENSIONS_REGISTER_EVENT, {
+      feature: "pathAccess",
+    });
+  });
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -122,6 +132,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
       return { block: true, reason };
     }
 
+    // TODO: Does the persistance here work? on block we're returning early and not getting to here.
     for (const grant of pendingGrants) {
       await persistGrant(grant);
     }

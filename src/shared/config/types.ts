@@ -4,6 +4,7 @@
  * GuardrailsConfig is the user-facing schema (all fields optional).
  * ResolvedConfig is the internal schema (all fields required, defaults applied).
  */
+import type { GuardrailsFeatureId } from "../events";
 
 /**
  * A pattern with explicit matching mode.
@@ -70,10 +71,7 @@ export interface GuardrailsConfig {
     completedAt?: string;
     version?: string;
   };
-  features?: {
-    policies?: boolean;
-    permissionGate?: boolean;
-    pathAccess?: boolean;
+  features?: Partial<Record<GuardrailsFeatureId, boolean>> & {
     // Deprecated. Kept only for migration.
     protectEnvFiles?: boolean;
   };
@@ -104,11 +102,7 @@ export interface ResolvedConfig {
   version: string;
   enabled: boolean;
   applyBuiltinDefaults: boolean;
-  features: {
-    policies: boolean;
-    permissionGate: boolean;
-    pathAccess: boolean;
-  };
+  features: Record<GuardrailsFeatureId, boolean>;
   policies: {
     rules: PolicyRule[];
   };
