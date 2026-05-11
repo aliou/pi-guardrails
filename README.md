@@ -142,12 +142,18 @@ Restrict tool access to the current working directory. When enabled, any tool ca
   "features": { "pathAccess": true },
   "pathAccess": {
     "mode": "ask",
-    "allowedPaths": ["~/code/shared-libs/", "~/.config/myapp"]
+    "allowedPaths": ["~/code/shared-libs/", "~/.config/myapp"],
+    "alwaysScope": "local"
   }
 }
 ```
 
-Grants are stored in project config (always) or session memory (session). The `allowedPaths` array is merged across all config scopes.
+Grants from the prompt are stored either in session memory ("this session" options) or in a persisted config ("always" options). The persisted scope is controlled by `pathAccess.alwaysScope`:
+
+- `"local"` (default): saved to the project config (`{project}/.pi/extensions/guardrails.json`).
+- `"global"`: saved to the user-wide config (`~/.pi/agent/extensions/guardrails.json`), so the same grant applies in every project.
+
+The `allowedPaths` array is merged across all config scopes, so anything you put under the global config applies in every project regardless of `alwaysScope`.
 
 Limitations:
 - Symlinks are not resolved (lexical path comparison only).
