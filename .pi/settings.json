@@ -1,6 +1,6 @@
 {
   "packages": [
     "npm:@378labs/pi-oss",
-    "npm:@agents/vitest"
+    "npm:@378-skills/vitest"
   ]
 }
