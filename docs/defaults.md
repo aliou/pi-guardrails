@@ -63,6 +63,25 @@ Permission gate is enforced by `extensions/permission-gate`.
 | `permissionGate.allowedPatterns` | `[]` |
 | `permissionGate.autoDenyPatterns` | `[]` |
 
+Auto-deny patterns block commands immediately without dialog. Each pattern supports an optional `description` field that is surfaced as the block reason, helping the agent understand why the command was denied and adapt accordingly.
+
+Example:
+
+```jsonc
+{
+  "permissionGate": {
+    "autoDenyPatterns": [
+      {
+        "pattern": "python -m venv",
+        "description": "Use the project .venv instead of creating another virtualenv."
+      }
+    ]
+  }
+}
+```
+
+When no description is provided, a generic reason is returned.
+
 Default dangerous patterns include:
 
 | Pattern | Description |

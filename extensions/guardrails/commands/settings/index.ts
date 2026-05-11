@@ -382,7 +382,7 @@ export function registerGuardrailsSettings(
             [];
           const items = currentItems.map((p) => ({
             pattern: p.pattern,
-            description: p.pattern,
+            description: p.description?.trim() || p.pattern,
             regex: p.regex,
           }));
           let latestCount = items.length;
@@ -398,6 +398,10 @@ export function registerGuardrailsSettings(
                   const pattern = p.pattern.trim();
                   if (!pattern) return null;
                   const cfg: PatternConfig = { pattern };
+                  const description = p.description.trim();
+                  if (description && description !== pattern) {
+                    cfg.description = description;
+                  }
                   if (p.regex) cfg.regex = true;
                   return cfg;
                 })

@@ -12,7 +12,11 @@ import {
 } from "../../src/shared/events";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
-import { createPermissionGateRule, matchesAnyCommandPattern } from "./rules";
+import {
+  createPermissionGateRule,
+  formatAutoDenyReason,
+  matchCommandPattern,
+} from "./rules";
 
 export default async function permissionGate(pi: ExtensionAPI) {
   await configLoader.load();
@@ -31,17 +35,21 @@ export default async function permissionGate(pi: ExtensionAPI) {
     const command = event.input.command;
     if (isCommandAllowed(command)) return;
 
-    if (
-      matchesAnyCommandPattern(command, config.permissionGate.autoDenyPatterns)
-    ) {
-      const reason =
-        "Command matched auto-deny pattern and was blocked automatically.";
+    const autoDenyMatch = matchCommandPattern(
+      command,
+      config.permissionGate.autoDenyPatterns,
+    );
+
+    if (autoDenyMatch) {
+      const reason = formatAutoDenyReason(autoDenyMatch);
+
       emitBlocked(pi, {
         feature: "permissionGate",
         toolName: "bash",
         input: event.input,
         reason,
       });
+
       return { block: true, reason };
     }
 

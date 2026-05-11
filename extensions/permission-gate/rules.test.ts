@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createPermissionGateRule, matchesAnyCommandPattern } from "./rules";
+import {
+  createPermissionGateRule,
+  formatAutoDenyReason,
+  matchCommandPattern,
+  matchesAnyCommandPattern,
+} from "./rules";
 
 describe("createPermissionGateRule", () => {
   it("passes file actions", async () => {
@@ -62,5 +67,66 @@ describe("matchesAnyCommandPattern", () => {
     expect(
       matchesAnyCommandPattern("npm test", [{ pattern: "npm publish" }]),
     ).toBe(false);
+  });
+});
+
+describe("matchCommandPattern", () => {
+  it("returns the matched PatternConfig", () => {
+    const patterns = [{ pattern: "npm publish" }, { pattern: "rm -rf" }];
+    expect(matchCommandPattern("npm publish --dry-run", patterns)).toBe(
+      patterns[0],
+    );
+  });
+
+  it("returns the matching regex pattern", () => {
+    const patterns = [{ pattern: "^DROP TABLE", regex: true }];
+    expect(matchCommandPattern("DROP TABLE users", patterns)).toBe(patterns[0]);
+  });
+
+  it("returns null when no pattern matches", () => {
+    expect(
+      matchCommandPattern("npm test", [{ pattern: "npm publish" }]),
+    ).toBeNull();
+  });
+
+  it("preserves description on the returned pattern", () => {
+    const patterns = [
+      {
+        pattern: "python -m venv",
+        description: "Use the project .venv instead",
+      },
+    ];
+    const result = matchCommandPattern("python -m venv .venv", patterns);
+    expect(result).not.toBeNull();
+    expect(result?.description).toBe("Use the project .venv instead");
+  });
+});
+
+describe("formatAutoDenyReason", () => {
+  it("uses description when present", () => {
+    expect(
+      formatAutoDenyReason({
+        pattern: "python -m venv",
+        description: "Use the project .venv instead",
+      }),
+    ).toBe("Command auto-denied: Use the project .venv instead");
+  });
+
+  it("falls back to generic reason when description is missing", () => {
+    expect(formatAutoDenyReason({ pattern: "python -m venv" })).toBe(
+      "Command matched auto-deny pattern and was blocked automatically.",
+    );
+  });
+
+  it("falls back when description is empty string", () => {
+    expect(
+      formatAutoDenyReason({ pattern: "python -m venv", description: "" }),
+    ).toBe("Command matched auto-deny pattern and was blocked automatically.");
+  });
+
+  it("falls back when description is whitespace-only", () => {
+    expect(
+      formatAutoDenyReason({ pattern: "python -m venv", description: "  " }),
+    ).toBe("Command matched auto-deny pattern and was blocked automatically.");
   });
 });

@@ -155,6 +155,25 @@ Built-in dangerous patterns are matched structurally (AST-based) for better accu
 
 You can also add custom dangerous patterns.
 
+### Auto-deny patterns
+
+Auto-deny patterns block commands immediately without confirmation dialog. Each pattern supports an optional `description` field that is returned as the block reason, helping the agent understand why the command was denied and adapt accordingly.
+
+```jsonc
+{
+  "permissionGate": {
+    "autoDenyPatterns": [
+      {
+        "pattern": "python -m venv",
+        "description": "Use the project .venv instead of creating another virtualenv."
+      }
+    ]
+  }
+}
+```
+
+When no description is provided, a generic reason is returned.
+
 ## Migration notes
 
 Legacy fields are auto-migrated:

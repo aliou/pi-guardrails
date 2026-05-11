@@ -46,11 +46,27 @@ export function createPermissionGateRule({
   };
 }
 
+export function matchCommandPattern(
+  command: string,
+  patterns: PatternConfig[],
+): PatternConfig | null {
+  const compiled = compileCommandPatterns(patterns);
+  for (let i = 0; i < compiled.length; i++) {
+    if (compiled[i].test(command)) return patterns[i];
+  }
+  return null;
+}
+
 export function matchesAnyCommandPattern(
   command: string,
   patterns: PatternConfig[],
 ): boolean {
-  return compileCommandPatterns(patterns).some((pattern) =>
-    pattern.test(command),
-  );
+  return matchCommandPattern(command, patterns) !== null;
+}
+
+export function formatAutoDenyReason(pattern: PatternConfig): string {
+  const description = pattern.description?.trim();
+  return description
+    ? `Command auto-denied: ${description}`
+    : "Command matched auto-deny pattern and was blocked automatically.";
 }

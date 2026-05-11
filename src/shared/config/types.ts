@@ -13,6 +13,8 @@ import type { GuardrailsFeatureId } from "../events";
  */
 export interface PatternConfig {
   pattern: string;
+  /** Optional description surfaced to the agent when the pattern triggers (e.g. auto-deny reason). */
+  description?: string;
   regex?: boolean;
 }
 
