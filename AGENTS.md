@@ -56,10 +56,11 @@ tests/
 
 ## Documentation
 
-When adding, updating, or removing default policy rules, default permission gate patterns, or example presets, you must also update the corresponding documentation files:
+When adding, updating, or removing default policy rules, default permission gate patterns, or example presets:
 
-- [`docs/defaults.md`](docs/defaults.md) — mirrors `DEFAULT_CONFIG` in `src/config.ts`
-- [`docs/examples.md`](docs/examples.md) — mirrors `POLICY_EXAMPLES` and `COMMAND_EXAMPLES` in `src/commands/settings-command.ts`
+- Update `schema.json` with `pnpm gen:schema` if config types changed.
+- Update `README.md` if public behavior, commands, or discovery flow changed.
+- Treat `src/shared/config/defaults.ts` and `extensions/guardrails/commands/settings/examples.ts` as the source of truth for defaults and presets.
 
 ## Versioning
 

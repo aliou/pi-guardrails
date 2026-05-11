@@ -133,10 +133,10 @@ Prefer pure rule/target tests over full extension harness tests. Use hook-level 
 
 ## Documentation
 
-When adding or changing defaults, permission patterns, or presets, update:
+When adding or changing defaults, permission patterns, or presets:
 
-- `docs/defaults.md`
-- `docs/examples.md` if presets change
-- `README.md` if commands, feature flags, or public behavior changes
+- Update `schema.json` with `pnpm gen:schema` if config types changed.
+- Update `README.md` if commands, feature flags, or public behavior changes.
+- Treat `src/shared/config/defaults.ts` and `extensions/guardrails/commands/settings/examples.ts` as the source of truth for defaults and presets.
 
 Add a changeset for user-facing behavior before release.

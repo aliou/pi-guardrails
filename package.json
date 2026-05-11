@@ -29,7 +29,6 @@
   "files": [
     "src",
     "extensions",
-    "docs",
     "README.md",
     "schema.json"
   ],

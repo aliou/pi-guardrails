@@ -2,11 +2,13 @@
 
 # Guardrails
 
-Security hooks for Pi to reduce accidental destructive actions and secret-file access.
+Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
-## Demo
+This package installs three Pi extensions:
 
-<video src="https://assets.aliou.me/pi-extensions/demos/pi-guardrails.mp4" controls playsinline muted></video>
+- **guardrails** for file protection policies, settings, onboarding, and examples.
+- **path-access** for controlling access outside the current workspace.
+- **permission-gate** for confirming or blocking risky shell commands.
 
 ## Install
 
@@ -14,178 +16,92 @@ Security hooks for Pi to reduce accidental destructive actions and secret-file a
 pi install npm:@aliou/pi-guardrails
 ```
 
-Or from git:
+## First run
 
-```bash
-pi install git:github.com/aliou/pi-guardrails
+After installing, run the onboarding command to choose a starting setup:
+
+```text
+/guardrails:onboarding
 ```
 
-## Documentation
+<!-- TODO: replace with final onboarding GIF. -->
 
-- [Default configuration](docs/defaults.md) — built-in policy rules and permission gate patterns
-- [Example presets](docs/examples.md) — pre-configured presets available with `/guardrails:examples`
+![Guardrails onboarding walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/onboarding.gif)
 
-## What it does
+You can change everything later with:
 
-- **policies**: named file-protection rules with per-rule protection levels.
-- **permission-gate**: detects dangerous bash commands and asks for confirmation.
-- **path-access**: restricts tool access to the current working directory with allow/ask/block modes.
+```text
+/guardrails:settings
+```
 
-## Config locations
+## Included extensions
 
-Guardrails reads and merges config from:
+### guardrails
+
+The `guardrails` extension owns file protection policies and the user-facing commands.
+
+Use it to protect files like `.env`, private keys, local credentials, generated logs, database dumps, or any project-specific path you do not want Pi to read or modify without clear intent.
+
+<!-- TODO: replace with final policies/settings GIF. -->
+
+![Guardrails policies and settings walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/policies.gif)
+
+Useful commands:
+
+```text
+/guardrails:settings
+/guardrails:onboarding
+/guardrails:examples
+```
+
+### path-access
+
+The `path-access` extension checks tool calls that target paths outside the current working directory.
+
+It can allow, block, or ask before Pi accesses files elsewhere on your machine. In ask mode, you can allow one file or a directory once, for the session, or always.
+
+<!-- TODO: replace with final path-access GIF. -->
+
+![Guardrails path access prompt walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/path-access.gif)
+
+### permission-gate
+
+The `permission-gate` extension detects dangerous bash commands before they run.
+
+It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, or configure auto-deny rules.
+
+<!-- TODO: replace with final permission-gate GIF. -->
+
+![Guardrails permission gate walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/permission-gate.gif)
+
+## Configuration
+
+Most configuration should happen through the interactive settings UI:
+
+```text
+/guardrails:settings
+```
+
+Advanced users can edit the settings file directly:
 
 - Global: `~/.pi/agent/extensions/guardrails.json`
 - Project: `.pi/extensions/guardrails.json`
-- Memory (session): internal temporary scope used by settings/commands
 
-Priority: `memory > local > global > defaults`.
+Guardrails writes a `$schema` field to saved settings files, so modern editors provide autocomplete and validation. The generated schema is committed at [`schema.json`](schema.json).
 
-Use `/guardrails:settings` to edit config interactively. Use `/guardrails:examples` to apply example policy and command presets.
+## Examples
 
-## Current schema
+Use the examples command to add common policy and command presets without replacing your existing config:
 
-```json
-{
-  "enabled": true,
-  "features": {
-    "policies": true,
-    "permissionGate": true,
-    "pathAccess": false
-  },
-  "pathAccess": {
-    "mode": "ask",
-    "allowedPaths": []
-  },
-  "policies": {
-    "rules": [
-      {
-        "id": "secret-files",
-        "description": "Files containing secrets",
-        "patterns": [
-          { "pattern": ".env" },
-          { "pattern": ".env.local" },
-          { "pattern": ".env.production" },
-          { "pattern": ".env.prod" },
-          { "pattern": ".dev.vars" }
-        ],
-        "allowedPatterns": [
-          { "pattern": ".env.example" },
-          { "pattern": ".env.sample" },
-          { "pattern": ".env.test" },
-          { "pattern": "*.example.env" },
-          { "pattern": "*.sample.env" },
-          { "pattern": "*.test.env" }
-        ],
-        "protection": "noAccess",
-        "onlyIfExists": true
-      }
-    ]
-  },
-  "permissionGate": {
-    "patterns": [
-      { "pattern": "rm -rf", "description": "recursive force delete" },
-      { "pattern": "sudo", "description": "superuser command" }
-    ],
-    "customPatterns": [],
-    "requireConfirmation": true,
-    "allowedPatterns": [],
-    "autoDenyPatterns": []
-  }
-}
+```text
+/guardrails:examples
 ```
 
-All fields optional. Missing fields use defaults.
+<!-- TODO: replace with final examples GIF. -->
 
-## Policies
+![Guardrails examples command walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/examples.gif)
 
-Each rule has:
-
-- `id`: stable identifier used for overrides across scopes.
-- `patterns`: files to match (glob by default, regex if `regex: true`). Glob semantics: patterns containing `/` match the full relative path; patterns without `/` match basename only.
-- `allowedPatterns`: exceptions.
-- `protection`:
-  - `noAccess`: block `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`
-  - `readOnly`: block `write`, `edit`, `bash`
-  - `none`: explicit no protection
-- `onlyIfExists` (default true)
-- `blockMessage` with `{file}` placeholder
-- `enabled` (default true)
-
-When multiple rules match the same file, strongest protection wins:
-`noAccess > readOnly > none`.
-
-## Path access
-
-Restrict tool access to the current working directory. When enabled, any tool call targeting a path outside `cwd` is checked against the configured mode:
-
-- **allow**: no restrictions
-- **ask**: prompt with options to grant access (file or directory, for session or always)
-- **block**: deny all outside access
-
-```jsonc
-{
-  "features": { "pathAccess": true },
-  "pathAccess": {
-    "mode": "ask",
-    "allowedPaths": ["~/code/shared-libs/", "~/.config/myapp"]
-  }
-}
-```
-
-Grants are stored in project config (always) or session memory (session). The `allowedPaths` array is merged across all config scopes.
-
-Limitations:
-- Symlinks are not resolved (lexical path comparison only).
-- Bash path extraction is best-effort (AST-based heuristics).
-- In non-interactive mode, `ask` mode degrades to `block`.
-
-## Permission gate
-
-Detects dangerous bash commands and prompts user confirmation.
-
-Built-in dangerous patterns are matched structurally (AST-based) for better accuracy:
-
-- `rm -rf`
-- `sudo`
-- `dd of=`
-- `mkfs.`
-- `chmod -R 777`
-- `chown -R`
-
-You can also add custom dangerous patterns.
-
-### Auto-deny patterns
-
-Auto-deny patterns block commands immediately without confirmation dialog. Each pattern supports an optional `description` field that is returned as the block reason, helping the agent understand why the command was denied and adapt accordingly.
-
-```jsonc
-{
-  "permissionGate": {
-    "autoDenyPatterns": [
-      {
-        "pattern": "python -m venv",
-        "description": "Use the project .venv instead of creating another virtualenv."
-      }
-    ]
-  }
-}
-```
-
-When no description is provided, a generic reason is returned.
-
-## Migration notes
-
-Legacy fields are auto-migrated:
-
-- `features.protectEnvFiles` -> `features.policies`
-- `envFiles` -> `policies.rules` (migrated into `secret-files`)
-
-`config.version` is a schema marker, not npm package version.
-
-Also note:
-
-- `preventBrew`, `preventPython`, `enforcePackageManager`, `packageManager` were removed from guardrails and moved to `@aliou/pi-toolchain`.
+The available presets live in [`extensions/guardrails/commands/settings/examples.ts`](extensions/guardrails/commands/settings/examples.ts).
 
 ## Development
 
@@ -195,30 +111,6 @@ pnpm test:watch   # Run tests in watch mode
 pnpm typecheck    # Type check
 pnpm lint         # Lint
 pnpm format       # Format
-```
-
-## Events
-
-Guardrails emits events for other extensions:
-
-### `guardrails:blocked`
-
-```ts
-interface GuardrailsBlockedEvent {
-  feature: "policies" | "permissionGate" | "pathAccess";
-  toolName: string;
-  input: Record<string, unknown>;
-  reason: string;
-  userDenied?: boolean;
-}
-```
-
-### `guardrails:dangerous`
-
-```ts
-interface GuardrailsDangerousEvent {
-  command: string;
-  description: string;
-  pattern: string;
-}
+pnpm gen:schema   # Regenerate schema.json
+pnpm check:schema # Verify schema.json is current
 ```
