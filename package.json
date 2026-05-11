@@ -30,7 +30,8 @@
     "src",
     "extensions",
     "docs",
-    "README.md"
+    "README.md",
+    "schema.json"
   ],
   "dependencies": {
     "@aliou/pi-utils-settings": "^0.15.1",
@@ -50,11 +51,14 @@
     "@types/node": "^25.0.10",
     "husky": "^9.1.7",
     "memfs": "^4.57.2",
+    "ts-json-schema-generator": "^2.9.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.4"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "gen:schema": "ts-json-schema-generator --path src/shared/config/types.ts --type GuardrailsConfig --no-type-check -o schema.json",
+    "check:schema": "ts-json-schema-generator --path src/shared/config/types.ts --type GuardrailsConfig --no-type-check -o /tmp/pi-guardrails-schema-check.json && diff -q schema.json /tmp/pi-guardrails-schema-check.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check",

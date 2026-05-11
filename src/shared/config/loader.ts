@@ -1,4 +1,5 @@
-import { ConfigLoader } from "@aliou/pi-utils-settings";
+import { buildSchemaUrl, ConfigLoader } from "@aliou/pi-utils-settings";
+import pkg from "../../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "./defaults";
 import { migrations } from "./migration";
 import type { GuardrailsConfig, PolicyRule, ResolvedConfig } from "./types";
@@ -9,6 +10,7 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
   {
     scopes: ["global", "local", "memory"],
     migrations,
+    schemaUrl: buildSchemaUrl(pkg.name, pkg.version),
     afterMerge: (resolved, global, local, memory) => {
       const ruleMap = new Map<string, PolicyRule>();
 

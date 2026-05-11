@@ -64,22 +64,34 @@ export interface PathAccessConfig {
 }
 
 export interface GuardrailsConfig {
+  /** JSON Schema URL for editor autocomplete and validation. Added automatically when Guardrails writes the file. */
+  $schema?: string;
+  /** Internal config schema marker for migration/debugging. Not tied to the package version. */
   version?: string;
+  /** Enable or disable all Guardrails checks. */
   enabled?: boolean;
-  /** Deprecated-defaults bridge: when true, applies built-in policy defaults. */
+  /** When true, include Guardrails built-in policy rules before user rules are merged. */
   applyBuiltinDefaults?: boolean;
+  /** Tracks whether the setup wizard has been completed. Usually managed by Guardrails. */
   onboarding?: {
+    /** Whether onboarding is complete. */
     completed?: boolean;
+    /** ISO timestamp for when onboarding completed. */
     completedAt?: string;
+    /** Guardrails config schema marker used when onboarding completed. */
     version?: string;
   };
+  /** Enable or disable individual Guardrails feature extensions. */
   features?: Partial<Record<GuardrailsFeatureId, boolean>> & {
     // Deprecated. Kept only for migration.
     protectEnvFiles?: boolean;
   };
+  /** File protection policies. */
   policies?: {
+    /** Named policy rules. Rules with the same id override earlier rules across scopes. */
     rules?: PolicyRule[];
   };
+  /** Outside-workspace path access settings. */
   pathAccess?: PathAccessConfig;
   // Deprecated. Kept only for migration.
   envFiles?: {
@@ -90,12 +102,17 @@ export interface GuardrailsConfig {
     onlyBlockIfExists?: boolean;
     blockMessage?: string;
   };
+  /** Dangerous bash command detection and confirmation settings. */
   permissionGate?: {
+    /** Additional dangerous command patterns. */
     patterns?: DangerousPattern[];
-    /** If set, replaces the default patterns entirely. */
+    /** If set, replaces the default dangerous command patterns entirely. */
     customPatterns?: DangerousPattern[];
+    /** When true, prompt before running dangerous commands. When false, only warn. */
     requireConfirmation?: boolean;
+    /** Command patterns that bypass dangerous command prompts. */
     allowedPatterns?: PatternConfig[];
+    /** Command patterns that are always blocked without prompting. */
     autoDenyPatterns?: PatternConfig[];
   };
 }
