@@ -24,8 +24,6 @@ After installing, run the onboarding command to choose a starting setup:
 /guardrails:onboarding
 ```
 
-<!-- TODO: replace with final onboarding GIF. -->
-
 ![Guardrails onboarding walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/onboarding.gif)
 
 You can change everything later with:
@@ -41,8 +39,6 @@ You can change everything later with:
 The `guardrails` extension owns file protection policies and the user-facing commands.
 
 Use it to protect files like `.env`, private keys, local credentials, generated logs, database dumps, or any project-specific path you do not want Pi to read or modify without clear intent.
-
-<!-- TODO: replace with final policies/settings GIF. -->
 
 ![Guardrails policies and settings walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/policies.gif)
 
@@ -60,8 +56,6 @@ The `path-access` extension checks tool calls that target paths outside the curr
 
 It can allow, block, or ask before Pi accesses files elsewhere on your machine. In ask mode, you can allow one file or a directory once, for the session, or always.
 
-<!-- TODO: replace with final path-access GIF. -->
-
 ![Guardrails path access prompt walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/path-access.gif)
 
 ### permission-gate
@@ -69,8 +63,6 @@ It can allow, block, or ask before Pi accesses files elsewhere on your machine. 
 The `permission-gate` extension detects dangerous bash commands before they run.
 
 It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, or configure auto-deny rules.
-
-<!-- TODO: replace with final permission-gate GIF. -->
 
 ![Guardrails permission gate walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/permission-gate.gif)
 
@@ -96,8 +88,6 @@ Use the examples command to add common policy and command presets without replac
 ```text
 /guardrails:examples
 ```
-
-<!-- TODO: replace with final examples GIF. -->
 
 ![Guardrails examples command walkthrough](https://assets.aliou.me/pi-extensions/demos/guardrails/v0.12.0/examples.gif)
 
