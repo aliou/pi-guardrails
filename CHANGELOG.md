@@ -1,5 +1,19 @@
 # @aliou/pi-guardrails
 
+## 0.12.0
+
+### Minor Changes
+
+- bd90cdf: Remove the permission gate command explainer and its subagent runtime.
+- 5cef4eb: Split Guardrails into separate policy, path-access, and permission-gate extensions backed by shared config, generated JSON schema support, and refreshed README documentation.
+
+  Breaking: renamed public event bus events to `guardrails:action:blocked`, `guardrails:risk:detected`, `guardrails:feature:request`, and `guardrails:feature:register`. Blocked and risk events now use core `Action` and `Safety` payload shapes.
+
+### Patch Changes
+
+- 7b01ab4: Move config migrations into shared modules and only show onboarding when no guardrails config exists.
+- 5d76145: Update settings utilities to the latest version.
+
 ## 0.11.2
 
 ### Patch Changes
