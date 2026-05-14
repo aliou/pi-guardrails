@@ -1,45 +1,100 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { Action, Safety } from "../core/types";
 
-// TODO: we need to harmonize the format of the events with similar scoping as the ext registration events from the registry.
-export const GUARDRAILS_BLOCKED_EVENT = "guardrails:blocked";
-export const GUARDRAILS_DANGEROUS_EVENT = "guardrails:dangerous";
+export const GUARDRAILS_ACTION_BLOCKED_EVENT = "guardrails:action:blocked";
+export const GUARDRAILS_RISK_DETECTED_EVENT = "guardrails:risk:detected";
+export const GUARDRAILS_FEATURE_REQUEST_EVENT = "guardrails:feature:request";
+export const GUARDRAILS_FEATURE_REGISTER_EVENT = "guardrails:feature:register";
 
 export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
 
-export const GUARDRAILS_EXTENSIONS_REQUEST_EVENT =
-  "guardrails:extensions:request";
-export const GUARDRAILS_EXTENSIONS_REGISTER_EVENT =
-  "guardrails:extensions:register";
-
-export interface GuardrailsExtensionsRegisterPayload {
+export interface GuardrailsEventBase {
+  source: "guardrails";
   feature: GuardrailsFeatureId;
+  timestamp: string;
 }
 
-// TODO: this should use core types and not an additional abstraction here, imho
-export interface GuardrailsBlockedEvent {
-  feature: "policies" | "permissionGate" | "pathAccess";
-  toolName: string;
-  input: Record<string, unknown>;
-  reason: string;
-  userDenied?: boolean;
+export interface GuardrailsFeatureRequestPayload {
+  source: "guardrails";
+  timestamp: string;
 }
 
-export interface GuardrailsDangerousEvent {
-  command: string;
-  description: string;
-  pattern: string;
+export interface GuardrailsFeatureRegisterPayload {
+  source: "guardrails";
+  timestamp: string;
+  feature: {
+    id: GuardrailsFeatureId;
+  };
 }
 
-export function emitBlocked(
+export type GuardrailsBlockSource =
+  | "policy"
+  | "permission"
+  | "user"
+  | "nonInteractive";
+
+export type GuardrailsActionBlockedPayload<TMeta = unknown> =
+  GuardrailsEventBase & {
+    action: Action;
+    reason: string;
+    block: {
+      source: GuardrailsBlockSource;
+      metadata?: TMeta;
+    };
+    context?: {
+      toolName?: string;
+      input?: Record<string, unknown>;
+    };
+  };
+
+export type GuardrailsRiskDetectedPayload<TMeta = unknown> =
+  GuardrailsEventBase & {
+    risk: Safety<TMeta> & { kind: "dangerous" };
+    context?: {
+      toolName?: string;
+      input?: Record<string, unknown>;
+    };
+  };
+
+function timestamp(): string {
+  return new Date().toISOString();
+}
+
+export function createFeatureRequestPayload(): GuardrailsFeatureRequestPayload {
+  return {
+    source: "guardrails",
+    timestamp: timestamp(),
+  };
+}
+
+export function createFeatureRegisterPayload(
+  feature: GuardrailsFeatureId,
+): GuardrailsFeatureRegisterPayload {
+  return {
+    source: "guardrails",
+    timestamp: timestamp(),
+    feature: { id: feature },
+  };
+}
+
+export function emitActionBlocked<TMeta = unknown>(
   pi: ExtensionAPI,
-  event: GuardrailsBlockedEvent,
+  event: Omit<GuardrailsActionBlockedPayload<TMeta>, "source" | "timestamp">,
 ): void {
-  pi.events.emit(GUARDRAILS_BLOCKED_EVENT, event);
+  pi.events.emit(GUARDRAILS_ACTION_BLOCKED_EVENT, {
+    source: "guardrails",
+    timestamp: timestamp(),
+    ...event,
+  });
 }
 
-export function emitDangerous(
+export function emitRiskDetected<TMeta = unknown>(
   pi: ExtensionAPI,
-  event: GuardrailsDangerousEvent,
+  event: Omit<GuardrailsRiskDetectedPayload<TMeta>, "source" | "timestamp">,
 ): void {
-  pi.events.emit(GUARDRAILS_DANGEROUS_EVENT, event);
+  pi.events.emit(GUARDRAILS_RISK_DETECTED_EVENT, {
+    source: "guardrails",
+    timestamp: timestamp(),
+    ...event,
+  });
 }

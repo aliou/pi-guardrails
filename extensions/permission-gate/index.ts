@@ -5,10 +5,11 @@ import {
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {
-  emitBlocked,
-  emitDangerous,
-  GUARDRAILS_EXTENSIONS_REGISTER_EVENT,
-  GUARDRAILS_EXTENSIONS_REQUEST_EVENT,
+  createFeatureRegisterPayload,
+  emitActionBlocked,
+  emitRiskDetected,
+  GUARDRAILS_FEATURE_REGISTER_EVENT,
+  GUARDRAILS_FEATURE_REQUEST_EVENT,
 } from "../../src/shared/events";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
@@ -21,10 +22,11 @@ import {
 export default async function permissionGate(pi: ExtensionAPI) {
   await configLoader.load();
 
-  pi.events.on(GUARDRAILS_EXTENSIONS_REQUEST_EVENT, () => {
-    pi.events.emit(GUARDRAILS_EXTENSIONS_REGISTER_EVENT, {
-      feature: "permissionGate",
-    });
+  pi.events.on(GUARDRAILS_FEATURE_REQUEST_EVENT, () => {
+    pi.events.emit(
+      GUARDRAILS_FEATURE_REGISTER_EVENT,
+      createFeatureRegisterPayload("permissionGate"),
+    );
   });
 
   pi.on("tool_call", async (event, ctx) => {
@@ -33,6 +35,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
     if (!isToolCallEventType("bash", event)) return;
 
     const command = event.input.command;
+    const action = { kind: "command" as const, command, origin: "bash" };
     if (isCommandAllowed(command)) return;
 
     const autoDenyMatch = matchCommandPattern(
@@ -43,31 +46,29 @@ export default async function permissionGate(pi: ExtensionAPI) {
     if (autoDenyMatch) {
       const reason = formatAutoDenyReason(autoDenyMatch);
 
-      emitBlocked(pi, {
+      emitActionBlocked(pi, {
         feature: "permissionGate",
-        toolName: "bash",
-        input: event.input,
+        action,
         reason,
+        block: { source: "permission", metadata: autoDenyMatch },
+        context: { toolName: "bash", input: event.input },
       });
 
       return { block: true, reason };
     }
 
-    const safety = await checkAction(
-      { kind: "command", command, origin: "bash" },
-      [
-        createPermissionGateRule({
-          patterns: config.permissionGate.patterns,
-          useBuiltinMatchers: config.permissionGate.useBuiltinMatchers,
-        }),
-      ],
-    );
+    const safety = await checkAction(action, [
+      createPermissionGateRule({
+        patterns: config.permissionGate.patterns,
+        useBuiltinMatchers: config.permissionGate.useBuiltinMatchers,
+      }),
+    ]);
     if (safety.kind === "safe") return;
 
-    emitDangerous(pi, {
-      command,
-      description: safety.reason,
-      pattern: safety.metadata.pattern,
+    emitRiskDetected(pi, {
+      feature: "permissionGate",
+      risk: safety,
+      context: { toolName: "bash", input: event.input },
     });
 
     if (!config.permissionGate.requireConfirmation) {
@@ -77,11 +78,12 @@ export default async function permissionGate(pi: ExtensionAPI) {
 
     if (!ctx.hasUI) {
       const reason = `Dangerous command blocked (no UI to confirm): ${safety.reason}`;
-      emitBlocked(pi, {
+      emitActionBlocked(pi, {
         feature: "permissionGate",
-        toolName: "bash",
-        input: event.input,
+        action: safety.action,
         reason,
+        block: { source: "nonInteractive", metadata: safety.metadata },
+        context: { toolName: "bash", input: event.input },
       });
       return { block: true, reason };
     }
@@ -108,12 +110,12 @@ export default async function permissionGate(pi: ExtensionAPI) {
     }
 
     const reason = "User denied dangerous command";
-    emitBlocked(pi, {
+    emitActionBlocked(pi, {
       feature: "permissionGate",
-      toolName: "bash",
-      input: event.input,
+      action: safety.action,
       reason,
-      userDenied: true,
+      block: { source: "user", metadata: safety.metadata },
+      context: { toolName: "bash", input: event.input },
     });
     return { block: true, reason };
   });

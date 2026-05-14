@@ -7,9 +7,10 @@ import {
 } from "../../src/core/paths";
 import { configLoader } from "../../src/shared/config";
 import {
-  emitBlocked,
-  GUARDRAILS_EXTENSIONS_REGISTER_EVENT,
-  GUARDRAILS_EXTENSIONS_REQUEST_EVENT,
+  createFeatureRegisterPayload,
+  emitActionBlocked,
+  GUARDRAILS_FEATURE_REGISTER_EVENT,
+  GUARDRAILS_FEATURE_REQUEST_EVENT,
 } from "../../src/shared/events";
 import {
   createPendingGrant,
@@ -26,10 +27,11 @@ import { targetsForTool } from "./targets";
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
 
-  pi.events.on(GUARDRAILS_EXTENSIONS_REQUEST_EVENT, () => {
-    pi.events.emit(GUARDRAILS_EXTENSIONS_REGISTER_EVENT, {
-      feature: "pathAccess",
-    });
+  pi.events.on(GUARDRAILS_FEATURE_REQUEST_EVENT, () => {
+    pi.events.emit(
+      GUARDRAILS_FEATURE_REGISTER_EVENT,
+      createFeatureRegisterPayload("pathAccess"),
+    );
   });
 
   pi.on("tool_call", async (event, ctx) => {
@@ -49,6 +51,11 @@ export default async function pathAccess(pi: ExtensionAPI) {
     const acceptedGrants: PendingPathGrant[] = [];
 
     for (const absolutePath of targets) {
+      const action = {
+        kind: "file" as const,
+        path: absolutePath,
+        origin: event.toolName,
+      };
       const state: PathAccessState = {
         cwd: ctx.cwd,
         mode: config.pathAccess.mode,
@@ -58,18 +65,19 @@ export default async function pathAccess(pi: ExtensionAPI) {
         ],
         hasUI: ctx.hasUI,
       };
-      const safety = await checkAction(
-        { kind: "file", path: absolutePath, origin: event.toolName },
-        [createPathAccessRule(state)],
-      );
+      const safety = await checkAction(action, [createPathAccessRule(state)]);
       if (safety.kind === "safe") continue;
 
       if (config.pathAccess.mode === "block" || !ctx.hasUI) {
-        emitBlocked(pi, {
+        emitActionBlocked(pi, {
           feature: "pathAccess",
-          toolName: event.toolName,
-          input,
+          action: safety.action,
           reason: safety.reason,
+          block: {
+            source: ctx.hasUI ? "policy" : "nonInteractive",
+            metadata: safety.metadata,
+          },
+          context: { toolName: event.toolName, input },
         });
         return { block: true, reason: safety.reason };
       }
@@ -122,12 +130,12 @@ export default async function pathAccess(pi: ExtensionAPI) {
       }
 
       const reason = "User denied access outside working directory";
-      emitBlocked(pi, {
+      emitActionBlocked(pi, {
         feature: "pathAccess",
-        toolName: event.toolName,
-        input,
+        action: safety.action,
         reason,
-        userDenied: true,
+        block: { source: "user", metadata: safety.metadata },
+        context: { toolName: event.toolName, input },
       });
       return { block: true, reason };
     }

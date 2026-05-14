@@ -2,11 +2,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {
-  emitBlocked,
-  GUARDRAILS_EXTENSIONS_REGISTER_EVENT,
-  GUARDRAILS_EXTENSIONS_REQUEST_EVENT,
-  type GuardrailsExtensionsRegisterPayload,
+  createFeatureRequestPayload,
+  emitActionBlocked,
+  GUARDRAILS_FEATURE_REGISTER_EVENT,
+  GUARDRAILS_FEATURE_REQUEST_EVENT,
   type GuardrailsFeatureId,
+  type GuardrailsFeatureRegisterPayload,
 } from "../../src/shared/events";
 import { drainPendingWarnings } from "../../src/shared/warnings";
 import { registerGuardrailsExamplesCommand } from "./commands/examples";
@@ -48,11 +49,12 @@ function setupPolicyHook(pi: ExtensionAPI): void {
       );
       if (safety.kind === "safe") continue;
 
-      emitBlocked(pi, {
+      emitActionBlocked(pi, {
         feature: "policies",
-        toolName: event.toolName,
-        input,
+        action: safety.action,
         reason: safety.reason,
+        block: { source: "policy", metadata: safety.metadata },
+        context: { toolName: event.toolName, input },
       });
       return { block: true, reason: safety.reason };
     }
@@ -64,9 +66,9 @@ export default async function guardrails(pi: ExtensionAPI) {
 
   const loadedFeatures = new Set<GuardrailsFeatureId>(["policies"]);
 
-  pi.events.on(GUARDRAILS_EXTENSIONS_REGISTER_EVENT, (data: unknown) => {
-    const payload = data as GuardrailsExtensionsRegisterPayload;
-    loadedFeatures.add(payload.feature);
+  pi.events.on(GUARDRAILS_FEATURE_REGISTER_EVENT, (data: unknown) => {
+    const payload = data as GuardrailsFeatureRegisterPayload;
+    loadedFeatures.add(payload.feature.id);
   });
 
   registerGuardrailsSettings(pi, {
@@ -83,7 +85,10 @@ export default async function guardrails(pi: ExtensionAPI) {
     loadedFeatures.clear();
     loadedFeatures.add("policies");
 
-    pi.events.emit(GUARDRAILS_EXTENSIONS_REQUEST_EVENT, undefined);
+    pi.events.emit(
+      GUARDRAILS_FEATURE_REQUEST_EVENT,
+      createFeatureRequestPayload(),
+    );
 
     const warnings = drainPendingWarnings();
     if (warnings.length === 1) {
