@@ -6,6 +6,27 @@ const CWD = "/work/project";
 const HOME = homedir();
 
 describe("extractBashPathCandidates", () => {
+  it("does not extract go package wildcard patterns as paths", async () => {
+    const result = await extractBashPathCandidates("go test ./...", CWD);
+
+    expect(result).toEqual([]);
+  });
+
+  it("extracts go run .go file operands", async () => {
+    const result = await extractBashPathCandidates("go run main.go", CWD);
+
+    expect(result).toEqual(["/work/project/main.go"]);
+  });
+
+  it("handles go -C global flag", async () => {
+    const result = await extractBashPathCandidates(
+      "go -C /tmp test ./...",
+      CWD,
+    );
+
+    expect(result).toEqual([]);
+  });
+
   describe("when a command has regular expression arguments", () => {
     it("ignores sed expressions and extracts file operands", async () => {
       const result = await extractBashPathCandidates(

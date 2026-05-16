@@ -91,4 +91,52 @@ describe("classifyCommandArgs", () => {
     expect(tokens("sort", ["-t", "/", "./file"])).toEqual(["./file"]);
     expect(tokens("tr", ["/", ":"])).toEqual([]);
   });
+
+  describe("go subcommand", () => {
+    it("skips Go package wildcard patterns", () => {
+      expect(tokens("go", ["test", "./..."])).toEqual([]);
+    });
+
+    it("keeps go run .go file operands", () => {
+      expect(tokens("go", ["run", "main.go"])).toEqual(["main.go"]);
+    });
+
+    it("skips non-.go positionals for go run", () => {
+      expect(tokens("go", ["run", "-exec", "/bin/env", "main.go"])).toEqual([
+        "main.go",
+      ]);
+    });
+
+    it("skips package patterns for build/vet/list", () => {
+      expect(tokens("go", ["build", "./..."])).toEqual([]);
+      expect(tokens("go", ["vet", "./pkg/..."])).toEqual([]);
+      expect(tokens("go", ["list", "./..."])).toEqual([]);
+    });
+
+    it("keeps file-valued flags", () => {
+      expect(tokens("go", ["build", "-modfile", "./go.mod", "./..."])).toEqual([
+        "./go.mod",
+      ]);
+    });
+
+    it("keeps -o flag value for go build", () => {
+      expect(tokens("go", ["build", "-o", "./bin/app", "./..."])).toEqual([
+        "./bin/app",
+      ]);
+    });
+
+    it("handles -C global flag before subcommand", () => {
+      expect(tokens("go", ["-C", "/tmp", "test", "./..."])).toEqual([]);
+    });
+
+    it("handles -C joined form before subcommand", () => {
+      expect(tokens("go", ["-C=/tmp", "test", "./..."])).toEqual([]);
+    });
+
+    it("keeps go run .go file operands with -C", () => {
+      expect(tokens("go", ["-C", "/tmp", "run", "main.go"])).toEqual([
+        "main.go",
+      ]);
+    });
+  });
 });
