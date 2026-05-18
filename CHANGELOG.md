@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.12.1
+
+### Patch Changes
+
+- 6c149e5: Fix go package wildcards (./...) incorrectly treated as file paths, blocking commands like `go test ./...`
+
 ## 0.12.0
 
 ### Minor Changes
