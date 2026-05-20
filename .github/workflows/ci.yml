@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -33,7 +33,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Check schema
-        run: pnpm check:schema
+        run: pnpm run --if-present check:schema
 
       - name: Test
         run: pnpm run --if-present test
