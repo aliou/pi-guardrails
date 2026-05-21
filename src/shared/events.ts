@@ -5,6 +5,7 @@ export const GUARDRAILS_ACTION_BLOCKED_EVENT = "guardrails:action:blocked";
 export const GUARDRAILS_RISK_DETECTED_EVENT = "guardrails:risk:detected";
 export const GUARDRAILS_FEATURE_REQUEST_EVENT = "guardrails:feature:request";
 export const GUARDRAILS_FEATURE_REGISTER_EVENT = "guardrails:feature:register";
+export const GUARDRAILS_ACTION_PROMPTED_EVENT = "guardrails:action:prompted";
 
 export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
 
@@ -39,6 +40,22 @@ export type GuardrailsActionBlockedPayload<TMeta = unknown> =
     reason: string;
     block: {
       source: GuardrailsBlockSource;
+      metadata?: TMeta;
+    };
+    context?: {
+      toolName?: string;
+      input?: Record<string, unknown>;
+    };
+  };
+
+export type GuardrailsActionPromptedPayload<TMeta = unknown> =
+  GuardrailsEventBase & {
+    action: Action;
+    reason: string;
+    prompt: {
+      /** What kind of prompt was shown */
+      kind: "confirmation" | "permission";
+      /** The feature-specific metadata about the risk */
       metadata?: TMeta;
     };
     context?: {
@@ -93,6 +110,17 @@ export function emitRiskDetected<TMeta = unknown>(
   event: Omit<GuardrailsRiskDetectedPayload<TMeta>, "source" | "timestamp">,
 ): void {
   pi.events.emit(GUARDRAILS_RISK_DETECTED_EVENT, {
+    source: "guardrails",
+    timestamp: timestamp(),
+    ...event,
+  });
+}
+
+export function emitActionPrompted<TMeta = unknown>(
+  pi: ExtensionAPI,
+  event: Omit<GuardrailsActionPromptedPayload<TMeta>, "source" | "timestamp">,
+): void {
+  pi.events.emit(GUARDRAILS_ACTION_PROMPTED_EVENT, {
     source: "guardrails",
     timestamp: timestamp(),
     ...event,

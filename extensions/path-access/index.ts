@@ -9,6 +9,7 @@ import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
   emitActionBlocked,
+  emitActionPrompted,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
 } from "../../src/shared/events";
@@ -85,6 +86,17 @@ export default async function pathAccess(pi: ExtensionAPI) {
       const parentDir = dirname(absolutePath);
       const showFileOptions =
         event.toolName !== "ls" && event.toolName !== "find";
+      emitActionPrompted(pi, {
+        feature: "pathAccess",
+        action: safety.action,
+        reason: safety.reason,
+        prompt: {
+          kind: "confirmation",
+          metadata: safety.metadata,
+        },
+        context: { toolName: event.toolName, input },
+      });
+
       const result = await ctx.ui.custom<PromptResult>(
         createPathAccessPromptComponent(
           event.toolName,

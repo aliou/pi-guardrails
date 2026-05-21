@@ -7,6 +7,7 @@ import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
   emitActionBlocked,
+  emitActionPrompted,
   emitRiskDetected,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
@@ -89,6 +90,17 @@ export default async function permissionGate(pi: ExtensionAPI) {
     }
 
     type ConfirmResult = "allow" | "allow-session" | "deny";
+    emitActionPrompted(pi, {
+      feature: "permissionGate",
+      action: safety.action,
+      reason: safety.reason,
+      prompt: {
+        kind: "permission",
+        metadata: safety.metadata,
+      },
+      context: { toolName: "bash", input: event.input },
+    });
+
     let result = await ctx.ui.custom<ConfirmResult>(
       createPermissionGateConfirmComponent(command, safety.reason),
     );
