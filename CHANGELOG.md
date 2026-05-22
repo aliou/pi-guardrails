@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.13.0
+
+### Minor Changes
+
+- 0f4f478: Add `guardrails:action:prompted` event that fires when guardrails shows an interactive prompt to the user, before the user has responded. This complements the existing `guardrails:action:blocked` (post-decision) and `guardrails:risk:detected` events.
+
 ## 0.12.1
 
 ### Patch Changes
