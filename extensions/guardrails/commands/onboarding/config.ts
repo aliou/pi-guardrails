@@ -2,6 +2,7 @@ import {
   CURRENT_VERSION,
   type GuardrailsConfig,
 } from "../../../../src/shared/config";
+import { DEFAULT_CONFIG } from "../../../../src/shared/config/defaults";
 
 export function buildOnboardedConfig(
   applyBuiltinDefaults: boolean,
@@ -18,7 +19,10 @@ export function buildOnboardedConfig(
   };
   if (pathAccessEnabled) {
     config.features = { ...config.features, pathAccess: true };
-    config.pathAccess = { mode: "ask" };
+    config.pathAccess = {
+      mode: "ask",
+      allowedPaths: [...DEFAULT_CONFIG.pathAccess.allowedPaths],
+    };
   }
   return config;
 }

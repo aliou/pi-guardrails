@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   },
   pathAccess: {
     mode: "ask",
-    allowedPaths: [],
+    allowedPaths: ["/dev/null"],
   },
   policies: {
     rules: [
