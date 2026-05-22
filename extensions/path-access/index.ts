@@ -13,6 +13,7 @@ import {
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
 } from "../../src/shared/events";
+import { piDocumentationPaths } from "./dynamic-resources";
 import {
   createPendingGrant,
   isGrantTooBroad,
@@ -27,6 +28,23 @@ import { targetsForTool } from "./targets";
 
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
+
+  // Pi docs paths depend only on `PI_PACKAGE_DIR` / the package root and are
+  // fixed for the process lifetime, so resolve once at setup.
+  const piDocsPaths = piDocumentationPaths();
+
+  let currentSkillAllowedPaths: string[] = [];
+
+  pi.on("before_agent_start", (event) => {
+    const skills = event.systemPromptOptions.skills;
+
+    if (!skills || skills.length === 0) return;
+
+    currentSkillAllowedPaths = skills.flatMap((skill) => [
+      skill.filePath,
+      skill.baseDir,
+    ]);
+  });
 
   pi.events.on(GUARDRAILS_FEATURE_REQUEST_EVENT, () => {
     pi.events.emit(
@@ -62,6 +80,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
         mode: config.pathAccess.mode,
         allowedPaths: [
           ...resolveAllowedPaths(config.pathAccess.allowedPaths, ctx.cwd),
+          ...piDocsPaths,
+          ...currentSkillAllowedPaths,
           ...pendingAllowedPaths(acceptedGrants),
         ],
         hasUI: ctx.hasUI,
