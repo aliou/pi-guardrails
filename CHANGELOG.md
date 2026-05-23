@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.13.1
+
+### Patch Changes
+
+- b8e1fac: Loosen Pi core peer dependency ranges so guardrails can install with newer Pi versions.
+
 ## 0.13.0
 
 ### Minor Changes
