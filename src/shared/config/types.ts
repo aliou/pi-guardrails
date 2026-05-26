@@ -58,9 +58,23 @@ export interface PolicyRule {
 
 export type PathAccessMode = "allow" | "ask" | "block";
 
+export interface IgnoredBashArgRule {
+  /** Basename of the shell command whose argv should be checked. */
+  command: string;
+  /** Optional leading argv tokens required before this rule applies. */
+  subcommands?: string[];
+  /** Pattern matched against the individual argv token. */
+  argPattern: string;
+  /** Optional description for settings/schema readers. */
+  description?: string;
+  /** When true, argPattern is treated as a regular expression. Default: substring match. */
+  regex?: boolean;
+}
+
 export interface PathAccessConfig {
   mode?: PathAccessMode;
   allowedPaths?: string[];
+  ignoredBashArgs?: IgnoredBashArgRule[];
 }
 
 export interface GuardrailsConfig {
@@ -128,6 +142,7 @@ export interface ResolvedConfig {
   pathAccess: {
     mode: PathAccessMode;
     allowedPaths: string[];
+    ignoredBashArgs: IgnoredBashArgRule[];
   };
   permissionGate: {
     patterns: DangerousPattern[];

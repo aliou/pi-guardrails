@@ -8,6 +8,7 @@ export {
 export type {
   DangerousPattern,
   GuardrailsConfig,
+  IgnoredBashArgRule,
   PathAccessConfig,
   PathAccessMode,
   PatternConfig,

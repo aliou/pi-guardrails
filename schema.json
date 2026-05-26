@@ -176,12 +176,51 @@
       },
       "type": "object"
     },
+    "IgnoredBashArgRule": {
+      "additionalProperties": false,
+      "properties": {
+        "argPattern": {
+          "description": "Pattern matched against the individual argv token.",
+          "type": "string"
+        },
+        "command": {
+          "description": "Basename of the shell command whose argv should be checked.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Optional description for settings/schema readers.",
+          "type": "string"
+        },
+        "regex": {
+          "description": "When true, argPattern is treated as a regular expression. Default: substring match.",
+          "type": "boolean"
+        },
+        "subcommands": {
+          "description": "Optional leading argv tokens required before this rule applies.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "command",
+        "argPattern"
+      ],
+      "type": "object"
+    },
     "PathAccessConfig": {
       "additionalProperties": false,
       "properties": {
         "allowedPaths": {
           "items": {
             "type": "string"
+          },
+          "type": "array"
+        },
+        "ignoredBashArgs": {
+          "items": {
+            "$ref": "#/definitions/IgnoredBashArgRule"
           },
           "type": "array"
         },

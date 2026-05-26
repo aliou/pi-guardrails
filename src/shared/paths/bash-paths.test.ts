@@ -6,6 +6,57 @@ const CWD = "/work/project";
 const HOME = homedir();
 
 describe("extractBashPathCandidates", () => {
+  it("does not extract configured ignored bash args", async () => {
+    const result = await extractBashPathCandidates(
+      "tool docs /library/id ./file",
+      CWD,
+      [
+        {
+          command: "tool",
+          subcommands: ["docs"],
+          argPattern: "^/library/",
+          regex: true,
+        },
+      ],
+    );
+
+    expect(result).toEqual(["/work/project/file"]);
+  });
+
+  it("keeps ignored bash args scoped to matching subcommands", async () => {
+    const result = await extractBashPathCandidates(
+      "tool read /library/id ./file",
+      CWD,
+      [
+        {
+          command: "tool",
+          subcommands: ["docs"],
+          argPattern: "^/library/",
+          regex: true,
+        },
+      ],
+    );
+
+    expect(result).toEqual(["/library/id", "/work/project/file"]);
+  });
+
+  it("does not apply ignored bash args to redirects", async () => {
+    const result = await extractBashPathCandidates(
+      "tool docs /library/id > /library/out",
+      CWD,
+      [
+        {
+          command: "tool",
+          subcommands: ["docs"],
+          argPattern: "^/library/",
+          regex: true,
+        },
+      ],
+    );
+
+    expect(result).toEqual(["/library/out"]);
+  });
+
   it("does not extract go package wildcard patterns as paths", async () => {
     const result = await extractBashPathCandidates("go test ./...", CWD);
 

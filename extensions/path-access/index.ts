@@ -47,7 +47,14 @@ export default async function pathAccess(pi: ExtensionAPI) {
 
     const input = event.input as Record<string, unknown>;
     const targets = [
-      ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
+      ...new Set(
+        await targetsForTool(
+          event.toolName,
+          input,
+          ctx.cwd,
+          config.pathAccess.ignoredBashArgs,
+        ),
+      ),
     ];
     const acceptedGrants: PendingPathGrant[] = [];
 

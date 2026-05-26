@@ -19,6 +19,35 @@ describe("targetsForTool", () => {
     ).resolves.toEqual([join(cwd, "README.md")]);
   });
 
+  it("filters configured ignored bash args", async () => {
+    const cwd = "/repo";
+    vol.fromJSON({ "/repo/README.md": "hello" });
+
+    await expect(
+      targetsForTool(
+        "bash",
+        { command: "tool docs /library/id ./README.md" },
+        cwd,
+        [
+          {
+            command: "tool",
+            subcommands: ["docs"],
+            argPattern: "^/library/",
+            regex: true,
+          },
+        ],
+      ),
+    ).resolves.toEqual([join(cwd, "README.md")]);
+  });
+
+  it("does not apply ignored bash args to direct file tools", async () => {
+    await expect(
+      targetsForTool("read", { path: "/library/id" }, "/repo", [
+        { command: "read", argPattern: "^/library/", regex: true },
+      ]),
+    ).resolves.toEqual(["/library/id"]);
+  });
+
   it("does not treat awk regexes as paths", async () => {
     const cwd = "/repo";
     vol.fromJSON({ "/repo/test.txt": "aaa" });

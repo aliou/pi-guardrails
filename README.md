@@ -56,6 +56,8 @@ The `path-access` extension checks tool calls that target paths outside the curr
 
 It can allow, block, or ask before Pi accesses files elsewhere on your machine. In ask mode, you can allow one file or a directory once, for the session, or always.
 
+Advanced users can configure `pathAccess.ignoredBashArgs` for command-scoped bash arguments that look like paths but are CLI identifiers. These rules only affect bash argv extraction, not redirects or direct file tools.
+
 [![Guardrails path access prompt walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/path-access.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/path-access.mp4)
 
 ### permission-gate

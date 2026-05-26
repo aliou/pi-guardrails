@@ -2,7 +2,12 @@ import { buildSchemaUrl, ConfigLoader } from "@aliou/pi-utils-settings";
 import pkg from "../../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "./defaults";
 import { migrations } from "./migration";
-import type { GuardrailsConfig, PolicyRule, ResolvedConfig } from "./types";
+import type {
+  GuardrailsConfig,
+  IgnoredBashArgRule,
+  PolicyRule,
+  ResolvedConfig,
+} from "./types";
 
 export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
   "guardrails",
@@ -57,6 +62,22 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
         }
       }
       resolved.pathAccess.allowedPaths = [...mergedPaths];
+
+      const ignoredBashArgs = new Map<string, IgnoredBashArgRule>();
+      for (const rules of [
+        global?.pathAccess?.ignoredBashArgs,
+        local?.pathAccess?.ignoredBashArgs,
+        memory?.pathAccess?.ignoredBashArgs,
+      ]) {
+        for (const rule of rules ?? []) {
+          const command = String(rule.command ?? "").trim();
+          const argPattern = String(rule.argPattern ?? "").trim();
+          if (!command || !argPattern) continue;
+          const normalized = { ...rule, command, argPattern };
+          ignoredBashArgs.set(JSON.stringify(normalized), normalized);
+        }
+      }
+      resolved.pathAccess.ignoredBashArgs = [...ignoredBashArgs.values()];
 
       return resolved;
     },
