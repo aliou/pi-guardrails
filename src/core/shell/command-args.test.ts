@@ -92,6 +92,49 @@ describe("classifyCommandArgs", () => {
     expect(tokens("tr", ["/", ":"])).toEqual([]);
   });
 
+  describe("ctx7 docs command", () => {
+    it("skips slash-prefixed library IDs", () => {
+      expect(
+        tokens("ctx7", ["docs", "/websites/apisix_apache_apisix", "routes"]),
+      ).toEqual([]);
+    });
+
+    it("skips library IDs through npx ctx7", () => {
+      expect(
+        tokens("npx", [
+          "ctx7@latest",
+          "docs",
+          "/websites/apisix_apache_apisix",
+          "routes",
+        ]),
+      ).toEqual([]);
+    });
+
+    it("skips library IDs through npx --yes ctx7", () => {
+      expect(
+        tokens("npx", [
+          "--yes",
+          "ctx7@latest",
+          "docs",
+          "/websites/apisix_apache_apisix",
+          "routes",
+        ]),
+      ).toEqual([]);
+    });
+
+    it("skips library IDs through npx -y ctx7", () => {
+      expect(
+        tokens("npx", [
+          "-y",
+          "ctx7@latest",
+          "docs",
+          "/websites/apisix_apache_apisix",
+          "routes",
+        ]),
+      ).toEqual([]);
+    });
+  });
+
   describe("go subcommand", () => {
     it("skips Go package wildcard patterns", () => {
       expect(tokens("go", ["test", "./..."])).toEqual([]);

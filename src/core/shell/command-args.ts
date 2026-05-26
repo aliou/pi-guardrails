@@ -33,6 +33,8 @@ export function classifyCommandArgs(
     return classifyInterpreterArgs(cmd, args);
   }
   if (cmd === "go") return classifyGoArgs(args);
+  if (cmd === "ctx7") return classifyCtx7Args(args);
+  if (cmd === "npx") return classifyNpxArgs(args);
   if (cmd === "cut")
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
@@ -224,6 +226,40 @@ function skipOptionValues(
     out.push({ token: arg });
   }
   return out;
+}
+
+function isCtx7PackageSpec(token: string): boolean {
+  return /^ctx7(?:@.+)?$/.test(token);
+}
+
+/**
+ * Classify Context7 docs arguments.
+ *
+ * `ctx7 docs` uses slash-prefixed library IDs such as `/facebook/react`
+ * and `/websites/apisix_apache_apisix`. They are identifiers, not
+ * filesystem paths.
+ */
+function classifyCtx7Args(args: string[]): ClassifiedArg[] {
+  if (args[0] === "docs") return [];
+
+  return args.map((token) => ({ token }));
+}
+
+/**
+ * Unwrap the common `npx ctx7@latest docs ...` form.
+ */
+function classifyNpxArgs(args: string[]): ClassifiedArg[] {
+  let packageIndex = 0;
+  while (args[packageIndex] === "-y" || args[packageIndex] === "--yes") {
+    packageIndex++;
+  }
+
+  const packageSpec = args[packageIndex];
+  if (packageSpec && isCtx7PackageSpec(packageSpec)) {
+    return classifyCtx7Args(args.slice(packageIndex + 1));
+  }
+
+  return args.map((token) => ({ token }));
 }
 
 /**

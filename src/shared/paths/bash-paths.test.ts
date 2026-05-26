@@ -6,6 +6,15 @@ const CWD = "/work/project";
 const HOME = homedir();
 
 describe("extractBashPathCandidates", () => {
+  it("does not extract ctx7 docs library IDs as paths", async () => {
+    const result = await extractBashPathCandidates(
+      'npx ctx7@latest docs /websites/apisix_apache_apisix "routes"',
+      CWD,
+    );
+
+    expect(result).toEqual([]);
+  });
+
   it("does not extract go package wildcard patterns as paths", async () => {
     const result = await extractBashPathCandidates("go test ./...", CWD);
 
