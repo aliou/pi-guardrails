@@ -1,5 +1,17 @@
 # @aliou/pi-guardrails
 
+## 0.13.2
+
+### Patch Changes
+
+- 22f51a9: Fix feature and permission gate toggles storing display strings instead of booleans
+
+  Toggling `features.*` or `permissionGate.requireConfirmation` in the settings command stored the raw display string ("enabled"/"disabled", "on"/"off") instead of converting to `true`/`false`. Since any non-empty string is truthy, features appeared stuck "on" when toggled to "disabled" or "off".
+
+- 8a1996a: Make onboarding status toggleable in global settings
+
+  Onboarding status was a read-only label with no way to reset it. Now toggleable between "completed" and "pending" so users can re-run onboarding after a Pi reload.
+
 ## 0.13.1
 
 ### Patch Changes
