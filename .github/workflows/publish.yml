@@ -5,6 +5,7 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,7 +14,7 @@ concurrency:
 jobs:
   publish:
     name: Publish
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -37,6 +38,9 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           scope: "@aliou"
           cache: "pnpm"
+
+      - name: Upgrade npm for stage publish support
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -72,52 +76,44 @@ jobs:
           rm -f release.json
         continue-on-error: true
 
-      - name: Create Release PR or Publish
+      - name: Create Release PR or Stage
         id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          publish: pnpm changeset publish
           title: ${{ steps.release-info.outputs.title }}
           commit: ${{ steps.release-info.outputs.commit }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for unpublished packages
+        id: check-publish
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          REGISTRY_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL_VERSION" != "$REGISTRY_VERSION" ]; then
+            echo "needs_staging=true" >> "$GITHUB_OUTPUT"
+            echo "version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_staging=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stage packages
+        if: steps.check-publish.outputs.needs_staging == 'true'
+        run: npm stage publish
+        env:
           NPM_CONFIG_PROVENANCE: true
 
       - name: Create GitHub releases
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.check-publish.outputs.needs_staging == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
         run: |
-          node <<'NODE'
-          const { execSync } = require("node:child_process");
-
-          const published = JSON.parse(process.env.PUBLISHED_PACKAGES || "[]");
-
-          for (const pkg of published) {
-            const tag = `v${pkg.version}`;
-
-            const existing = execSync(`git tag --list ${tag}`, { encoding: "utf8" }).trim();
-            if (!existing) {
-              execSync(`git tag ${tag}`);
-              execSync(`git push origin ${tag}`);
-            }
-
-            let hasRelease = false;
-            try {
-              const output = execSync(`gh release view ${tag} --json tagName --jq .tagName`, {
-                stdio: ["ignore", "pipe", "ignore"],
-              }).toString().trim();
-              hasRelease = output.length > 0;
-            } catch {
-              hasRelease = false;
-            }
-
-            if (!hasRelease) {
-              execSync(`gh release create ${tag} --title ${tag} --notes "Release ${tag}"`, {
-                stdio: "inherit",
-              });
-            }
-          }
-          NODE
+          TAG="v${{ steps.check-publish.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --notes "Release $TAG"
+          fi
