@@ -1,13 +1,31 @@
-import { buildSchemaUrl, ConfigLoader } from "@aliou/pi-utils-settings";
+import {
+  buildSchemaUrl,
+  ConfigLoader,
+  type Scope,
+} from "@aliou/pi-utils-settings";
 import pkg from "../../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG } from "./defaults";
 import { migrations } from "./migration";
 import type { GuardrailsConfig, PolicyRule, ResolvedConfig } from "./types";
 
-export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
-  "guardrails",
-  DEFAULT_CONFIG,
-  {
+class GuardrailsConfigLoader extends ConfigLoader<
+  GuardrailsConfig,
+  ResolvedConfig
+> {
+  override async save(scope: Scope, config: GuardrailsConfig): Promise<void> {
+    await super.save(scope, ensureConfigVersion(config));
+  }
+}
+
+function ensureConfigVersion(config: GuardrailsConfig): GuardrailsConfig {
+  if (typeof config.version === "string" && config.version.trim()) {
+    return config;
+  }
+  return { ...config, version: DEFAULT_CONFIG.version };
+}
+
+export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
+  return new GuardrailsConfigLoader("guardrails", DEFAULT_CONFIG, {
     scopes: ["global", "local", "memory"],
     migrations,
     schemaUrl: buildSchemaUrl(pkg.name, pkg.version),
@@ -60,5 +78,7 @@ export const configLoader = new ConfigLoader<GuardrailsConfig, ResolvedConfig>(
 
       return resolved;
     },
-  },
-);
+  });
+}
+
+export const configLoader = createGuardrailsConfigLoader();
