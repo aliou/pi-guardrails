@@ -1,5 +1,15 @@
 # @aliou/pi-guardrails
 
+## 0.13.3
+
+### Patch Changes
+
+- 9674ac5: Stamp guardrails config saves with the current schema version.
+
+  This prevents newly-created partial configs from being mistaken for legacy v0 configs on reload.
+
+- 17ae843: Use regex for git force-push example to catch the flag at any position.
+
 ## 0.13.2
 
 ### Patch Changes
