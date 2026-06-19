@@ -1,5 +1,27 @@
 # @aliou/pi-guardrails
 
+## 0.14.0
+
+### Minor Changes
+
+- e012ea0: Migrate `pathAccess.allowedPaths` from a flat `string[]` (trailing-slash convention) to an explicit `{ kind, path }` discriminated array.
+
+  - `file` grants match the exact path; `directory` grants match the directory and its descendants.
+  - Removes the implicit trailing-slash convention from config, storage, and runtime access matching.
+  - Fixes skill `baseDir` grants being matched as exact files instead of directory boundaries.
+  - Adds migration `010-allowed-paths-objects` to convert existing string entries; `009` made format-agnostic so it no longer re-runs on migrated configs.
+  - Settings UI `Allowed paths` editor now toggles kind per entry (Tab) instead of relying on trailing slashes.
+  - Regenerates `schema.json` with the new `AllowedPath` definition.
+  - Bumps `@aliou/pi-utils-settings` to `^0.17.0` and switches migrations to its built-in `Migration.message` field. Migration warnings now flow through `ConfigLoader.drainMessages()` instead of guardrails' manual `addPendingWarning` queue (which is retained only for non-migration warnings like invalid regex patterns). The `001` config-backup failure path drops to `console.error`.
+
+### Patch Changes
+
+- a7f2980: Bump `@aliou/pi-utils-settings` to `^0.17.0` and switch migration warnings to its built-in `Migration.message` field.
+
+  - Migration warnings now flow through `ConfigLoader.drainMessages()` (drained and rendered in the `session_start` handler) instead of guardrails' manual `addPendingWarning` queue.
+  - The `001` config-backup failure path drops to `console.error` (it fires on an error path, not a successful run, so it cannot use the `message` field).
+  - Removes the now-unused `src/shared/warnings.ts` module. Invalid-regex handling in pattern compilation silently matches nothing for now (TODO: surface via `ctx.ui.notify` once compilation is pre-cached at setup).
+
 ## 0.13.3
 
 ### Patch Changes
