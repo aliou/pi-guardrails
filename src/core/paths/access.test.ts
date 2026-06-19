@@ -22,11 +22,13 @@ describe("isPathAllowed", () => {
         expected: false,
       },
     ])("$desc", ({ path, expected }) => {
-      expect(isPathAllowed(path, ["/foo/bar"])).toBe(expected);
+      expect(isPathAllowed(path, [{ kind: "file", path: "/foo/bar" }])).toBe(
+        expected,
+      );
     });
   });
 
-  describe("when entry is a directory grant (trailing /)", () => {
+  describe("when entry is a directory grant", () => {
     it.each([
       {
         desc: "matches the directory itself",
@@ -45,13 +47,20 @@ describe("isPathAllowed", () => {
         expected: false,
       },
     ])("$desc", ({ path, expected }) => {
-      expect(isPathAllowed(path, ["/foo/bar/"])).toBe(expected);
+      expect(
+        isPathAllowed(path, [{ kind: "directory", path: "/foo/bar" }]),
+      ).toBe(expected);
     });
   });
 
   describe("when allowedPaths has multiple entries", () => {
     it("returns true if any entry matches", () => {
-      expect(isPathAllowed("/b", ["/a", "/b"])).toBe(true);
+      expect(
+        isPathAllowed("/b", [
+          { kind: "file", path: "/a" },
+          { kind: "file", path: "/b" },
+        ]),
+      ).toBe(true);
     });
 
     it.each([
@@ -63,7 +72,12 @@ describe("isPathAllowed", () => {
       path,
       expected,
     }) => {
-      expect(isPathAllowed(path, ["/foo/file.ts", "/bar/"])).toBe(expected);
+      expect(
+        isPathAllowed(path, [
+          { kind: "file", path: "/foo/file.ts" },
+          { kind: "directory", path: "/bar" },
+        ]),
+      ).toBe(expected);
     });
   });
 });
@@ -117,7 +131,10 @@ describe("checkPathAccess", () => {
     });
 
     it("returns allow when the path is in allowedPaths", () => {
-      const state = base({ mode: "block", allowedPaths: ["/etc/hosts"] });
+      const state = base({
+        mode: "block",
+        allowedPaths: [{ kind: "file", path: "/etc/hosts" }],
+      });
       expect(checkPathAccess("/etc/hosts", "/etc/hosts", state).kind).toBe(
         "allow",
       );
@@ -141,7 +158,10 @@ describe("checkPathAccess", () => {
     });
 
     it("returns allow when the path is in allowedPaths (no prompt)", () => {
-      const state = base({ mode: "ask", allowedPaths: ["/etc/hosts"] });
+      const state = base({
+        mode: "ask",
+        allowedPaths: [{ kind: "file", path: "/etc/hosts" }],
+      });
       expect(checkPathAccess("/etc/hosts", "/etc/hosts", state).kind).toBe(
         "allow",
       );

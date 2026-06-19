@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { AllowedPath } from "../../src/core/paths";
 import { createPathAccessRule } from "./rules";
 
 const cwd = "/repo";
-const state = (allowedPaths: string[] = []) => ({
+const state = (allowedPaths: AllowedPath[] = []) => ({
   cwd,
   mode: "block" as const,
   allowedPaths,
@@ -38,7 +39,9 @@ describe("createPathAccessRule", () => {
   });
 
   it("passes explicitly allowed outside paths", () => {
-    const rule = createPathAccessRule(state(["/tmp/"]));
+    const rule = createPathAccessRule(
+      state([{ kind: "directory", path: "/tmp" }]),
+    );
     expect(rule.check({ kind: "file", path: "/tmp/secret.txt" })).toEqual({
       kind: "pass",
     });

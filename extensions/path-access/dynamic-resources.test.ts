@@ -7,16 +7,12 @@ import {
 import { describe, expect, it } from "vitest";
 import { piDocumentationPaths } from "./dynamic-resources";
 
-function withTrailingSlash(p: string): string {
-  return p.endsWith("/") ? p : `${p}/`;
-}
-
-describe("piDocsAllowedPaths", () => {
-  it("returns README, docs, and examples paths from the running Pi runtime", () => {
+describe("piDocumentationPaths", () => {
+  it("returns README as a file grant and docs/examples as directory grants", () => {
     expect(piDocumentationPaths()).toEqual([
-      getReadmePath(),
-      withTrailingSlash(getDocsPath()),
-      withTrailingSlash(getExamplesPath()),
+      { kind: "file", path: getReadmePath() },
+      { kind: "directory", path: getDocsPath() },
+      { kind: "directory", path: getExamplesPath() },
     ]);
   });
 
@@ -24,15 +20,25 @@ describe("piDocsAllowedPaths", () => {
     const [readme, docs, examples] = piDocumentationPaths();
     const packageRoot = resolve(join(getReadmePath(), ".."));
 
-    expect(readme).toBe(join(packageRoot, "README.md"));
-    expect(docs).toBe(`${join(packageRoot, "docs")}/`);
-    expect(examples).toBe(`${join(packageRoot, "examples")}/`);
+    expect(readme).toEqual({
+      kind: "file",
+      path: join(packageRoot, "README.md"),
+    });
+    expect(docs).toEqual({
+      kind: "directory",
+      path: join(packageRoot, "docs"),
+    });
+    expect(examples).toEqual({
+      kind: "directory",
+      path: join(packageRoot, "examples"),
+    });
   });
 
-  it("always emits trailing slashes on directory paths", () => {
-    const [, docs, examples] = piDocumentationPaths();
-    expect(docs.endsWith("/")).toBe(true);
-    expect(examples.endsWith("/")).toBe(true);
+  it("carries kind explicitly instead of relying on trailing slashes", () => {
+    const [readme, docs, examples] = piDocumentationPaths();
+    expect(readme.kind).toBe("file");
+    expect(docs.kind).toBe("directory");
+    expect(examples.kind).toBe("directory");
   });
 
   it("honors PI_PACKAGE_DIR override (Nix/Guix store paths)", () => {
@@ -42,9 +48,18 @@ describe("piDocsAllowedPaths", () => {
     try {
       const [readme, docs, examples] = piDocumentationPaths();
 
-      expect(readme).toBe(resolve(join(fakeRoot, "README.md")));
-      expect(docs).toBe(`${resolve(join(fakeRoot, "docs"))}/`);
-      expect(examples).toBe(`${resolve(join(fakeRoot, "examples"))}/`);
+      expect(readme).toEqual({
+        kind: "file",
+        path: resolve(join(fakeRoot, "README.md")),
+      });
+      expect(docs).toEqual({
+        kind: "directory",
+        path: resolve(join(fakeRoot, "docs")),
+      });
+      expect(examples).toEqual({
+        kind: "directory",
+        path: resolve(join(fakeRoot, "examples")),
+      });
     } finally {
       if (original === undefined) {
         delete process.env.PI_PACKAGE_DIR;

@@ -9,6 +9,7 @@ import * as applyBuiltinDefaults from "./006-apply-builtin-defaults";
 import * as markOnboardingDone from "./007-mark-onboarding-done";
 import * as normalizeStringBooleans from "./008-normalize-string-booleans";
 import * as allowDevNull from "./009-allow-dev-null";
+import * as allowedPathsObjects from "./010-allowed-paths-objects";
 
 export { CURRENT_VERSION } from "./version";
 
@@ -61,6 +62,13 @@ export const migrations: Migration<GuardrailsConfig>[] = [
     run: allowDevNull.run,
     message:
       "pathAccess.allowedPaths was migrated to allow /dev/null by default.",
+  },
+  {
+    name: "allowed-paths-objects",
+    shouldRun: allowedPathsObjects.shouldRun,
+    run: allowedPathsObjects.run,
+    message:
+      "pathAccess.allowedPaths was migrated from path strings to { kind, path } objects.",
   },
 ];
 

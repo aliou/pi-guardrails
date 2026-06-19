@@ -2,6 +2,19 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
 /**
+ * A path grant with an explicit kind.
+ *
+ * `file` matches the exact path only. `directory` matches the directory itself
+ * and any descendant (boundary/prefix match).
+ *
+ * This replaces the previous trailing-slash convention on a flat `string[]`,
+ * where the kind was inferred from whether a path ended in `/`.
+ */
+export type AllowedPath =
+  | { kind: "file"; path: string }
+  | { kind: "directory"; path: string };
+
+/**
  * Expand a leading tilde to the current user's home directory.
  * Preserves all other paths unchanged.
  */
@@ -52,9 +65,27 @@ export function normalizeForDisplay(absPath: string, cwd: string): string {
 
 /**
  * Convert an absolute path to storage form for config persistence.
- * Uses ~/ for home paths, absolute otherwise. Appends trailing / for directory grants.
+ *
+ * Uses `~/` for home paths, absolute otherwise, and normalizes separators to
+ * forward slash. The kind (file vs directory) is carried explicitly on the
+ * returned `AllowedPath` instead of via a trailing slash.
  */
-export function toStorageForm(absPath: string, isDirectory: boolean): string {
+export function toStorageGrant(
+  absPath: string,
+  isDirectory: boolean,
+): AllowedPath {
+  return {
+    kind: isDirectory ? "directory" : "file",
+    path: toStoragePath(absPath),
+  };
+}
+
+/**
+ * Normalize an absolute path for storage: expand home to `~/`, collapse
+ * backslashes to forward slashes, and strip any trailing slash (the kind now
+ * lives on `AllowedPath`, not on the path string).
+ */
+function toStoragePath(absPath: string): string {
   const home = homedir();
   let stored: string;
   if (
@@ -66,10 +97,8 @@ export function toStorageForm(absPath: string, isDirectory: boolean): string {
   } else {
     stored = absPath;
   }
-  // Normalize separators to forward slash for storage
   stored = stored.replace(/\\/g, "/");
-  if (isDirectory && !stored.endsWith("/")) stored += "/";
-  if (!isDirectory && stored.endsWith("/")) stored = stored.slice(0, -1);
+  stored = stored.replace(/\/+$/, "");
   return stored;
 }
 

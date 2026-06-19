@@ -11,10 +11,7 @@ import {
   getExamplesPath,
   getReadmePath,
 } from "@earendil-works/pi-coding-agent";
-
-function withTrailingSlash(p: string): string {
-  return p.endsWith("/") ? p : `${p}/`;
-}
+import type { AllowedPath } from "../../src/core/paths";
 
 /**
  * Resolve Pi documentation paths dynamically from the running Pi runtime.
@@ -29,12 +26,12 @@ function withTrailingSlash(p: string): string {
  * Pi version actually running. They depend only on the process environment
  * and are fixed for the process lifetime — resolve once, no per-turn work.
  *
- * Directories include a trailing slash for path-access matching convention.
+ * The README is a single file grant; docs and examples are directory grants.
  */
-export function piDocumentationPaths(): string[] {
+export function piDocumentationPaths(): AllowedPath[] {
   return [
-    getReadmePath(),
-    withTrailingSlash(getDocsPath()),
-    withTrailingSlash(getExamplesPath()),
+    { kind: "file", path: getReadmePath() },
+    { kind: "directory", path: getDocsPath() },
+    { kind: "directory", path: getExamplesPath() },
   ];
 }

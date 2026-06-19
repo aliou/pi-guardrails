@@ -6,6 +6,7 @@ export {
   migrations,
 } from "./migration";
 export type {
+  AllowedPath,
   DangerousPattern,
   GuardrailsConfig,
   PathAccessConfig,

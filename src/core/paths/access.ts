@@ -1,4 +1,4 @@
-import { isWithinBoundary } from "./path";
+import { type AllowedPath, isWithinBoundary } from "./path";
 
 export type PathDecision =
   | { kind: "allow" }
@@ -8,25 +8,25 @@ export type PathDecision =
 export interface PathAccessState {
   cwd: string;
   mode: "allow" | "ask" | "block";
-  allowedPaths: string[]; // already resolved to absolute, with trailing / convention
+  allowedPaths: AllowedPath[]; // already resolved to absolute
   hasUI: boolean;
 }
 
 /**
  * Check if an absolute path is covered by the allowedPaths list.
- * - Entries ending in "/" are directory grants (boundary/prefix match).
- * - Entries without trailing "/" are exact file grants.
+ *
+ * `directory` grants match the directory itself and any descendant (boundary
+ * match). `file` grants match the exact path only.
  */
 export function isPathAllowed(
   absPath: string,
-  allowedPaths: string[],
+  allowedPaths: AllowedPath[],
 ): boolean {
   for (const entry of allowedPaths) {
-    if (entry.endsWith("/")) {
-      const dirPath = entry.slice(0, -1);
-      if (isWithinBoundary(absPath, dirPath)) return true;
+    if (entry.kind === "directory") {
+      if (isWithinBoundary(absPath, entry.path)) return true;
     } else {
-      if (absPath === entry) return true;
+      if (absPath === entry.path) return true;
     }
   }
   return false;

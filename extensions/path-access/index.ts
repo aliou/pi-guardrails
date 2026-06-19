@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import {
+  type AllowedPath,
   normalizeForDisplay,
   type PathAccessState,
 } from "../../src/core/paths";
@@ -33,7 +34,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
   // fixed for the process lifetime, so resolve once at setup.
   const piDocsPaths = piDocumentationPaths();
 
-  let currentSkillAllowedPaths: string[] = [];
+  let currentSkillAllowedPaths: AllowedPath[] = [];
 
   pi.on("before_agent_start", (event) => {
     const skills = event.systemPromptOptions.skills;
@@ -41,8 +42,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
     if (!skills || skills.length === 0) return;
 
     currentSkillAllowedPaths = skills.flatMap((skill) => [
-      skill.filePath,
-      skill.baseDir,
+      { kind: "file", path: skill.filePath },
+      { kind: "directory", path: skill.baseDir },
     ]);
   });
 

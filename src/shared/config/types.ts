@@ -7,6 +7,14 @@
 import type { GuardrailsFeatureId } from "../events";
 
 /**
+ * A path grant with an explicit kind. Re-exported from the core path module so
+ * config consumers can import it from one place.
+ */
+export type { AllowedPath } from "../../core/paths/path";
+
+import type { AllowedPath } from "../../core/paths/path";
+
+/**
  * A pattern with explicit matching mode.
  * Default: glob for files, substring for commands.
  * regex: true means full regex matching.
@@ -60,7 +68,12 @@ export type PathAccessMode = "allow" | "ask" | "block";
 
 export interface PathAccessConfig {
   mode?: PathAccessMode;
-  allowedPaths?: string[];
+  /**
+   * Paths always allowed, regardless of cwd. Each entry carries an explicit
+   * `kind`: `file` matches the exact path, `directory` matches the directory
+   * and its descendants.
+   */
+  allowedPaths?: AllowedPath[];
 }
 
 export interface GuardrailsConfig {
@@ -127,7 +140,7 @@ export interface ResolvedConfig {
   };
   pathAccess: {
     mode: PathAccessMode;
-    allowedPaths: string[];
+    allowedPaths: AllowedPath[];
   };
   permissionGate: {
     patterns: DangerousPattern[];
