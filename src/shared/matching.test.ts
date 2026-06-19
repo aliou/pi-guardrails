@@ -4,7 +4,6 @@ import {
   compileFilePattern,
   normalizeFilePath,
 } from "./matching";
-import { drainPendingWarnings } from "./warnings";
 
 describe("normalizeFilePath", () => {
   it.each([
@@ -43,15 +42,10 @@ describe("compileFilePattern", () => {
     expect(pattern.test("docs/public.txt")).toBe(false);
   });
 
-  it("records a warning and returns a non-matching pattern for invalid regex", () => {
-    drainPendingWarnings();
-
+  it("returns a non-matching pattern for invalid regex", () => {
     const pattern = compileFilePattern({ pattern: "[", regex: true });
 
     expect(pattern.test("anything")).toBe(false);
-    expect(drainPendingWarnings()).toEqual([
-      "Invalid regex in guardrails config: [",
-    ]);
   });
 });
 
@@ -73,14 +67,9 @@ describe("compileCommandPattern", () => {
     expect(pattern.test("terraform plan")).toBe(false);
   });
 
-  it("records a warning and returns a non-matching pattern for invalid regex", () => {
-    drainPendingWarnings();
-
+  it("returns a non-matching pattern for invalid regex", () => {
     const pattern = compileCommandPattern({ pattern: "[", regex: true });
 
     expect(pattern.test("anything")).toBe(false);
-    expect(drainPendingWarnings()).toEqual([
-      "Invalid regex in guardrails config: [",
-    ]);
   });
 });

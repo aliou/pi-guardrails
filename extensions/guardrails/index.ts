@@ -9,7 +9,6 @@ import {
   type GuardrailsFeatureId,
   type GuardrailsFeatureRegisterPayload,
 } from "../../src/shared/events";
-import { drainPendingWarnings } from "../../src/shared/warnings";
 import { registerGuardrailsExamplesCommand } from "./commands/examples";
 import { registerGuardrailsOnboardingCommand } from "./commands/onboarding";
 import { isOnboardingPending } from "./commands/onboarding/config";
@@ -90,7 +89,7 @@ export default async function guardrails(pi: ExtensionAPI) {
       createFeatureRequestPayload(),
     );
 
-    const warnings = drainPendingWarnings();
+    const warnings = configLoader.drainMessages();
     if (warnings.length === 1) {
       ctx.ui.notify(warnings[0], "warning");
     } else if (warnings.length > 1) {

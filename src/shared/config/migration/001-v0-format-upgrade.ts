@@ -1,6 +1,5 @@
 import { copyFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { addPendingWarning } from "../../warnings";
 import type {
   DangerousPattern,
   GuardrailsConfig,
@@ -101,7 +100,7 @@ async function backupConfig(configPath: string): Promise<void> {
     try {
       await copyFile(configPath, backupPath);
     } catch (err) {
-      addPendingWarning(`guardrails: could not back up config: ${err}`);
+      console.error(`[guardrails] could not back up config: ${err}`);
     }
   }
 }

@@ -22,31 +22,45 @@ export const migrations: Migration<GuardrailsConfig>[] = [
     name: "strip-toolchain-fields",
     shouldRun: stripToolchainFields.shouldRun,
     run: stripToolchainFields.run,
+    message:
+      "preventBrew, preventPython, enforcePackageManager, and packageManager " +
+      "have been removed from guardrails and moved to @aliou/pi-toolchain. " +
+      "These fields will be stripped from your config.",
   },
   {
     name: "strip-command-explainer-fields",
     shouldRun: stripCommandExplainerFields.shouldRun,
     run: stripCommandExplainerFields.run,
+    message:
+      "permissionGate.explainCommands, explainModel, and explainTimeout " +
+      "have been removed. These fields will be stripped from your config.",
   },
   {
     name: "env-files-to-policies",
     shouldRun: envFilesToPolicies.shouldRun,
     run: envFilesToPolicies.run,
+    message: envFilesToPolicies.message,
   },
   {
     name: "normalize-allowed-paths",
     shouldRun: normalizeAllowedPaths.shouldRun,
     run: normalizeAllowedPaths.run,
+    message:
+      "pathAccess.allowedPaths was migrated from pattern objects to path strings.",
   },
   {
     name: "normalize-string-booleans",
     shouldRun: normalizeStringBooleans.shouldRun,
     run: normalizeStringBooleans.run,
+    message:
+      "Config migrated: boolean settings stored as strings were converted to true/false.",
   },
   {
     name: "allow-dev-null",
     shouldRun: allowDevNull.shouldRun,
     run: allowDevNull.run,
+    message:
+      "pathAccess.allowedPaths was migrated to allow /dev/null by default.",
   },
 ];
 

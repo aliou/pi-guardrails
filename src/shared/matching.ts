@@ -10,7 +10,6 @@
 
 import { matchesGlob } from "node:path";
 import type { PatternConfig } from "./config";
-import { addPendingWarning } from "./warnings";
 
 export interface CompiledPattern {
   test: (input: string) => boolean;
@@ -47,9 +46,10 @@ export function compileFilePattern(config: PatternConfig): CompiledPattern {
         source: config,
       };
     } catch {
-      addPendingWarning(
-        `Invalid regex in guardrails config: ${config.pattern}`,
-      );
+      // TODO: surface invalid regex to the user via ctx.ui.notify once pattern
+      // compilation is pre-cached at extension setup (so it has ctx access and
+      // runs once, instead of re-firing on every tool call). For now the
+      // pattern silently matches nothing.
       return { test: () => false, source: config };
     }
   }
@@ -80,9 +80,10 @@ export function compileCommandPattern(config: PatternConfig): CompiledPattern {
       const re = new RegExp(config.pattern);
       return { test: (input) => re.test(input), source: config };
     } catch {
-      addPendingWarning(
-        `Invalid regex in guardrails config: ${config.pattern}`,
-      );
+      // TODO: surface invalid regex to the user via ctx.ui.notify once pattern
+      // compilation is pre-cached at extension setup (so it has ctx access and
+      // runs once, instead of re-firing on every tool call). For now the
+      // pattern silently matches nothing.
       return { test: () => false, source: config };
     }
   }

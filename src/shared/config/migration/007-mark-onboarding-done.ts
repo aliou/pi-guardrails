@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -11,9 +10,6 @@ export function shouldRun(config: GuardrailsConfig): boolean {
 
 export function run(config: GuardrailsConfig): GuardrailsConfig {
   const migrated = structuredClone(config);
-  addPendingWarning(
-    "Guardrails config was migrated. Existing setup marked as onboarding-complete.",
-  );
   migrated.onboarding = {
     ...(migrated.onboarding ?? {}),
     completed: true,

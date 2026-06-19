@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -23,10 +22,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
     allowedPaths: [...allowedPaths, DEV_NULL],
   };
   migrated.version = CURRENT_VERSION;
-
-  addPendingWarning(
-    "[guardrails] pathAccess.allowedPaths was migrated to allow /dev/null by default.",
-  );
 
   return migrated;
 }

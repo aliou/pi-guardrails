@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -48,9 +47,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
 
   if (changed) {
     migrated.version = CURRENT_VERSION;
-    addPendingWarning(
-      "[guardrails] Config migrated: boolean settings stored as strings were converted to true/false.",
-    );
   }
 
   return migrated as GuardrailsConfig;
