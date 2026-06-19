@@ -14,6 +14,7 @@ import type {
   SettingsListTheme,
 } from "@earendil-works/pi-tui";
 import type {
+  AllowedPath,
   DangerousPattern,
   GuardrailsConfig,
   PatternConfig,
@@ -355,7 +356,13 @@ export function registerGuardrailsSettings(
         return (_val: string, submenuDone: (v?: string) => void) => {
           const value = getNestedValue(scopedConfig, id);
           const items = Array.isArray(value)
-            ? value.filter((path): path is string => typeof path === "string")
+            ? value.filter(
+                (entry): entry is AllowedPath =>
+                  typeof entry === "object" &&
+                  entry !== null &&
+                  (entry.kind === "file" || entry.kind === "directory") &&
+                  typeof entry.path === "string",
+              )
             : [];
           let latestCount = items.length;
           return new PathListEditor({
@@ -531,7 +538,7 @@ export function registerGuardrailsSettings(
               id: "pathAccess.allowedPaths",
               label: "Allowed paths",
               description:
-                "Paths always allowed (trailing / for directories). Supports ~/",
+                "Paths always allowed outside cwd. Each entry is { kind, path }: file matches exactly, directory matches the tree. Supports ~/",
               currentValue: count("pathAccess.allowedPaths"),
               submenu: pathListSubmenu(
                 "pathAccess.allowedPaths",

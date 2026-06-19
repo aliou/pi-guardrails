@@ -8,10 +8,18 @@ import {
 } from "./grants";
 
 describe("path access grants", () => {
-  it("resolves allowed paths relative to cwd", () => {
-    expect(resolveAllowedPaths(["../shared", "logs/"], "/repo/app")).toEqual([
-      "/repo/shared",
-      "/repo/app/logs/",
+  it("resolves allowed paths relative to cwd, preserving kind", () => {
+    expect(
+      resolveAllowedPaths(
+        [
+          { kind: "directory", path: "../shared" },
+          { kind: "directory", path: "logs" },
+        ],
+        "/repo/app",
+      ),
+    ).toEqual([
+      { kind: "directory", path: "/repo/shared" },
+      { kind: "directory", path: "/repo/app/logs" },
     ]);
   });
 
@@ -19,17 +27,22 @@ describe("path access grants", () => {
     expect(
       pendingAllowedPaths([
         {
-          storagePath: "/tmp/file.txt",
+          kind: "file",
+          storageGrant: { kind: "file", path: "/tmp/file.txt" },
           absolutePath: "/tmp/file.txt",
           scope: "memory",
         },
         {
-          storagePath: "/tmp/logs/",
+          kind: "directory",
+          storageGrant: { kind: "directory", path: "/tmp/logs" },
           absolutePath: "/tmp/logs",
           scope: "local",
         },
       ]),
-    ).toEqual(["/tmp/file.txt", "/tmp/logs/"]);
+    ).toEqual([
+      { kind: "file", path: "/tmp/file.txt" },
+      { kind: "directory", path: "/tmp/logs" },
+    ]);
   });
 
   it("rejects home grants as too broad", () => {
@@ -37,11 +50,12 @@ describe("path access grants", () => {
     expect(isGrantTooBroad(`${homedir()}/project`)).toBe(false);
   });
 
-  it("creates pending grants with storage form", () => {
+  it("creates pending grants with a storage grant", () => {
     expect(createPendingGrant("/tmp/logs", true, "local")).toEqual({
+      kind: "directory",
       absolutePath: "/tmp/logs",
       scope: "local",
-      storagePath: "/tmp/logs/",
+      storageGrant: { kind: "directory", path: "/tmp/logs" },
     });
   });
 });

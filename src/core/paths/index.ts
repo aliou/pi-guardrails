@@ -5,10 +5,11 @@ export {
   type PathDecision,
 } from "./access";
 export {
+  type AllowedPath,
   expandHomePath,
   isWithinBoundary,
   maybePathLike,
   normalizeForDisplay,
   resolveFromCwd,
-  toStorageForm,
+  toStorageGrant,
 } from "./path";

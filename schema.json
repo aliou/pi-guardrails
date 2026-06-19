@@ -2,6 +2,45 @@
   "$ref": "#/definitions/GuardrailsConfig",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "AllowedPath": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "file",
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "directory",
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "A path grant with an explicit kind.\n\n`file` matches the exact path only. `directory` matches the directory itself and any descendant (boundary/prefix match).\n\nThis replaces the previous trailing-slash convention on a flat `string[]`, where the kind was inferred from whether a path ended in `/`."
+    },
     "DangerousPattern": {
       "additionalProperties": false,
       "description": "Permission gate pattern. When regex is false (default), the pattern is matched as substring against the raw command string. When regex is true, uses full regex against the raw string.",
@@ -180,8 +219,9 @@
       "additionalProperties": false,
       "properties": {
         "allowedPaths": {
+          "description": "Paths always allowed, regardless of cwd. Each entry carries an explicit `kind`: `file` matches the exact path, `directory` matches the directory and its descendants.",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/AllowedPath"
           },
           "type": "array"
         },

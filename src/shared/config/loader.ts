@@ -4,6 +4,7 @@ import {
   type Scope,
 } from "@aliou/pi-utils-settings";
 import pkg from "../../../package.json" with { type: "json" };
+import type { AllowedPath } from "../../core/paths/path";
 import { DEFAULT_CONFIG } from "./defaults";
 import { migrations } from "./migration";
 import type { GuardrailsConfig, PolicyRule, ResolvedConfig } from "./types";
@@ -63,18 +64,21 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
         resolved.permissionGate.useBuiltinMatchers = false;
       }
 
-      const mergedPaths = new Set<string>();
+      const mergedPaths = new Map<string, AllowedPath>();
       for (const paths of [
         global?.pathAccess?.allowedPaths,
         local?.pathAccess?.allowedPaths,
         memory?.pathAccess?.allowedPaths,
       ]) {
-        for (const path of paths ?? []) {
-          const trimmed = path.trim();
-          if (trimmed) mergedPaths.add(trimmed);
+        for (const entry of paths ?? []) {
+          if (!entry || typeof entry !== "object") continue;
+          const path = typeof entry.path === "string" ? entry.path.trim() : "";
+          if (!path) continue;
+          const kind = entry.kind === "directory" ? "directory" : "file";
+          mergedPaths.set(`${kind}:${path}`, { kind, path });
         }
       }
-      resolved.pathAccess.allowedPaths = [...mergedPaths];
+      resolved.pathAccess.allowedPaths = [...mergedPaths.values()];
 
       return resolved;
     },

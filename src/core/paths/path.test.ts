@@ -6,7 +6,7 @@ import {
   maybePathLike,
   normalizeForDisplay,
   resolveFromCwd,
-  toStorageForm,
+  toStorageGrant,
 } from "./path";
 
 const HOME = homedir();
@@ -128,52 +128,52 @@ describe("normalizeForDisplay", () => {
   });
 });
 
-describe("toStorageForm", () => {
+describe("toStorageGrant", () => {
   it.each([
     {
       desc: "file under home",
       absPath: `${HOME}/code/file.ts`,
       isDirectory: false,
-      expected: "~/code/file.ts",
+      expected: { kind: "file", path: "~/code/file.ts" },
     },
     {
       desc: "directory under home",
       absPath: `${HOME}/code`,
       isDirectory: true,
-      expected: "~/code/",
+      expected: { kind: "directory", path: "~/code" },
     },
     {
       desc: "absolute file outside home",
       absPath: "/etc/hosts",
       isDirectory: false,
-      expected: "/etc/hosts",
+      expected: { kind: "file", path: "/etc/hosts" },
     },
     {
       desc: "absolute directory outside home",
       absPath: "/etc",
       isDirectory: true,
-      expected: "/etc/",
+      expected: { kind: "directory", path: "/etc" },
     },
     {
       desc: "input has trailing slash but isDirectory=false",
       absPath: "/etc/hosts/",
       isDirectory: false,
-      expected: "/etc/hosts",
+      expected: { kind: "file", path: "/etc/hosts" },
     },
     {
       desc: "input uses Windows backslashes",
       absPath: "C:\\Users\\foo",
       isDirectory: false,
-      expected: "C:/Users/foo",
+      expected: { kind: "file", path: "C:/Users/foo" },
     },
     {
       desc: "input is home itself with isDirectory=true",
       absPath: HOME,
       isDirectory: true,
-      expected: "~/",
+      expected: { kind: "directory", path: "~" },
     },
   ])("when $desc, returns $expected", ({ absPath, isDirectory, expected }) => {
-    expect(toStorageForm(absPath, isDirectory)).toBe(expected);
+    expect(toStorageGrant(absPath, isDirectory)).toEqual(expected);
   });
 });
 

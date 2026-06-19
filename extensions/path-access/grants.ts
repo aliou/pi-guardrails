@@ -1,30 +1,33 @@
 import { homedir } from "node:os";
-import { resolveFromCwd, toStorageForm } from "../../src/core/paths";
+import {
+  type AllowedPath,
+  resolveFromCwd,
+  toStorageGrant,
+} from "../../src/core/paths";
 import { configLoader } from "../../src/shared/config";
 
 export type PendingPathGrant = {
-  storagePath: string;
+  kind: "file" | "directory";
+  storageGrant: AllowedPath;
   scope: "memory" | "local";
   absolutePath: string;
 };
 
 export function resolveAllowedPaths(
-  allowedPaths: string[],
+  allowedPaths: AllowedPath[],
   cwd: string,
-): string[] {
-  return allowedPaths.map((path) => {
-    const isDir = path.endsWith("/");
-    const resolved = resolveFromCwd(isDir ? path.slice(0, -1) : path, cwd);
-    return isDir ? `${resolved}/` : resolved;
-  });
+): AllowedPath[] {
+  return allowedPaths.map((entry) => ({
+    kind: entry.kind,
+    path: resolveFromCwd(entry.path, cwd),
+  }));
 }
 
-export function pendingAllowedPaths(grants: PendingPathGrant[]): string[] {
-  return grants.map((grant) =>
-    grant.storagePath.endsWith("/")
-      ? `${grant.absolutePath}/`
-      : grant.absolutePath,
-  );
+export function pendingAllowedPaths(grants: PendingPathGrant[]): AllowedPath[] {
+  return grants.map((grant) => ({
+    kind: grant.kind,
+    path: grant.absolutePath,
+  }));
 }
 
 export function isGrantTooBroad(absPath: string): boolean {
@@ -38,9 +41,10 @@ export function createPendingGrant(
   scope: "memory" | "local",
 ): PendingPathGrant {
   return {
+    kind: isDirectory ? "directory" : "file",
     absolutePath,
     scope,
-    storagePath: toStorageForm(absolutePath, isDirectory),
+    storageGrant: toStorageGrant(absolutePath, isDirectory),
   };
 }
 
@@ -52,17 +56,26 @@ export async function persistGrant(grant: PendingPathGrant): Promise<void> {
   const pathAccess = (raw.pathAccess ?? {}) as Record<string, unknown>;
   const existing = Array.isArray(pathAccess.allowedPaths)
     ? pathAccess.allowedPaths.filter(
-        (path): path is string => typeof path === "string",
+        (entry): entry is AllowedPath =>
+          typeof entry === "object" &&
+          entry !== null &&
+          (entry.kind === "file" || entry.kind === "directory") &&
+          typeof (entry as { path?: unknown }).path === "string",
       )
     : [];
 
-  if (existing.includes(grant.storagePath)) return;
+  const alreadyPresent = existing.some(
+    (entry) =>
+      entry.kind === grant.storageGrant.kind &&
+      entry.path === grant.storageGrant.path,
+  );
+  if (alreadyPresent) return;
 
   await configLoader.save(grant.scope, {
     ...raw,
     pathAccess: {
       ...pathAccess,
-      allowedPaths: [...existing, grant.storagePath],
+      allowedPaths: [...existing, grant.storageGrant],
     },
   });
 }
