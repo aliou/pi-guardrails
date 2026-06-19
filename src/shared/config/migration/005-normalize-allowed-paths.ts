@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -16,9 +15,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
 
   pathAccess.allowedPaths = normalizeAllowedPaths(pathAccess.allowedPaths);
   migrated.version = CURRENT_VERSION;
-  addPendingWarning(
-    "[guardrails] pathAccess.allowedPaths was migrated from pattern objects to path strings.",
-  );
   return migrated as GuardrailsConfig;
 }
 

@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -23,11 +22,6 @@ export function shouldRun(config: GuardrailsConfig): boolean {
 }
 
 export function run(config: GuardrailsConfig): GuardrailsConfig {
-  addPendingWarning(
-    "[guardrails] permissionGate.explainCommands, explainModel, and explainTimeout " +
-      "have been removed. These fields will be stripped from your config.",
-  );
-
   const cleaned = structuredClone(config) as Record<string, unknown>;
   const permissionGate = cleaned.permissionGate as
     | Record<string, unknown>

@@ -1,4 +1,3 @@
-import { addPendingWarning } from "../../warnings";
 import type { GuardrailsConfig } from "../types";
 import { CURRENT_VERSION } from "./version";
 
@@ -20,12 +19,6 @@ export function shouldRun(config: GuardrailsConfig): boolean {
 }
 
 export function run(config: GuardrailsConfig): GuardrailsConfig {
-  addPendingWarning(
-    "[guardrails] preventBrew, preventPython, enforcePackageManager, and packageManager " +
-      "have been removed from guardrails and moved to @aliou/pi-toolchain. " +
-      "These fields will be stripped from your config.",
-  );
-
   const cleaned = structuredClone(config) as Record<string, unknown>;
   const features = cleaned.features as Record<string, unknown> | undefined;
   if (features) {
