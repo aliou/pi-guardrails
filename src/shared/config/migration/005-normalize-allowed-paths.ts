@@ -5,7 +5,12 @@ export function shouldRun(config: GuardrailsConfig): boolean {
   const raw = config as Record<string, unknown>;
   const pathAccess = raw.pathAccess as Record<string, unknown> | undefined;
   if (!Array.isArray(pathAccess?.allowedPaths)) return false;
-  return pathAccess.allowedPaths.some((item) => typeof item !== "string");
+  return pathAccess.allowedPaths.some(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as Record<string, unknown>).pattern === "string",
+  );
 }
 
 export function run(config: GuardrailsConfig): GuardrailsConfig {
@@ -27,8 +32,11 @@ function normalizeAllowedPaths(items: unknown): string[] {
     if (typeof item === "string") {
       path = item;
     } else if (typeof item === "object" && item !== null) {
-      const pattern = (item as Record<string, unknown>).pattern;
+      const obj = item as Record<string, unknown>;
+      const pattern = obj.pattern;
+      const objectPath = obj.path;
       if (typeof pattern === "string") path = pattern;
+      else if (typeof objectPath === "string") path = objectPath;
     }
 
     const normalized = path?.trim();
