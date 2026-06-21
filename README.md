@@ -129,7 +129,10 @@ These packages reduce blast radius by running Pi, subagents, or tool calls insid
 
 ## Development
 
+Requires Node.js and pnpm. After cloning, install dependencies and run the test suite:
+
 ```bash
+pnpm install
 pnpm test         # Run tests
 pnpm test:watch   # Run tests in watch mode
 pnpm typecheck    # Type check

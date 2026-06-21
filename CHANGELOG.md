@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.14.1
+
+### Patch Changes
+
+- 86aa055: Fix repeated guardrails startup warnings caused by allowed path migrations re-running on current `{ kind, path }` entries.
+
 ## 0.14.0
 
 ### Minor Changes
