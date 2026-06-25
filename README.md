@@ -4,6 +4,8 @@
 
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
+> Note: Guardrails is an actively maintained extension. Make sure to keep up to date with the latest release for the latest policy rules and command matchers.
+
 This package installs three Pi extensions:
 
 - **guardrails** for file protection policies, settings, onboarding, and examples.
