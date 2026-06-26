@@ -64,7 +64,7 @@ Granted paths are stored in `pathAccess.allowedPaths` as explicit `{ kind, path 
 
 The `permission-gate` extension detects dangerous bash commands before they run.
 
-It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, or configure auto-deny rules.
+It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, decline and stop (which also aborts the current turn), or configure auto-deny rules.
 
 [![Guardrails permission gate walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.mp4)
 

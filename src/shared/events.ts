@@ -32,6 +32,7 @@ export type GuardrailsBlockSource =
   | "policy"
   | "permission"
   | "user"
+  | "user-stop"
   | "nonInteractive";
 
 export type GuardrailsActionBlockedPayload<TMeta = unknown> =

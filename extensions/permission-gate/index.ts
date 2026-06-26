@@ -89,7 +89,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
       return { block: true, reason };
     }
 
-    type ConfirmResult = "allow" | "allow-session" | "deny";
+    type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
     emitActionPrompted(pi, {
       feature: "permissionGate",
       action: safety.action,
@@ -108,10 +108,11 @@ export default async function permissionGate(pi: ExtensionAPI) {
     if (result === undefined) {
       const selection = await ctx.ui.select(
         `Dangerous command: ${safety.reason}`,
-        ["Allow once", "Allow for session", "Deny"],
+        ["Allow once", "Allow for session", "Deny", "Decline and stop"],
       );
       if (selection === "Allow once") result = "allow";
       else if (selection === "Allow for session") result = "allow-session";
+      else if (selection === "Decline and stop") result = "stop";
       else result = "deny";
     }
 
@@ -119,6 +120,19 @@ export default async function permissionGate(pi: ExtensionAPI) {
     if (result === "allow-session") {
       await saveCommandSessionGrant(command);
       return;
+    }
+
+    if (result === "stop") {
+      const reason = "User declined and stopped dangerous command";
+      emitActionBlocked(pi, {
+        feature: "permissionGate",
+        action: safety.action,
+        reason,
+        block: { source: "user-stop", metadata: safety.metadata },
+        context: { toolName: "bash", input: event.input },
+      });
+      ctx.abort();
+      return { block: true, reason };
     }
 
     const reason = "User denied dangerous command";

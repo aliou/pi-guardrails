@@ -103,7 +103,7 @@ export function createPermissionGateConfirmComponent(
     tui: { terminal: { rows: number; columns: number }; requestRender(): void },
     theme: MinimalTheme,
     _kb: unknown,
-    done: (result: "allow" | "allow-session" | "deny") => void,
+    done: (result: "allow" | "allow-session" | "deny" | "stop") => void,
   ) => {
     const container = new Container();
     const redBorder = (s: string) => theme.fg("error", s);
@@ -140,7 +140,7 @@ export function createPermissionGateConfirmComponent(
       new Text(
         theme.fg(
           "dim",
-          "↑/↓ or j/k: scroll • y/enter: allow • a: session • n/esc: deny",
+          "↑/↓ or j/k: scroll • y/enter: allow • a: session • n/esc: deny • s: decline & stop",
         ),
         1,
         0,
@@ -215,6 +215,8 @@ export function createPermissionGateConfirmComponent(
           data === "N"
         ) {
           done("deny");
+        } else if (data === "s" || data === "S") {
+          done("stop");
         }
       },
     };
