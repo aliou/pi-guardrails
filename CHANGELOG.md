@@ -1,5 +1,15 @@
 # @aliou/pi-guardrails
 
+## 0.15.0
+
+### Minor Changes
+
+- 9f0d736: Add a "decline and stop" option to the permission-gate prompt. Choosing it (press `s`, or select "Decline and stop" in the RPC fallback) blocks the dangerous command, emits a `guardrails:action:blocked` event with the new `user-stop` block source, and aborts the current agent turn so the assistant does not keep going.
+
+### Patch Changes
+
+- 09934f0: Update AGENTS.md to reflect the current three-extension layout and remove the unused, broken test harness.
+
 ## 0.14.1
 
 ### Patch Changes
