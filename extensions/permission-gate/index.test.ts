@@ -1,4 +1,19 @@
+import type {
+  BashToolCallEvent,
+  ExtensionAPI,
+  ExtensionContext,
+  ExtensionHandler,
+  ReadToolCallEvent,
+  ToolCallEvent,
+  ToolCallEventResult,
+} from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
+import {
+  GUARDRAILS_ACTION_BLOCKED_EVENT,
+  GUARDRAILS_FEATURE_REGISTER_EVENT,
+  GUARDRAILS_FEATURE_REQUEST_EVENT,
+} from "../../src/shared/events";
+import permissionGate from "./index";
 
 // Control the config the hook sees without touching the real config loader.
 vi.mock("../../src/shared/config", () => {
@@ -25,17 +40,7 @@ vi.mock("../../src/shared/config", () => {
   };
 });
 
-import {
-  GUARDRAILS_ACTION_BLOCKED_EVENT,
-  GUARDRAILS_FEATURE_REGISTER_EVENT,
-  GUARDRAILS_FEATURE_REQUEST_EVENT,
-} from "../../src/shared/events";
-import permissionGate from "./index";
-
-type ToolCallHandler = (
-  event: { toolName: string; input: { command: string } },
-  ctx: any,
-) => Promise<unknown>;
+type ToolCallHandler = ExtensionHandler<ToolCallEvent, ToolCallEventResult>;
 
 interface MockPi {
   events: { on: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> };
@@ -70,18 +75,18 @@ function createCtx(overrides: Record<string, unknown> = {}) {
     },
     abort: vi.fn(),
     ...overrides,
-  };
+  } as unknown as ExtensionContext;
 }
 
 const DANGEROUS_EVENT = {
   toolName: "bash",
   input: { command: "dangerous-cmd" },
-};
+} as unknown as BashToolCallEvent;
 
 describe("permissionGate extension hook", () => {
   it("registers the permissionGate feature on request", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const onCalls = pi.events.on.mock.calls;
     const requestHandler = onCalls.find(
@@ -100,10 +105,13 @@ describe("permissionGate extension hook", () => {
 
   it("returns undefined for safe commands", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const result = await pi.callHook(
-      { toolName: "bash", input: { command: "echo hello" } },
+      {
+        toolName: "bash",
+        input: { command: "echo hello" },
+      } as BashToolCallEvent,
       createCtx(),
     );
     expect(result).toBeUndefined();
@@ -111,10 +119,13 @@ describe("permissionGate extension hook", () => {
 
   it("returns undefined for non-bash tools", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const result = await pi.callHook(
-      { toolName: "read", input: { command: "dangerous-cmd" } },
+      {
+        toolName: "read",
+        input: { command: "dangerous-cmd" },
+      } as unknown as ReadToolCallEvent,
       createCtx(),
     );
     expect(result).toBeUndefined();
@@ -122,7 +133,7 @@ describe("permissionGate extension hook", () => {
 
   it("deny returns { block: true } without aborting the turn", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("deny"), select: vi.fn() },
@@ -145,7 +156,7 @@ describe("permissionGate extension hook", () => {
 
   it("stop calls ctx.abort() and returns { block: true } with user-stop source", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("stop"), select: vi.fn() },
@@ -168,7 +179,7 @@ describe("permissionGate extension hook", () => {
 
   it("allow once returns undefined and does not abort", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("allow"), select: vi.fn() },
@@ -181,7 +192,7 @@ describe("permissionGate extension hook", () => {
 
   it("RPC fallback exposes 'Decline and stop' and maps it to stop", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const select = vi.fn().mockResolvedValue("Decline and stop");
     const ctx = createCtx({
@@ -208,7 +219,7 @@ describe("permissionGate extension hook", () => {
 
   it("non-interactive (no UI) blocks with nonInteractive source and does not abort", async () => {
     const pi = createPi();
-    await permissionGate(pi as any);
+    await permissionGate(pi as unknown as ExtensionAPI);
 
     const ctx = createCtx({ hasUI: false });
     const result = await pi.callHook(DANGEROUS_EVENT, ctx);
