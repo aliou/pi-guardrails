@@ -110,10 +110,16 @@ jobs:
         if: steps.check-publish.outputs.needs_staging == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.check-publish.outputs.version }}
         run: |
-          TAG="v${{ steps.check-publish.outputs.version }}"
+          TAG="v$VERSION"
           git tag "$TAG"
           git push origin "$TAG"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "$TAG" --notes "Release $TAG"
+            awk -v v="$VERSION" '
+              $0 == "## " v { found=1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md > /tmp/release-notes.md
+            gh release create "$TAG" --title "$TAG" --notes-file /tmp/release-notes.md
           fi
