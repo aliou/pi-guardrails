@@ -68,6 +68,18 @@ It catches built-in risky patterns like recursive deletes, privileged commands, 
 
 [![Guardrails permission gate walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.mp4)
 
+## Public events
+
+Guardrails extensions publish lifecycle events on Pi's shared event bus so other extensions can observe safety decisions without coupling to the prompt UI:
+
+- `guardrails:risk:detected` when an action matches a risk rule.
+- `guardrails:action:prompted` immediately before an interactive permission or path-access prompt is shown.
+- `guardrails:action:prompt-resolved` after that prompt interaction finishes, including when the prompt throws. It carries the same action, reason, prompt, and tool context as the matching prompted event.
+- `guardrails:action:blocked` when an action is blocked by policy, configuration, unavailable UI, or the user.
+- `guardrails:feature:request` and `guardrails:feature:register` for discovery between the three included extensions.
+
+Consumers can use the prompted/resolved pair to report that Pi is waiting for human input without inferring state from terminal output.
+
 ## Configuration
 
 Most configuration should happen through the interactive settings UI:

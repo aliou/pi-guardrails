@@ -7,10 +7,10 @@ import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
   emitActionBlocked,
-  emitActionPrompted,
   emitRiskDetected,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
+  withActionPromptLifecycle,
 } from "../../src/shared/events";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
@@ -90,31 +90,34 @@ export default async function permissionGate(pi: ExtensionAPI) {
     }
 
     type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
-    emitActionPrompted(pi, {
-      feature: "permissionGate",
-      action: safety.action,
-      reason: safety.reason,
-      prompt: {
-        kind: "permission",
-        metadata: safety.metadata,
+    const result = await withActionPromptLifecycle<ConfirmResult>(
+      pi,
+      {
+        feature: "permissionGate",
+        action: safety.action,
+        reason: safety.reason,
+        prompt: {
+          kind: "permission",
+          metadata: safety.metadata,
+        },
+        context: { toolName: "bash", input: event.input },
       },
-      context: { toolName: "bash", input: event.input },
-    });
+      async () => {
+        const customResult = await ctx.ui.custom<ConfirmResult>(
+          createPermissionGateConfirmComponent(command, safety.reason),
+        );
+        if (customResult !== undefined) return customResult;
 
-    let result = await ctx.ui.custom<ConfirmResult>(
-      createPermissionGateConfirmComponent(command, safety.reason),
+        const selection = await ctx.ui.select(
+          `Dangerous command: ${safety.reason}`,
+          ["Allow once", "Allow for session", "Deny", "Decline and stop"],
+        );
+        if (selection === "Allow once") return "allow";
+        if (selection === "Allow for session") return "allow-session";
+        if (selection === "Decline and stop") return "stop";
+        return "deny";
+      },
     );
-
-    if (result === undefined) {
-      const selection = await ctx.ui.select(
-        `Dangerous command: ${safety.reason}`,
-        ["Allow once", "Allow for session", "Deny", "Decline and stop"],
-      );
-      if (selection === "Allow once") result = "allow";
-      else if (selection === "Allow for session") result = "allow-session";
-      else if (selection === "Decline and stop") result = "stop";
-      else result = "deny";
-    }
 
     if (result === "allow") return;
     if (result === "allow-session") {

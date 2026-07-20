@@ -10,9 +10,9 @@ import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
   emitActionBlocked,
-  emitActionPrompted,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
+  withActionPromptLifecycle,
 } from "../../src/shared/events";
 import { piDocumentationPaths } from "./dynamic-resources";
 import {
@@ -107,25 +107,28 @@ export default async function pathAccess(pi: ExtensionAPI) {
       const parentDir = dirname(absolutePath);
       const showFileOptions =
         event.toolName !== "ls" && event.toolName !== "find";
-      emitActionPrompted(pi, {
-        feature: "pathAccess",
-        action: safety.action,
-        reason: safety.reason,
-        prompt: {
-          kind: "confirmation",
-          metadata: safety.metadata,
+      const result = await withActionPromptLifecycle(
+        pi,
+        {
+          feature: "pathAccess",
+          action: safety.action,
+          reason: safety.reason,
+          prompt: {
+            kind: "confirmation",
+            metadata: safety.metadata,
+          },
+          context: { toolName: event.toolName, input },
         },
-        context: { toolName: event.toolName, input },
-      });
-
-      const result = await ctx.ui.custom<PromptResult>(
-        createPathAccessPromptComponent(
-          event.toolName,
-          safety.metadata.displayPath,
-          normalizeForDisplay(parentDir, ctx.cwd),
-          ctx.cwd,
-          showFileOptions,
-        ),
+        () =>
+          ctx.ui.custom<PromptResult>(
+            createPathAccessPromptComponent(
+              event.toolName,
+              safety.metadata.displayPath,
+              normalizeForDisplay(parentDir, ctx.cwd),
+              ctx.cwd,
+              showFileOptions,
+            ),
+          ),
       );
 
       if (result === "allow-file-once" || result === "allow-dir-once") {

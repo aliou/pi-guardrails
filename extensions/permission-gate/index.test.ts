@@ -10,6 +10,8 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 import {
   GUARDRAILS_ACTION_BLOCKED_EVENT,
+  GUARDRAILS_ACTION_PROMPT_RESOLVED_EVENT,
+  GUARDRAILS_ACTION_PROMPTED_EVENT,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
 } from "../../src/shared/events";
@@ -177,7 +179,7 @@ describe("permissionGate extension hook", () => {
     );
   });
 
-  it("allow once returns undefined and does not abort", async () => {
+  it("allow once returns undefined and emits the prompt lifecycle", async () => {
     const pi = createPi();
     await permissionGate(pi as unknown as ExtensionAPI);
 
@@ -188,6 +190,13 @@ describe("permissionGate extension hook", () => {
     const result = await pi.callHook(DANGEROUS_EVENT, ctx);
     expect(result).toBeUndefined();
     expect(ctx.abort).not.toHaveBeenCalled();
+
+    const eventNames = pi.events.emit.mock.calls.map(([event]) => event);
+    expect(eventNames).toContain(GUARDRAILS_ACTION_PROMPTED_EVENT);
+    expect(eventNames).toContain(GUARDRAILS_ACTION_PROMPT_RESOLVED_EVENT);
+    expect(eventNames.indexOf(GUARDRAILS_ACTION_PROMPTED_EVENT)).toBeLessThan(
+      eventNames.indexOf(GUARDRAILS_ACTION_PROMPT_RESOLVED_EVENT),
+    );
   });
 
   it("RPC fallback exposes 'Decline and stop' and maps it to stop", async () => {

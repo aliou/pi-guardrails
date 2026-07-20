@@ -6,6 +6,8 @@ export const GUARDRAILS_RISK_DETECTED_EVENT = "guardrails:risk:detected";
 export const GUARDRAILS_FEATURE_REQUEST_EVENT = "guardrails:feature:request";
 export const GUARDRAILS_FEATURE_REGISTER_EVENT = "guardrails:feature:register";
 export const GUARDRAILS_ACTION_PROMPTED_EVENT = "guardrails:action:prompted";
+export const GUARDRAILS_ACTION_PROMPT_RESOLVED_EVENT =
+  "guardrails:action:prompt-resolved";
 
 export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
 
@@ -64,6 +66,9 @@ export type GuardrailsActionPromptedPayload<TMeta = unknown> =
       input?: Record<string, unknown>;
     };
   };
+
+export type GuardrailsActionPromptResolvedPayload<TMeta = unknown> =
+  GuardrailsActionPromptedPayload<TMeta>;
 
 export type GuardrailsRiskDetectedPayload<TMeta = unknown> =
   GuardrailsEventBase & {
@@ -126,4 +131,31 @@ export function emitActionPrompted<TMeta = unknown>(
     timestamp: timestamp(),
     ...event,
   });
+}
+
+export function emitActionPromptResolved<TMeta = unknown>(
+  pi: ExtensionAPI,
+  event: Omit<
+    GuardrailsActionPromptResolvedPayload<TMeta>,
+    "source" | "timestamp"
+  >,
+): void {
+  pi.events.emit(GUARDRAILS_ACTION_PROMPT_RESOLVED_EVENT, {
+    source: "guardrails",
+    timestamp: timestamp(),
+    ...event,
+  });
+}
+
+export async function withActionPromptLifecycle<TResult, TMeta = unknown>(
+  pi: ExtensionAPI,
+  event: Omit<GuardrailsActionPromptedPayload<TMeta>, "source" | "timestamp">,
+  prompt: () => Promise<TResult>,
+): Promise<TResult> {
+  emitActionPrompted(pi, event);
+  try {
+    return await prompt();
+  } finally {
+    emitActionPromptResolved(pi, event);
+  }
 }
