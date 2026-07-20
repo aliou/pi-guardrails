@@ -64,12 +64,14 @@ extensions/
     prompt.ts             # Confirmation UI prompt
     rules.ts              # Permission gate rule and command matching
     index.ts              # Registers permission-gate hook and feature registration
+  herdr/                   # Optional Herdr Agents overview integration
+    index.ts               # Maps prompt lifecycle events to herdr:blocked
 tests/
   utils/                  # Test utilities (memfs setup, theme, tmpdir, vitest setup)
   vitest.setup.ts         # Global test setup
 ```
 
-Each extension owns one Pi `tool_call` hook. Instead of a single guardrails hook, the package registers three independent extensions that communicate feature presence through the Pi event bus.
+Each safety extension owns one Pi `tool_call` hook. Instead of a single guardrails hook, the package registers three independent safety extensions that communicate feature presence through the Pi event bus. A fourth extension maps prompt lifecycle events to Herdr's optional `herdr:blocked` integration event.
 
 ## Conventions
 

@@ -4,11 +4,12 @@
 
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
-This package installs three Pi extensions:
+This package installs four Pi extensions:
 
 - **guardrails** for file protection policies, settings, onboarding, and examples.
 - **path-access** for controlling access outside the current workspace.
 - **permission-gate** for confirming or blocking risky shell commands.
+- **herdr** for optionally reporting approval prompts to Herdr's Agents overview.
 
 ## Install
 
@@ -67,6 +68,12 @@ The `permission-gate` extension detects dangerous bash commands before they run.
 It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, decline and stop (which also aborts the current turn), or configure auto-deny rules.
 
 [![Guardrails permission gate walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.mp4)
+
+### herdr
+
+The `herdr` extension translates Guardrails' prompt lifecycle into the `herdr:blocked` event understood by Herdr's official Pi integration. Herdr's Agents overview shows Pi as blocked while Guardrails needs approval and clears the state when the prompt resolves.
+
+The integration is optional and has no Herdr dependency or configuration. Without Herdr's Pi integration listening for the event, the reports are no-ops.
 
 ## Public events
 
