@@ -64,12 +64,14 @@ extensions/
     prompt.ts             # Confirmation UI prompt
     rules.ts              # Permission gate rule and command matching
     index.ts              # Registers permission-gate hook and feature registration
+  herdr/                  # Maps Guardrails prompt lifecycle to Herdr blocked state
+    index.ts              # Registers event adapter and reload-safe cleanup
 tests/
   utils/                  # Test utilities (memfs setup, theme, tmpdir, vitest setup)
   vitest.setup.ts         # Global test setup
 ```
 
-Each extension owns one Pi `tool_call` hook. Instead of a single guardrails hook, the package registers three independent extensions that communicate feature presence through the Pi event bus.
+The package registers four independent extensions. The three Guardrails features each own one Pi `tool_call` hook and communicate feature presence through the Pi event bus. The Herdr adapter owns no tool hook and only maps prompt lifecycle events to `herdr:blocked`.
 
 ## Conventions
 
@@ -81,7 +83,7 @@ Each extension owns one Pi `tool_call` hook. Instead of a single guardrails hook
 - Config migrations are predicate-based (`shouldRun`) using structural checks; do not rely on lexicographic version string comparisons.
 - Runtime code must only handle current config/core shapes. Old config shapes belong exclusively in migrations; do not add runtime compatibility branches for legacy config.
 - `config.version` is a schema marker for debugging/inspection, not the package version.
-- Events emitted on the pi event bus for inter-extension communication are defined in `src/shared/events.ts`. Current public events are `guardrails:action:blocked`, `guardrails:action:prompted`, `guardrails:risk:detected`, `guardrails:feature:request`, and `guardrails:feature:register`.
+- Events emitted on the pi event bus for inter-extension communication are defined in `src/shared/events.ts`. Current public events are `guardrails:action:blocked`, `guardrails:prompt:opened`, `guardrails:prompt:closed`, `guardrails:risk:detected`, `guardrails:feature:request`, and `guardrails:feature:register`. `guardrails:action:prompted` is a deprecated alias for `guardrails:prompt:opened`.
 
 ## Documentation
 

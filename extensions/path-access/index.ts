@@ -9,10 +9,14 @@ import {
 import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
+  createPromptClosedPayload,
+  createPromptOpenedPayload,
   emitActionBlocked,
-  emitActionPrompted,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
+  GUARDRAILS_PROMPT_CLOSED_EVENT,
+  GUARDRAILS_PROMPT_OPENED_EVENT,
+  setupLegacyPromptEventAlias,
 } from "../../src/shared/events";
 import { piDocumentationPaths } from "./dynamic-resources";
 import {
@@ -53,6 +57,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
       createFeatureRegisterPayload("pathAccess"),
     );
   });
+  setupLegacyPromptEventAlias(pi, "pathAccess");
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -107,7 +112,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
       const parentDir = dirname(absolutePath);
       const showFileOptions =
         event.toolName !== "ls" && event.toolName !== "find";
-      emitActionPrompted(pi, {
+      const promptOpened = createPromptOpenedPayload({
         feature: "pathAccess",
         action: safety.action,
         reason: safety.reason,
@@ -117,16 +122,25 @@ export default async function pathAccess(pi: ExtensionAPI) {
         },
         context: { toolName: event.toolName, input },
       });
+      pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
-      const result = await ctx.ui.custom<PromptResult>(
-        createPathAccessPromptComponent(
-          event.toolName,
-          safety.metadata.displayPath,
-          normalizeForDisplay(parentDir, ctx.cwd),
-          ctx.cwd,
-          showFileOptions,
-        ),
-      );
+      let result: PromptResult | undefined;
+      try {
+        result = await ctx.ui.custom<PromptResult>(
+          createPathAccessPromptComponent(
+            event.toolName,
+            safety.metadata.displayPath,
+            normalizeForDisplay(parentDir, ctx.cwd),
+            ctx.cwd,
+            showFileOptions,
+          ),
+        );
+      } finally {
+        pi.events.emit(
+          GUARDRAILS_PROMPT_CLOSED_EVENT,
+          createPromptClosedPayload(promptOpened),
+        );
+      }
 
       if (result === "allow-file-once" || result === "allow-dir-once") {
         continue;
