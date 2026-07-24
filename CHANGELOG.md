@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.16.0
+
+### Minor Changes
+
+- fff80de: Add correlated prompt lifecycle events and report active approval prompts to Herdr.
+
 ## 0.15.0
 
 ### Minor Changes
