@@ -30,6 +30,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: 0.79.6
         version: 0.79.6
+      '@golevelup/ts-vitest':
+        specifier: ^4.0.0
+        version: 4.0.0
       '@sinclair/typebox':
         specifier: ^0.34.48
         version: 0.34.48
@@ -81,6 +84,9 @@ packages:
   '@aliou/sh@0.1.0':
     resolution: {integrity: sha512-MtVSUqNAHK8a0yQdwv4ADlTIBnEg8bpFXcqp0PaxwqxhSWAxcIrpAIPbsc3CJnUK3R++BcgaxBZ5saicHtU+8Q==}
     engines: {node: '>=22'}
+
+  '@golevelup/ts-vitest@4.0.0':
+    resolution: {integrity: sha512-TNIhtox9zWfxlww0ql91l/k2zDthN4owg5qDieRHtjIwIvuoUlXLiwqAb/ifkRr8K+jZLRIC9QrKN/J7TBghlQ==}
 
   '@anthropic-ai/sdk@0.91.1':
     resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
@@ -1781,6 +1787,8 @@ snapshots:
       '@earendil-works/pi-tui': 0.79.6
 
   '@aliou/sh@0.1.0': {}
+
+  '@golevelup/ts-vitest@4.0.0': {}
 
   '@anthropic-ai/sdk@0.91.1(zod@3.25.76)':
     dependencies:
