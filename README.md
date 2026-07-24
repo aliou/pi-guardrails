@@ -4,11 +4,12 @@
 
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
-This package installs three Pi extensions:
+This package installs four Pi extensions:
 
 - **guardrails** for file protection policies, settings, onboarding, and examples.
 - **path-access** for controlling access outside the current workspace.
 - **permission-gate** for confirming or blocking risky shell commands.
+- **herdr** for reporting Guardrails approval prompts to Herdr.
 
 ## Install
 
@@ -50,6 +51,12 @@ Useful commands:
 /guardrails:examples
 ```
 
+#### Herdr integration
+
+The included Herdr adapter reports active Guardrails approval prompts through Herdr's `herdr:blocked` event. Herdr can then show the Pi pane as blocked while it waits for a permission-gate or path-access decision.
+
+The adapter has no configuration or direct Herdr dependency. Its emitted events have no effect unless Herdr's Pi integration is active.
+
 ### path-access
 
 The `path-access` extension checks tool calls that target paths outside the current working directory.
@@ -67,6 +74,15 @@ The `permission-gate` extension detects dangerous bash commands before they run.
 It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, decline and stop (which also aborts the current turn), or configure auto-deny rules.
 
 [![Guardrails permission gate walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.mp4)
+
+## Extension events
+
+Guardrails emits paired prompt lifecycle events on Pi's shared event bus:
+
+- `guardrails:prompt:opened` when an interactive Guardrails prompt starts waiting for input.
+- `guardrails:prompt:closed` when that prompt stops waiting, including when the UI throws.
+
+Both events include the same `prompt.id` for correlation.
 
 ## Configuration
 

@@ -7,11 +7,19 @@ import type {
   ToolCallEvent,
   ToolCallEventResult,
 } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import {
+  createMock,
+  type DeepMocked,
+  type PartialFuncReturn,
+} from "@golevelup/ts-vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GUARDRAILS_ACTION_BLOCKED_EVENT,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
+  GUARDRAILS_PROMPT_CLOSED_EVENT,
+  GUARDRAILS_PROMPT_OPENED_EVENT,
+  type GuardrailsPromptOpenedPayload,
 } from "../../src/shared/events";
 import permissionGate from "./index";
 
@@ -42,30 +50,15 @@ vi.mock("../../src/shared/config", () => {
 
 type ToolCallHandler = ExtensionHandler<ToolCallEvent, ToolCallEventResult>;
 
-interface MockPi {
-  events: { on: ReturnType<typeof vi.fn>; emit: ReturnType<typeof vi.fn> };
-  on: ReturnType<typeof vi.fn>;
+function registeredToolCallHandler(pi: DeepMocked<ExtensionAPI>) {
+  const calls: unknown[][] = pi.on.mock.calls;
+  return calls.find(([event]) => event === "tool_call")?.[1] as
+    | ToolCallHandler
+    | undefined;
 }
 
-function createPi(): MockPi & { callHook: ToolCallHandler } {
-  let hook: ToolCallHandler | undefined;
-  const pi: MockPi = {
-    events: { on: vi.fn(), emit: vi.fn() },
-    on: vi.fn((event: string, handler: ToolCallHandler) => {
-      if (event === "tool_call") hook = handler;
-    }),
-  };
-  return {
-    ...pi,
-    callHook: (...args) => {
-      if (!hook) throw new Error("tool_call hook not registered");
-      return hook(...args);
-    },
-  };
-}
-
-function createCtx(overrides: Record<string, unknown> = {}) {
-  return {
+function createCtx(overrides: PartialFuncReturn<ExtensionContext> = {}) {
+  return createMock<ExtensionContext>({
     hasUI: true,
     mode: "tui",
     ui: {
@@ -75,26 +68,33 @@ function createCtx(overrides: Record<string, unknown> = {}) {
     },
     abort: vi.fn(),
     ...overrides,
-  } as unknown as ExtensionContext;
+  });
 }
 
 const DANGEROUS_EVENT = {
+  type: "tool_call",
+  toolCallId: "dangerous-call",
   toolName: "bash",
   input: { command: "dangerous-cmd" },
-} as unknown as BashToolCallEvent;
+} satisfies BashToolCallEvent;
 
 describe("permissionGate extension hook", () => {
+  let pi: DeepMocked<ExtensionAPI>;
+  let toolCallHandler: ToolCallHandler | undefined;
+
+  beforeEach(async () => {
+    pi = createMock<ExtensionAPI>();
+    await permissionGate(pi);
+    toolCallHandler = registeredToolCallHandler(pi);
+  });
+
   it("registers the permissionGate feature on request", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
-
-    const onCalls = pi.events.on.mock.calls;
-    const requestHandler = onCalls.find(
+    const registration = pi.events.on.mock.calls.find(
       ([event]) => event === GUARDRAILS_FEATURE_REQUEST_EVENT,
-    )?.[1] as ((...args: unknown[]) => void) | undefined;
+    );
 
-    expect(requestHandler).toBeDefined();
-    requestHandler?.();
+    assert(registration, "feature request handler should be registered");
+    registration[1](undefined);
     expect(pi.events.emit).toHaveBeenCalledWith(
       GUARDRAILS_FEATURE_REGISTER_EVENT,
       expect.objectContaining({
@@ -104,42 +104,43 @@ describe("permissionGate extension hook", () => {
   });
 
   it("returns undefined for safe commands", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
-    const result = await pi.callHook(
+    const result = await toolCallHandler(
       {
+        type: "tool_call",
+        toolCallId: "safe-call",
         toolName: "bash",
         input: { command: "echo hello" },
-      } as BashToolCallEvent,
+      } satisfies BashToolCallEvent,
       createCtx(),
     );
     expect(result).toBeUndefined();
   });
 
   it("returns undefined for non-bash tools", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
-    const result = await pi.callHook(
+    const result = await toolCallHandler(
       {
+        type: "tool_call",
+        toolCallId: "read-call",
         toolName: "read",
-        input: { command: "dangerous-cmd" },
-      } as unknown as ReadToolCallEvent,
+        input: { path: "dangerous-cmd" },
+      } satisfies ReadToolCallEvent,
       createCtx(),
     );
     expect(result).toBeUndefined();
   });
 
   it("deny returns { block: true } without aborting the turn", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("deny"), select: vi.fn() },
     });
 
-    const result = await pi.callHook(DANGEROUS_EVENT, ctx);
+    const result = await toolCallHandler(DANGEROUS_EVENT, ctx);
 
     expect(result).toEqual({
       block: true,
@@ -155,14 +156,13 @@ describe("permissionGate extension hook", () => {
   });
 
   it("stop calls ctx.abort() and returns { block: true } with user-stop source", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("stop"), select: vi.fn() },
     });
 
-    const result = await pi.callHook(DANGEROUS_EVENT, ctx);
+    const result = await toolCallHandler(DANGEROUS_EVENT, ctx);
 
     expect(result).toEqual({
       block: true,
@@ -178,28 +178,59 @@ describe("permissionGate extension hook", () => {
   });
 
   it("allow once returns undefined and does not abort", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue("allow"), select: vi.fn() },
     });
 
-    const result = await pi.callHook(DANGEROUS_EVENT, ctx);
+    const result = await toolCallHandler(DANGEROUS_EVENT, ctx);
     expect(result).toBeUndefined();
     expect(ctx.abort).not.toHaveBeenCalled();
+
+    const opened = pi.events.emit.mock.calls.find(
+      ([event]) => event === GUARDRAILS_PROMPT_OPENED_EVENT,
+    )?.[1] as GuardrailsPromptOpenedPayload | undefined;
+    assert(opened, "prompt opened event should be emitted");
+    expect(pi).toHaveEmitted(
+      GUARDRAILS_PROMPT_CLOSED_EVENT,
+      expect.objectContaining({ prompt: { id: opened.prompt.id } }),
+    );
+  });
+
+  it("closes the prompt when its UI throws", async () => {
+    assert(toolCallHandler, "tool_call handler should be registered");
+
+    const ctx = createCtx({
+      ui: {
+        custom: vi.fn().mockRejectedValue(new Error("UI failed")),
+        select: vi.fn(),
+      },
+    });
+
+    await expect(toolCallHandler(DANGEROUS_EVENT, ctx)).rejects.toThrow(
+      "UI failed",
+    );
+
+    const opened = pi.events.emit.mock.calls.find(
+      ([event]) => event === GUARDRAILS_PROMPT_OPENED_EVENT,
+    )?.[1] as GuardrailsPromptOpenedPayload | undefined;
+    assert(opened, "prompt opened event should be emitted");
+    expect(pi).toHaveEmitted(
+      GUARDRAILS_PROMPT_CLOSED_EVENT,
+      expect.objectContaining({ prompt: { id: opened.prompt.id } }),
+    );
   });
 
   it("RPC fallback exposes 'Decline and stop' and maps it to stop", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
     const select = vi.fn().mockResolvedValue("Decline and stop");
     const ctx = createCtx({
       ui: { custom: vi.fn().mockResolvedValue(undefined), select },
     });
 
-    const result = await pi.callHook(DANGEROUS_EVENT, ctx);
+    const result = await toolCallHandler(DANGEROUS_EVENT, ctx);
 
     expect(select).toHaveBeenCalledWith(
       expect.stringContaining("test danger"),
@@ -218,11 +249,10 @@ describe("permissionGate extension hook", () => {
   });
 
   it("non-interactive (no UI) blocks with nonInteractive source and does not abort", async () => {
-    const pi = createPi();
-    await permissionGate(pi as unknown as ExtensionAPI);
+    assert(toolCallHandler, "tool_call handler should be registered");
 
     const ctx = createCtx({ hasUI: false });
-    const result = await pi.callHook(DANGEROUS_EVENT, ctx);
+    const result = await toolCallHandler(DANGEROUS_EVENT, ctx);
 
     expect(result).toEqual({
       block: true,

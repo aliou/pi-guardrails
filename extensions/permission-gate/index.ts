@@ -6,11 +6,15 @@ import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
+  createPromptClosedPayload,
+  createPromptOpenedPayload,
   emitActionBlocked,
-  emitActionPrompted,
   emitRiskDetected,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
   GUARDRAILS_FEATURE_REQUEST_EVENT,
+  GUARDRAILS_PROMPT_CLOSED_EVENT,
+  GUARDRAILS_PROMPT_OPENED_EVENT,
+  setupLegacyPromptEventAlias,
 } from "../../src/shared/events";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
@@ -29,6 +33,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
       createFeatureRegisterPayload("permissionGate"),
     );
   });
+  setupLegacyPromptEventAlias(pi, "permissionGate");
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -90,7 +95,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
     }
 
     type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
-    emitActionPrompted(pi, {
+    const promptOpened = createPromptOpenedPayload({
       feature: "permissionGate",
       action: safety.action,
       reason: safety.reason,
@@ -100,20 +105,31 @@ export default async function permissionGate(pi: ExtensionAPI) {
       },
       context: { toolName: "bash", input: event.input },
     });
+    pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
-    let result = await ctx.ui.custom<ConfirmResult>(
-      createPermissionGateConfirmComponent(command, safety.reason),
-    );
-
-    if (result === undefined) {
-      const selection = await ctx.ui.select(
-        `Dangerous command: ${safety.reason}`,
-        ["Allow once", "Allow for session", "Deny", "Decline and stop"],
+    let result: ConfirmResult;
+    try {
+      const customResult = await ctx.ui.custom<ConfirmResult>(
+        createPermissionGateConfirmComponent(command, safety.reason),
       );
-      if (selection === "Allow once") result = "allow";
-      else if (selection === "Allow for session") result = "allow-session";
-      else if (selection === "Decline and stop") result = "stop";
-      else result = "deny";
+
+      if (customResult === undefined) {
+        const selection = await ctx.ui.select(
+          `Dangerous command: ${safety.reason}`,
+          ["Allow once", "Allow for session", "Deny", "Decline and stop"],
+        );
+        if (selection === "Allow once") result = "allow";
+        else if (selection === "Allow for session") result = "allow-session";
+        else if (selection === "Decline and stop") result = "stop";
+        else result = "deny";
+      } else {
+        result = customResult;
+      }
+    } finally {
+      pi.events.emit(
+        GUARDRAILS_PROMPT_CLOSED_EVENT,
+        createPromptClosedPayload(promptOpened),
+      );
     }
 
     if (result === "allow") return;
