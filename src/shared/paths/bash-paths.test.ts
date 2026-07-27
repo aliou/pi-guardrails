@@ -73,6 +73,27 @@ describe("extractBashPathCandidates", () => {
       expect(result).toEqual(["/etc/passwd", "/tmp/x"]);
     });
 
+    it("extracts paths from ash -c programs", async () => {
+      const result = await extractBashPathCandidates(
+        "ash -c 'cat /etc/passwd'",
+        CWD,
+      );
+      expect(result).toEqual(["/etc/passwd"]);
+    });
+
+    it("bounds nested shell recursion depth", async () => {
+      // Build 5 levels of sh -c wrapping a cat. This exceeds MAX_SHELL_DEPTH,
+      // so recursion stops before the innermost cat is parsed: /etc/passwd is
+      // not extracted and no fake cwd-relative candidate leaks. Uses the
+      // '"'"' single-quote escape trick that @aliou/sh parses cleanly.
+      let cmd = "cat /etc/passwd";
+      for (let i = 0; i < 5; i++) {
+        cmd = `sh -c '${cmd.replace(/'/g, "'\"'\"'")}'`;
+      }
+      const result = await extractBashPathCandidates(cmd, CWD);
+      expect(result).toEqual([]);
+    });
+
     it("extracts paths from node -e inline code", async () => {
       const result = await extractBashPathCandidates(
         'node -e \'require("fs").readFileSync("/etc/passwd")\'',
