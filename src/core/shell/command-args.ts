@@ -201,6 +201,8 @@ type InterpreterFlags = {
   skipFlags: Set<string>;
   /** Code-flag values are shell programs; re-parse and recurse. */
   shellFamily: boolean;
+  /** Match flags case-insensitively (PowerShell parameters). */
+  caseInsensitive: boolean;
 };
 
 /** Shell-family interpreters whose -c value is itself a shell program. */
@@ -211,6 +213,7 @@ const SHELL_INTERPRETERS = new Set([
   "dash",
   "ksh",
   "mksh",
+  "ash",
 ]);
 
 /** Non-shell interpreters that take inline code flags. */
@@ -240,11 +243,15 @@ function isInterpreter(cmd: string): boolean {
 
 function interpreterFlags(cmd: string): InterpreterFlags {
   if (cmd === "powershell" || cmd === "pwsh") {
+    // PowerShell parameters are case-insensitive and have documented
+    // short aliases: -c/-ca for -Command, -f/-fi for -File, -e/-ec for
+    // -EncodedCommand.
     return {
-      codeFlags: new Set(["-Command"]),
-      fileFlags: new Set(["-File"]),
-      skipFlags: new Set(["-EncodedCommand"]),
+      codeFlags: new Set(["-command", "-c", "-ca"]),
+      fileFlags: new Set(["-file", "-f", "-fi"]),
+      skipFlags: new Set(["-encodedcommand", "-e", "-ec"]),
       shellFamily: false,
+      caseInsensitive: true,
     };
   }
   if (SHELL_INTERPRETERS.has(cmd)) {
@@ -253,6 +260,7 @@ function interpreterFlags(cmd: string): InterpreterFlags {
       fileFlags: new Set(),
       skipFlags: new Set(),
       shellFamily: true,
+      caseInsensitive: false,
     };
   }
   const codeFlags =
@@ -266,6 +274,7 @@ function interpreterFlags(cmd: string): InterpreterFlags {
     fileFlags: new Set(),
     skipFlags: new Set(),
     shellFamily: false,
+    caseInsensitive: false,
   };
 }
 
@@ -292,12 +301,13 @@ function extractPathsFromCode(code: string): ClassifiedArg[] {
 }
 
 function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
-  const { codeFlags, fileFlags, skipFlags, shellFamily } =
+  const { codeFlags, fileFlags, skipFlags, shellFamily, caseInsensitive } =
     interpreterFlags(cmd);
   const out: ClassifiedArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
-    if (codeFlags.has(arg)) {
+    const flag = caseInsensitive ? arg.toLowerCase() : arg;
+    if (codeFlags.has(flag)) {
       const code = args[++i];
       if (code) {
         if (shellFamily) out.push({ token: code, recurseShell: true });
@@ -305,12 +315,12 @@ function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
       }
       continue;
     }
-    if (fileFlags.has(arg)) {
+    if (fileFlags.has(flag)) {
       if (args[i + 1])
         out.push({ token: args[++i] as string, forcePath: true });
       continue;
     }
-    if (skipFlags.has(arg)) {
+    if (skipFlags.has(flag)) {
       i++;
       continue;
     }

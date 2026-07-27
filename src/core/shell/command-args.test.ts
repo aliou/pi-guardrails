@@ -87,6 +87,19 @@ describe("classifyCommandArgs", () => {
     ]);
   });
 
+  it("handles PowerShell flag casing and aliases", () => {
+    expect(tokens("powershell", ["-c", "Get-Content /etc/passwd"])).toEqual([
+      "/etc/passwd",
+    ]);
+    expect(tokens("pwsh", ["-COMMAND", "Get-Content /etc/passwd"])).toEqual([
+      "/etc/passwd",
+    ]);
+  });
+
+  it("skips PowerShell -EncodedCommand values", () => {
+    expect(tokens("powershell", ["-e", "ZgBvAG8A"])).toEqual([]);
+  });
+
   it("keeps shell script operands", () => {
     expect(tokens("bash", ["./setup.sh"])).toEqual(["./setup.sh"]);
   });

@@ -14,14 +14,21 @@ async function expandCandidate(
   return matches.length > 0 ? matches : [candidate];
 }
 
+/** Maximum nesting depth for recursive shell -c parsing. */
+const MAX_SHELL_DEPTH = 3;
+
 /**
  * Extract path-like candidates from a bash command string.
  * Returns absolute paths. Best-effort: uses AST parsing with regex fallback.
  * Does NOT filter by any policy — returns all path-like arguments.
+ *
+ * `depth` bounds recursion into nested shell `-c` programs to prevent
+ * stack exhaustion on deeply nested agent-controlled commands.
  */
 export async function extractBashPathCandidates(
   command: string,
   cwd: string,
+  depth = 0,
 ): Promise<string[]> {
   const seen = new Set<string>();
   const results: string[] = [];
@@ -53,15 +60,18 @@ export async function extractBashPathCandidates(
       if (commandName) {
         for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
           if (arg.recurseShell) {
+            if (depth >= MAX_SHELL_DEPTH) continue;
             pending.push(
-              extractBashPathCandidates(arg.token, cwd).then((nested) => {
-                for (const abs of nested) {
-                  if (!seen.has(abs)) {
-                    seen.add(abs);
-                    results.push(abs);
+              extractBashPathCandidates(arg.token, cwd, depth + 1).then(
+                (nested) => {
+                  for (const abs of nested) {
+                    if (!seen.has(abs)) {
+                      seen.add(abs);
+                      results.push(abs);
+                    }
                   }
-                }
-              }),
+                },
+              ),
             );
           } else {
             pending.push(addCandidate(arg.token, arg.forcePath));
