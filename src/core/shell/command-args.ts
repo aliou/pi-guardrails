@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { maybePathLike } from "../paths/path";
 
 export type ClassifiedArg = { token: string; forcePath?: boolean };
 
@@ -26,9 +27,17 @@ export function classifyCommandArgs(
   if (cmd === "find" || cmd === "gfind") return classifyFindArgs(args);
   if (cmd === "jq" || cmd === "yq") return classifyFilterCommandArgs(args);
   if (
-    ["python", "python2", "python3", "node", "ruby", "perl", "php"].includes(
-      cmd,
-    )
+    [
+      "python",
+      "python2",
+      "python3",
+      "node",
+      "ruby",
+      "perl",
+      "php",
+      "powershell",
+      "pwsh",
+    ].includes(cmd)
   ) {
     return classifyInterpreterArgs(cmd, args);
   }
@@ -190,17 +199,70 @@ function classifyFilterCommandArgs(args: string[]): ClassifiedArg[] {
   return out;
 }
 
-function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
+type InterpreterFlags = {
+  /** Flags whose value is an embedded program; paths are extracted from it. */
+  codeFlags: Set<string>;
+  /** Flags whose value is a script file path. */
+  fileFlags: Set<string>;
+  /** Flags whose value is non-path data and should be skipped. */
+  skipFlags: Set<string>;
+};
+
+function interpreterFlags(cmd: string): InterpreterFlags {
+  if (cmd === "powershell" || cmd === "pwsh") {
+    return {
+      codeFlags: new Set(["-Command"]),
+      fileFlags: new Set(["-File"]),
+      skipFlags: new Set(["-EncodedCommand"]),
+    };
+  }
   const codeFlags =
     cmd === "python" || cmd.startsWith("python")
       ? new Set(["-c"])
       : cmd === "php"
         ? new Set(["-r"])
         : new Set(["-e"]);
+  return { codeFlags, fileFlags: new Set(), skipFlags: new Set() };
+}
+
+/**
+ * Tokenize an embedded program string and return path-like tokens.
+ *
+ * Interpreters (python -c, powershell -Command, node -e) hide filesystem
+ * access inside a program string that the outer shell parser treats as a
+ * single argument. Scanning the program for quoted/whitespace-delimited
+ * path-like tokens lets path-access policies gate the embedded access.
+ */
+const CODE_TOKEN_REGEX =
+  /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&(){}[\]]+)/g;
+
+function extractPathsFromCode(code: string): ClassifiedArg[] {
+  const out: ClassifiedArg[] = [];
+  for (const match of code.matchAll(CODE_TOKEN_REGEX)) {
+    const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
+    if (!token || token.startsWith("-")) continue;
+    if (!maybePathLike(token)) continue;
+    out.push({ token });
+  }
+  return out;
+}
+
+function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
+  const { codeFlags, fileFlags, skipFlags } = interpreterFlags(cmd);
   const out: ClassifiedArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
     if (codeFlags.has(arg)) {
+      const code = args[++i];
+      if (code) out.push(...extractPathsFromCode(code));
+      continue;
+    }
+    if (fileFlags.has(arg)) {
+      if (args[i + 1])
+        out.push({ token: args[++i] as string, forcePath: true });
+      continue;
+    }
+    if (skipFlags.has(arg)) {
       i++;
       continue;
     }

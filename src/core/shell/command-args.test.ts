@@ -75,8 +75,10 @@ describe("classifyCommandArgs", () => {
     expect(tokens("jq", args)).toEqual(["./filter.jq", "./data.json"]);
   });
 
-  it("ignores interpreter inline code", () => {
-    expect(tokens("python3", ["-c", 'open("/etc/passwd")'])).toEqual([]);
+  it("extracts paths from interpreter inline code", () => {
+    expect(tokens("python3", ["-c", 'open("/etc/passwd")'])).toEqual([
+      "/etc/passwd",
+    ]);
   });
 
   it("keeps interpreter script operands", () => {
