@@ -81,6 +81,16 @@ describe("classifyCommandArgs", () => {
     ]);
   });
 
+  it("marks shell -c code for recursion", () => {
+    expect(classifyCommandArgs("sh", ["-c", "cat /etc/passwd"])).toEqual([
+      { token: "cat /etc/passwd", recurseShell: true },
+    ]);
+  });
+
+  it("keeps shell script operands", () => {
+    expect(tokens("bash", ["./setup.sh"])).toEqual(["./setup.sh"]);
+  });
+
   it("keeps interpreter script operands", () => {
     expect(tokens("python3", ["./script.py", "./data.json"])).toEqual([
       "./script.py",

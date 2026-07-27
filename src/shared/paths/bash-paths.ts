@@ -52,7 +52,20 @@ export async function extractBashPathCandidates(
       const commandName = words[0];
       if (commandName) {
         for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
-          pending.push(addCandidate(arg.token, arg.forcePath));
+          if (arg.recurseShell) {
+            pending.push(
+              extractBashPathCandidates(arg.token, cwd).then((nested) => {
+                for (const abs of nested) {
+                  if (!seen.has(abs)) {
+                    seen.add(abs);
+                    results.push(abs);
+                  }
+                }
+              }),
+            );
+          } else {
+            pending.push(addCandidate(arg.token, arg.forcePath));
+          }
         }
       }
       for (const redir of cmd.redirects ?? []) {
