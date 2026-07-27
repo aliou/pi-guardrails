@@ -64,6 +64,22 @@ describe("extractBashPathCandidates", () => {
       );
       expect(result).toEqual(["/etc/passwd"]);
     });
+
+    it("recursively extracts paths from nested shell -c programs", async () => {
+      const result = await extractBashPathCandidates(
+        "sh -c 'cat /etc/passwd > /tmp/x'",
+        CWD,
+      );
+      expect(result).toEqual(["/etc/passwd", "/tmp/x"]);
+    });
+
+    it("extracts paths from node -e inline code", async () => {
+      const result = await extractBashPathCandidates(
+        'node -e \'require("fs").readFileSync("/etc/passwd")\'',
+        CWD,
+      );
+      expect(result).toEqual(["/etc/passwd"]);
+    });
   });
 
   // Regression: github issue #32 — awk regex patterns should not be

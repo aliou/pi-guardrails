@@ -1,7 +1,12 @@
 import { basename } from "node:path";
 import { maybePathLike } from "../paths/path";
 
-export type ClassifiedArg = { token: string; forcePath?: boolean };
+export type ClassifiedArg = {
+  token: string;
+  forcePath?: boolean;
+  /** Token is an embedded shell program; re-parse and recurse. */
+  recurseShell?: boolean;
+};
 
 function normalizeCommandName(command: string): string {
   return basename(command).toLowerCase();
@@ -26,19 +31,7 @@ export function classifyCommandArgs(
   }
   if (cmd === "find" || cmd === "gfind") return classifyFindArgs(args);
   if (cmd === "jq" || cmd === "yq") return classifyFilterCommandArgs(args);
-  if (
-    [
-      "python",
-      "python2",
-      "python3",
-      "node",
-      "ruby",
-      "perl",
-      "php",
-      "powershell",
-      "pwsh",
-    ].includes(cmd)
-  ) {
+  if (isInterpreter(cmd)) {
     return classifyInterpreterArgs(cmd, args);
   }
   if (cmd === "go") return classifyGoArgs(args);
@@ -206,7 +199,44 @@ type InterpreterFlags = {
   fileFlags: Set<string>;
   /** Flags whose value is non-path data and should be skipped. */
   skipFlags: Set<string>;
+  /** Code-flag values are shell programs; re-parse and recurse. */
+  shellFamily: boolean;
 };
+
+/** Shell-family interpreters whose -c value is itself a shell program. */
+const SHELL_INTERPRETERS = new Set([
+  "bash",
+  "sh",
+  "zsh",
+  "dash",
+  "ksh",
+  "mksh",
+]);
+
+/** Non-shell interpreters that take inline code flags. */
+const CODE_INTERPRETERS = new Set([
+  "python",
+  "python2",
+  "python3",
+  "node",
+  "ruby",
+  "perl",
+  "php",
+  "powershell",
+  "pwsh",
+  "lua",
+  "lua5.1",
+  "lua5.2",
+  "lua5.3",
+  "lua5.4",
+  "rscript",
+  "oscript",
+  "osascript",
+]);
+
+function isInterpreter(cmd: string): boolean {
+  return SHELL_INTERPRETERS.has(cmd) || CODE_INTERPRETERS.has(cmd);
+}
 
 function interpreterFlags(cmd: string): InterpreterFlags {
   if (cmd === "powershell" || cmd === "pwsh") {
@@ -214,6 +244,15 @@ function interpreterFlags(cmd: string): InterpreterFlags {
       codeFlags: new Set(["-Command"]),
       fileFlags: new Set(["-File"]),
       skipFlags: new Set(["-EncodedCommand"]),
+      shellFamily: false,
+    };
+  }
+  if (SHELL_INTERPRETERS.has(cmd)) {
+    return {
+      codeFlags: new Set(["-c"]),
+      fileFlags: new Set(),
+      skipFlags: new Set(),
+      shellFamily: true,
     };
   }
   const codeFlags =
@@ -222,7 +261,12 @@ function interpreterFlags(cmd: string): InterpreterFlags {
       : cmd === "php"
         ? new Set(["-r"])
         : new Set(["-e"]);
-  return { codeFlags, fileFlags: new Set(), skipFlags: new Set() };
+  return {
+    codeFlags,
+    fileFlags: new Set(),
+    skipFlags: new Set(),
+    shellFamily: false,
+  };
 }
 
 /**
@@ -248,13 +292,17 @@ function extractPathsFromCode(code: string): ClassifiedArg[] {
 }
 
 function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
-  const { codeFlags, fileFlags, skipFlags } = interpreterFlags(cmd);
+  const { codeFlags, fileFlags, skipFlags, shellFamily } =
+    interpreterFlags(cmd);
   const out: ClassifiedArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
     if (codeFlags.has(arg)) {
       const code = args[++i];
-      if (code) out.push(...extractPathsFromCode(code));
+      if (code) {
+        if (shellFamily) out.push({ token: code, recurseShell: true });
+        else out.push(...extractPathsFromCode(code));
+      }
       continue;
     }
     if (fileFlags.has(arg)) {
