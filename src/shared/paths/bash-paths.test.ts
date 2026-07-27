@@ -57,12 +57,12 @@ describe("extractBashPathCandidates", () => {
       expect(result).toEqual(["/work/project/data.json"]);
     });
 
-    it("ignores interpreter inline code", async () => {
+    it("extracts paths from interpreter inline code", async () => {
       const result = await extractBashPathCandidates(
         "python3 -c 'open(\"/etc/passwd\").read()'",
         CWD,
       );
-      expect(result).toEqual([]);
+      expect(result).toEqual(["/etc/passwd"]);
     });
   });
 
