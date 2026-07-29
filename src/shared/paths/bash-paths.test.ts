@@ -114,6 +114,18 @@ describe("extractBashPathCandidates", () => {
     expect(result).toEqual([]);
   });
 
+  // Regression: github issue #79 — `find <dir> \( ... \) | xargs grep -l
+  // "a\|b"` produces `\` words and an escaped-pipe grep pattern that were
+  // treated as paths. On Windows, resolve(cwd, "\\") collapses to the drive
+  // root (D:\), triggering a bogus outside-workspace prompt.
+  it("ignores find expression tokens and xargs grep patterns", async () => {
+    const result = await extractBashPathCandidates(
+      'find ./src -type f \\( -name "*.cs" -o -name "*.gd" \\) | xargs grep -l "Hitbox\\|hitbox" 2>/dev/null',
+      CWD,
+    );
+    expect(result).toEqual(["/work/project/src", "/dev/null"]);
+  });
+
   describe("when command has path arguments", () => {
     it("extracts a single absolute path", async () => {
       expect(await extractBashPathCandidates("cat /etc/hosts", CWD)).toEqual([
@@ -141,10 +153,18 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("detects Windows-style paths", async () => {
-      const result = await extractBashPathCandidates("type C:\\foo\\bar", CWD);
+      // Quoted backslashes survive bash escape processing.
+      const quoted = await extractBashPathCandidates(
+        'type "C:\\foo\\bar"',
+        CWD,
+      );
+      expect(quoted).toHaveLength(1);
+      expect(quoted[0]).toContain("C:\\foo\\bar");
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toContain("C:\\foo\\bar");
+      // Forward-slash drive paths need no quoting.
+      const fwd = await extractBashPathCandidates("ls D:/Code/app", CWD);
+      expect(fwd).toHaveLength(1);
+      expect(fwd[0]).toContain("D:/Code/app");
     });
   });
 

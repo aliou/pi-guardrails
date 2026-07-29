@@ -12,8 +12,8 @@ importers:
         specifier: ^0.17.0
         version: 0.17.0(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)
       '@aliou/sh':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.2
+        version: 0.2.2
     devDependencies:
       '@aliou/biome-plugins':
         specifier: ^0.8.1
@@ -81,12 +81,9 @@ packages:
       '@earendil-works/pi-tui':
         optional: true
 
-  '@aliou/sh@0.1.0':
-    resolution: {integrity: sha512-MtVSUqNAHK8a0yQdwv4ADlTIBnEg8bpFXcqp0PaxwqxhSWAxcIrpAIPbsc3CJnUK3R++BcgaxBZ5saicHtU+8Q==}
+  '@aliou/sh@0.2.2':
+    resolution: {integrity: sha512-fHcGEFDzRSv+z2r+ysWw47NlhaYrU2FujwMviWtyaZ71bHDXz8FI9VcP3jEkL5b2Otx2fc/QahyouaY0xV96Mw==}
     engines: {node: '>=22'}
-
-  '@golevelup/ts-vitest@4.0.0':
-    resolution: {integrity: sha512-TNIhtox9zWfxlww0ql91l/k2zDthN4owg5qDieRHtjIwIvuoUlXLiwqAb/ifkRr8K+jZLRIC9QrKN/J7TBghlQ==}
 
   '@anthropic-ai/sdk@0.91.1':
     resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
@@ -340,6 +337,9 @@ packages:
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@golevelup/ts-vitest@4.0.0':
+    resolution: {integrity: sha512-TNIhtox9zWfxlww0ql91l/k2zDthN4owg5qDieRHtjIwIvuoUlXLiwqAb/ifkRr8K+jZLRIC9QrKN/J7TBghlQ==}
 
   '@google/genai@1.52.0':
     resolution: {integrity: sha512-gwSvbpiN/17O9TbsqSsE/OzZcpv5Fo4RQjdngGgogtuB9RsyJ8ZHhX5KjHj1bp5N9snN2eK8LDGXSaWW2hof8Q==}
@@ -1786,9 +1786,7 @@ snapshots:
       '@earendil-works/pi-coding-agent': 0.79.6(ws@8.19.0)(zod@3.25.76)
       '@earendil-works/pi-tui': 0.79.6
 
-  '@aliou/sh@0.1.0': {}
-
-  '@golevelup/ts-vitest@4.0.0': {}
+  '@aliou/sh@0.2.2': {}
 
   '@anthropic-ai/sdk@0.91.1(zod@3.25.76)':
     dependencies:
@@ -2289,6 +2287,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@golevelup/ts-vitest@4.0.0': {}
 
   '@google/genai@1.52.0':
     dependencies:

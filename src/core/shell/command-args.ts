@@ -22,6 +22,12 @@ export function classifyCommandArgs(
 ): ClassifiedArg[] {
   const cmd = normalizeCommandName(command);
 
+  // xargs appends piped args to a nested command. Find the wrapped command
+  // (first non-flag token, skipping option values that are not paths) and
+  // classify the remaining fixed args as that command's arguments so its
+  // patterns (e.g. `xargs grep -l "a\|b"`) are not treated as paths.
+  if (cmd === "xargs") return classifyXargsArgs(args);
+
   if (cmd === "awk" || cmd === "gawk" || cmd === "mawk" || cmd === "nawk") {
     return classifyAwkArgs(args);
   }
@@ -162,7 +168,14 @@ function classifyFindArgs(args: string[]): ClassifiedArg[] {
   ]);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
-    if (!inExpression && !arg.startsWith("-") && arg !== "(" && arg !== "!") {
+    // Escaped parens `\(` `\)` arrive as lone `\` words after AST parsing;
+    // treat them as expression operators, never as path roots. On Windows
+    // resolve(cwd, "\\") is the drive root, which breaks boundary checks.
+    if (arg === "\\" || arg === "(" || arg === ")" || arg === "!") {
+      inExpression = true;
+      continue;
+    }
+    if (!inExpression && !arg.startsWith("-")) {
       out.push({ token: arg });
       continue;
     }
@@ -170,6 +183,35 @@ function classifyFindArgs(args: string[]): ClassifiedArg[] {
     if (patternOptions.has(arg)) i++;
   }
   return out;
+}
+
+/**
+ * xargs runs a nested command with piped args appended. Skip leading xargs
+ * options (values of -I/-J/-L/-n/-P/-s/-0 etc. are not paths), then classify
+ * the rest as the wrapped command's arguments. Bare `xargs` defaults to echo;
+ * `xargs -0 rm` style invocations classify as `rm`.
+ */
+function classifyXargsArgs(args: string[]): ClassifiedArg[] {
+  const optionsWithValues = new Set([
+    "-I",
+    "-J",
+    "-L",
+    "-n",
+    "-P",
+    "-s",
+    "-S",
+    "-E",
+  ]);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (optionsWithValues.has(arg)) {
+      i++;
+      continue;
+    }
+    if (isOption(arg)) continue;
+    return classifyCommandArgs(arg, args.slice(i + 1));
+  }
+  return [];
 }
 
 function classifyFilterCommandArgs(args: string[]): ClassifiedArg[] {

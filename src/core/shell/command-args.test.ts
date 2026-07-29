@@ -59,6 +59,57 @@ describe("classifyCommandArgs", () => {
     ]);
   });
 
+  // Regression: github issue #79 — escaped parens from `find ... \( ... \)`
+  // become `\` words, which resolve to the drive root on Windows
+  // (resolve("D:\\Code\\app", "\\") === "D:\\") and trigger a bogus
+  // outside-workspace prompt.
+  it("ignores escaped parens and operators in find expressions", () => {
+    expect(
+      tokens("find", [
+        "D:/Code/wandering-alchemist",
+        "-type",
+        "f",
+        "\\",
+        "-name",
+        "*.cs",
+        "-o",
+        "-name",
+        "*.gd",
+        "\\",
+      ]),
+    ).toEqual(["D:/Code/wandering-alchemist"]);
+  });
+
+  it("keeps multiple find roots before the expression", () => {
+    expect(
+      tokens("find", [
+        "./src",
+        "./tests",
+        "-name",
+        "*.ts",
+        "-o",
+        "-name",
+        "*.tsx",
+      ]),
+    ).toEqual(["./src", "./tests"]);
+  });
+
+  it("ignores grep patterns containing escaped pipes", () => {
+    expect(
+      tokens("grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"]),
+    ).toEqual(["./src"]);
+  });
+
+  // xargs forwards args to a nested command; classification must apply to
+  // the wrapped command so its patterns are not treated as paths.
+  it("classifies xargs-wrapped commands as their inner command", () => {
+    expect(tokens("xargs", ["grep", "-l", "Hitbox\\|hitbox"])).toEqual([]);
+  });
+
+  it("keeps xargs-wrapped file operands", () => {
+    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual(["./src"]);
+  });
+
   it("ignores jq filters and keeps file operands", () => {
     expect(tokens("jq", ['.path | test("^/tmp/")', "./data.json"])).toEqual([
       "./data.json",

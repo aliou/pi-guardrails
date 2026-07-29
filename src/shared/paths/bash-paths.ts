@@ -77,6 +77,18 @@ export async function extractBashPathCandidates(
             pending.push(addCandidate(arg.token, arg.forcePath));
           }
         }
+      } else {
+        // Subshell fragments (e.g. the `\( ... \)` group of a find
+        // expression) arrive as commands with no name: the "words" are
+        // flags, patterns, and shell punctuation, not paths. Only keep
+        // tokens that look like real paths; skip lone `\` from escaped
+        // parens, which resolves to the drive root on Windows (issue #79).
+        for (const word of words) {
+          if (word === "\\" || word === "(" || word === ")" || word === "!")
+            continue;
+          if (word.startsWith("-") && word !== "-" && word !== "--") continue;
+          pending.push(addCandidate(word));
+        }
       }
       for (const redir of cmd.redirects ?? []) {
         pending.push(addCandidate(wordToString(redir.target), true));

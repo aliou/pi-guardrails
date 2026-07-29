@@ -32,16 +32,21 @@ function partToString(part: WordPart): string {
       return part.value;
     case "DblQuoted":
       return part.parts.map(partToString).join("");
-    case "ParamExp":
-      return part.short
-        ? `$${part.param.value}`
-        : `\${${part.param.value}${part.op ?? ""}${part.value ? wordToString(part.value) : ""}}`;
+    case "ParamExp": {
+      if (part.short) return `$${part.param.value}`;
+      const inner = `${part.excl ? "!" : ""}${part.length ? "#" : ""}${part.param.value}${part.exp ? `${part.exp.op}${part.exp.word ? wordToString(part.exp.word) : ""}` : ""}`;
+      return `\${${inner}}`;
+    }
     case "CmdSubst":
       return "$(...)";
     case "ArithExp":
-      return `$((${part.expr}))`;
+      return "$((...))";
     case "ProcSubst":
       return `${part.op}(...)`;
+    case "BraceExp":
+      return part.elems.map(wordToString).join(",");
+    case "ExtGlob":
+      return `${part.op}${part.pattern})`;
   }
 }
 
