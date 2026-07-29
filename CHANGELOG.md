@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.16.1
+
+### Patch Changes
+
+- 79ce17b: Show bash commands inside path-access prompts, with a toggle for truncated commands.
+- a64c8b4: Reduce path-access prompt height by grouping approval actions when space allows.
+
 ## 0.16.0
 
 ### Minor Changes
