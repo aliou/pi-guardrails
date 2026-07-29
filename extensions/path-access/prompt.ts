@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import {
+  type Component,
   Container,
   Key,
   matchesKey,
@@ -121,12 +122,90 @@ const DIR_OPTIONS: PromptOption[] = [
   { label: "Deny", result: "deny" },
 ];
 
+const OPTION_INDENT = " ";
+const OPTION_COLUMN_GAP = 4;
+
+interface OptionLayout {
+  rows: number[][];
+  columnWidths: number[];
+}
+
+function naturalOptionWidth(option: PromptOption): number {
+  return visibleWidth(option.label) + 2;
+}
+
+function oneColumnRows(options: PromptOption[]): number[][] {
+  return options.map((_, index) => [index]);
+}
+
+function compactRows(options: PromptOption[]): number[][] {
+  if (options.length === FILE_OPTIONS.length) return [[0], [1, 2], [3, 4], [5]];
+  if (options.length === DIR_OPTIONS.length) return [[0], [1, 2], [3]];
+  return oneColumnRows(options);
+}
+
+function optionColumnWidths(
+  options: PromptOption[],
+  rows: number[][],
+): number[] {
+  const widths: number[] = [];
+  for (const row of rows) {
+    for (let column = 0; column < row.length; column++) {
+      const option = options[row[column]];
+      if (!option) continue;
+      widths[column] = Math.max(
+        widths[column] ?? 0,
+        naturalOptionWidth(option),
+      );
+    }
+  }
+  return widths;
+}
+
+function layoutWidth(layout: OptionLayout): number {
+  const columnsWidth = layout.columnWidths.reduce(
+    (sum, width) => sum + width,
+    0,
+  );
+  const gapsWidth =
+    Math.max(0, layout.columnWidths.length - 1) * OPTION_COLUMN_GAP;
+  return visibleWidth(OPTION_INDENT) + columnsWidth + gapsWidth;
+}
+
+function createOptionLayout(
+  options: PromptOption[],
+  width: number,
+): OptionLayout {
+  const availableWidth = Math.max(1, width - visibleWidth(OPTION_INDENT));
+  const compact = {
+    rows: compactRows(options),
+    columnWidths: optionColumnWidths(options, compactRows(options)),
+  };
+
+  if (
+    compact.rows.some((row) => row.length > 1) &&
+    layoutWidth(compact) <= width
+  ) {
+    return compact;
+  }
+
+  return {
+    rows: oneColumnRows(options),
+    columnWidths: [
+      Math.min(
+        availableWidth,
+        Math.max(...options.map((option) => naturalOptionWidth(option))),
+      ),
+    ],
+  };
+}
+
 /**
  * Build the confirmation UI component.
  * For directory-oriented tools (ls, find): only directory grant options.
  * For file tools and bash: both file and directory options.
  * Options rendered as highlighted tabs (selected = accent bg, unselected = dim),
- * navigable with ←/→/Tab/Shift+Tab.
+ * navigable linearly with arrows/Tab/Shift+Tab.
  */
 export function createPathAccessPromptComponent(
   toolName: string,
@@ -148,6 +227,7 @@ export function createPathAccessPromptComponent(
   ) => {
     const options = showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
     let selectedIndex = 0;
+    let optionLayout = createOptionLayout(options, tui.terminal.columns);
     let commandExpanded = false;
     let commandCanExpand = false;
 
@@ -192,40 +272,44 @@ export function createPathAccessPromptComponent(
     );
     container.addChild(new Spacer(1));
 
-    // Dynamically rendered option lines
-    const optionLines: Text[] = options.map(() => new Text("", 1, 0));
-    for (const line of optionLines) {
-      container.addChild(line);
-    }
+    const optionGrid: Component = {
+      render: (width: number) => {
+        optionLayout = createOptionLayout(options, width);
+        return optionLayout.rows.map((row) => {
+          const cells = row.map((optionIndex, column) => {
+            const option = options[optionIndex];
+            const cellWidth = optionLayout.columnWidths[column] ?? 1;
+            const labelWidth = Math.max(1, cellWidth - 2);
+            const label = truncateVisibleEnd(option.label, labelWidth);
+            const raw = ` ${label} `;
+            const pad = Math.max(0, cellWidth - visibleWidth(raw));
+            const styled =
+              optionIndex === selectedIndex
+                ? theme.bg("selectedBg", theme.fg("accent", raw))
+                : theme.fg("dim", raw);
+
+            return `${styled}${" ".repeat(pad)}`;
+          });
+
+          return `${OPTION_INDENT}${cells.join(" ".repeat(OPTION_COLUMN_GAP))}`;
+        });
+      },
+      invalidate: () => {},
+    };
+    container.addChild(optionGrid);
 
     container.addChild(new Spacer(1));
     const footerLine = new Text("", 1, 0);
     container.addChild(footerLine);
 
-    const renderOptions = () => {
-      for (let i = 0; i < options.length; i++) {
-        const label = options[i].label;
-        if (i === selectedIndex) {
-          optionLines[i].setText(
-            theme.bg("selectedBg", theme.fg("accent", ` ${label} `)),
-          );
-        } else {
-          optionLines[i].setText(theme.fg("dim", ` ${label} `));
-        }
-      }
-    };
-
-    renderOptions();
-
-    const moveSelection = (direction: number) => {
-      selectedIndex =
-        (selectedIndex + direction + options.length) % options.length;
-      renderOptions();
-      tui.requestRender();
-    };
-
     const requestRender = () => {
       tui.requestRender();
+    };
+
+    const moveLinear = (direction: number) => {
+      selectedIndex =
+        (selectedIndex + direction + options.length) % options.length;
+      requestRender();
     };
 
     return {
@@ -256,7 +340,7 @@ export function createPathAccessPromptComponent(
         footerLine.setText(
           theme.fg(
             "dim",
-            `↑/↓/Tab select · Enter select · Esc deny${commandToggleHint}`,
+            `←/→/↑/↓/Tab select · Enter select · Esc deny${commandToggleHint}`,
           ),
         );
         const raw = container.render(contentWidth);
@@ -275,18 +359,28 @@ export function createPathAccessPromptComponent(
       handleInput: (data: string) => {
         if (
           matchesKey(data, Key.up) ||
+          matchesKey(data, Key.left) ||
           data === "k" ||
-          matchesKey(data, Key.shift("tab"))
+          data === "h"
         ) {
-          moveSelection(-1);
+          moveLinear(-1);
           return;
         }
         if (
           matchesKey(data, Key.down) ||
+          matchesKey(data, Key.right) ||
           data === "j" ||
-          matchesKey(data, Key.tab)
+          data === "l"
         ) {
-          moveSelection(1);
+          moveLinear(1);
+          return;
+        }
+        if (matchesKey(data, Key.shift("tab"))) {
+          moveLinear(-1);
+          return;
+        }
+        if (matchesKey(data, Key.tab)) {
+          moveLinear(1);
           return;
         }
         if ((data === "x" || data === "X") && commandCanExpand) {

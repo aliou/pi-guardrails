@@ -111,4 +111,71 @@ describe("createPathAccessPromptComponent", () => {
     expect(commandLine).not.toContain("\u001B");
     expect(commandLine).not.toContain("\u0007");
   });
+
+  it("renders related options side by side when wide enough", () => {
+    const lines = renderPrompt("cat /outside/secret.txt", 100);
+    const fileRow = lines.find((line) =>
+      line.includes("Allow file this session"),
+    );
+    const dirRow = lines.find((line) =>
+      line.includes("Allow directory this session"),
+    );
+
+    expect(fileRow).toContain("Allow file always");
+    expect(dirRow).toContain("Allow directory always");
+  });
+
+  it("renders one option per row when narrow", () => {
+    const lines = renderPrompt("cat /outside/secret.txt", 48);
+    const fileRow = lines.find((line) =>
+      line.includes("Allow file this session"),
+    );
+
+    expect(fileRow).not.toContain("Allow file always");
+  });
+
+  it("keeps tab navigation linear in the compact layout", () => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.("\t");
+    prompt.handleInput?.("\r");
+
+    expect(done).toHaveBeenCalledWith("allow-file-session");
+  });
+
+  it("moves right to the next option", () => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.("\x1b[C");
+    prompt.handleInput?.("\r");
+
+    expect(done).toHaveBeenCalledWith("allow-file-session");
+  });
+
+  it("moves left to the previous option", () => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.("\x1b[D");
+    prompt.handleInput?.("\r");
+
+    expect(done).toHaveBeenCalledWith("deny");
+  });
+
+  it("moves down to the next option", () => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.("\x1b[B");
+    prompt.handleInput?.("\r");
+
+    expect(done).toHaveBeenCalledWith("allow-file-session");
+  });
+
+  it("moves up to the previous option", () => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.("\x1b[A");
+    prompt.handleInput?.("\r");
+
+    expect(done).toHaveBeenCalledWith("deny");
+  });
 });
