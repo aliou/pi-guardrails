@@ -1,4 +1,5 @@
 import type {
+  BashToolCallEvent,
   ExtensionAPI,
   ExtensionContext,
   ReadToolCallEvent,
@@ -11,6 +12,7 @@ import {
   type GuardrailsPromptOpenedPayload,
 } from "../../src/shared/events";
 import pathAccess from "./index";
+import type { createPathAccessPromptComponent } from "./prompt";
 
 vi.mock("../../src/shared/config", () => ({
   configLoader: {
@@ -37,6 +39,34 @@ const toolCall = {
   toolName: "read",
   input: { path: "/outside/secret.txt" },
 } satisfies ReadToolCallEvent;
+
+const bashToolCall = {
+  type: "tool_call",
+  toolCallId: "test-call",
+  toolName: "bash",
+  input: { command: "cat /outside/secret.txt" },
+} satisfies BashToolCallEvent;
+
+type PathAccessPromptComponent = ReturnType<
+  typeof createPathAccessPromptComponent
+>;
+
+const theme = {
+  fg: (_color: string, text: string) => text,
+  bg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+};
+
+function renderPromptComponent(component: PathAccessPromptComponent): string {
+  return component(
+    { terminal: { columns: 100 }, requestRender: vi.fn() },
+    theme,
+    undefined,
+    vi.fn(),
+  )
+    .render(100)
+    .join("\n");
+}
 
 function emittedPromptOpened(pi: DeepMocked<ExtensionAPI>) {
   return pi.events.emit.mock.calls.find(
@@ -100,6 +130,32 @@ describe("pathAccess extension hook", () => {
     expect(pi).toHaveEmitted(
       GUARDRAILS_PROMPT_CLOSED_EVENT,
       expect.objectContaining({ prompt: { id: opened.prompt.id } }),
+    );
+  });
+
+  it("shows the bash command in the outside-path prompt", async () => {
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(bashToolCall, ctx);
+
+    const promptComponent = ctx.ui.custom.mock.calls[0]?.[0] as
+      | PathAccessPromptComponent
+      | undefined;
+    assert(promptComponent, "path access prompt should be shown");
+    expect(renderPromptComponent(promptComponent)).toContain(
+      "Command: cat /outside/secret.txt",
     );
   });
 });
