@@ -70,6 +70,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
     }
 
     const input = event.input as Record<string, unknown>;
+    const bashCommand =
+      event.toolName === "bash" ? String(input.command ?? "") : undefined;
     const targets = [
       ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
     ];
@@ -133,6 +135,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
+            bashCommand,
           ),
         );
       } finally {

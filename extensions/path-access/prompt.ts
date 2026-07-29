@@ -30,6 +30,76 @@ function displayCwd(cwd: string): string {
   return cwd;
 }
 
+const MAX_COMMAND_DISPLAY_WIDTH = 500;
+const ELLIPSIS = "…";
+
+function truncateVisibleEnd(text: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  if (visibleWidth(text) <= maxWidth) return text;
+  if (maxWidth <= visibleWidth(ELLIPSIS)) return ELLIPSIS;
+
+  let result = "";
+  for (const char of Array.from(text)) {
+    if (visibleWidth(`${result}${char}${ELLIPSIS}`) > maxWidth) break;
+    result += char;
+  }
+
+  return `${result}${ELLIPSIS}`;
+}
+
+function normalizeCommand(command: string): string {
+  const collapsed = command
+    .replace(/\r\n/g, "\n")
+    .replace(/[\r\n]+/g, " ⏎ ")
+    .replace(/\t+/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+
+  let safe = "";
+  for (const char of collapsed) {
+    const code = char.charCodeAt(0);
+    if (code === 0x1b) {
+      safe += "␛";
+    } else if (code <= 0x1f || code === 0x7f) {
+      safe += "�";
+    } else {
+      safe += char;
+    }
+  }
+
+  return safe;
+}
+
+interface CommandRow {
+  text: string;
+  truncated: boolean;
+}
+
+function collapsedCommandRow(
+  command: string,
+  contentWidth: number,
+): CommandRow {
+  const prefix = "  Command: ";
+  if (visibleWidth(prefix) >= contentWidth) {
+    return { text: truncateVisibleEnd(prefix, contentWidth), truncated: true };
+  }
+
+  const capped = truncateVisibleEnd(command, MAX_COMMAND_DISPLAY_WIDTH);
+  const commandWidth = Math.max(0, contentWidth - visibleWidth(prefix));
+  const text = `${prefix}${truncateVisibleEnd(capped, commandWidth)}`;
+
+  return {
+    text,
+    truncated:
+      visibleWidth(command) > MAX_COMMAND_DISPLAY_WIDTH ||
+      visibleWidth(command) > commandWidth,
+  };
+}
+
+function expandedCommandRow(command: string): string {
+  return `  Command: ${command}`;
+}
+
 interface PromptOption {
   label: string;
   result: PromptResult;
@@ -64,6 +134,7 @@ export function createPathAccessPromptComponent(
   displayDir: string,
   cwd: string,
   showFileOptions: boolean,
+  command?: string,
 ) {
   return (
     tui: { terminal: { columns: number }; requestRender(): void },
@@ -77,10 +148,13 @@ export function createPathAccessPromptComponent(
   ) => {
     const options = showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
     let selectedIndex = 0;
+    let commandExpanded = false;
+    let commandCanExpand = false;
 
     const container = new Container();
     const border = (s: string) => theme.fg("warning", s);
     const cwdDisplay = displayCwd(cwd);
+    const normalizedCommand = command ? normalizeCommand(command) : "";
 
     container.addChild(
       new Text(
@@ -100,6 +174,12 @@ export function createPathAccessPromptComponent(
         0,
       ),
     );
+    const commandLine = normalizedCommand
+      ? new Text(theme.fg("dim", ""), 1, 0)
+      : undefined;
+    if (commandLine) {
+      container.addChild(commandLine);
+    }
     container.addChild(new Spacer(1));
     container.addChild(
       new Text(theme.fg("dim", `  Cwd:  ${cwdDisplay}`), 1, 0),
@@ -119,13 +199,8 @@ export function createPathAccessPromptComponent(
     }
 
     container.addChild(new Spacer(1));
-    container.addChild(
-      new Text(
-        theme.fg("dim", "↑/↓/Tab select · Enter select · Esc deny"),
-        1,
-        0,
-      ),
-    );
+    const footerLine = new Text("", 1, 0);
+    container.addChild(footerLine);
 
     const renderOptions = () => {
       for (let i = 0; i < options.length; i++) {
@@ -149,10 +224,41 @@ export function createPathAccessPromptComponent(
       tui.requestRender();
     };
 
+    const requestRender = () => {
+      tui.requestRender();
+    };
+
     return {
       render: (width: number) => {
         const innerWidth = Math.max(1, width - 2);
         const contentWidth = Math.max(1, width - 4);
+        const textContentWidth = Math.max(1, contentWidth - 2);
+        if (commandLine) {
+          const collapsed = collapsedCommandRow(
+            normalizedCommand,
+            textContentWidth,
+          );
+          commandCanExpand = collapsed.truncated;
+          commandLine.setText(
+            theme.fg(
+              "dim",
+              commandExpanded
+                ? expandedCommandRow(normalizedCommand)
+                : collapsed.text,
+            ),
+          );
+        }
+        const commandToggleHint = commandCanExpand
+          ? commandExpanded
+            ? " · x collapse command"
+            : " · x expand command"
+          : "";
+        footerLine.setText(
+          theme.fg(
+            "dim",
+            `↑/↓/Tab select · Enter select · Esc deny${commandToggleHint}`,
+          ),
+        );
         const raw = container.render(contentWidth);
         const top = border(`╭${"─".repeat(innerWidth)}╮`);
         const bottom = border(`╰${"─".repeat(innerWidth)}╯`);
@@ -181,6 +287,11 @@ export function createPathAccessPromptComponent(
           matchesKey(data, Key.tab)
         ) {
           moveSelection(1);
+          return;
+        }
+        if ((data === "x" || data === "X") && commandCanExpand) {
+          commandExpanded = !commandExpanded;
+          requestRender();
           return;
         }
         if (matchesKey(data, Key.enter)) {
