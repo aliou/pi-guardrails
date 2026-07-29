@@ -64,6 +64,7 @@ export function createPathAccessPromptComponent(
   displayDir: string,
   cwd: string,
   showFileOptions: boolean,
+  command?: string,
 ) {
   return (
     tui: { terminal: { columns: number }; requestRender(): void },
@@ -101,6 +102,20 @@ export function createPathAccessPromptComponent(
       ),
     );
     container.addChild(new Spacer(1));
+    
+    // Show command if available
+    if (command && command.trim()) {
+      const maxCommandLength = 60; // Prevent command from taking too much space
+      const displayCommand =
+        command.length > maxCommandLength
+          ? command.slice(0, maxCommandLength) + "..."
+          : command;
+      container.addChild(
+        new Text(theme.fg("dim", `  Command: ${displayCommand}`), 1, 0),
+      );
+      container.addChild(new Spacer(1));
+    }
+    
     container.addChild(
       new Text(theme.fg("dim", `  Cwd:  ${cwdDisplay}`), 1, 0),
     );

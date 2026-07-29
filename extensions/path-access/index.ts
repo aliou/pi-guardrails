@@ -126,6 +126,11 @@ export default async function pathAccess(pi: ExtensionAPI) {
 
       let result: PromptResult | undefined;
       try {
+        // For bash commands, use the actual command. For other tools, we can show the tool name
+        // and the prompt already shows the specific path details, so a simple representation is sufficient.
+        const commandDisplay =
+          event.toolName === "bash" ? String(input.command ?? "") : undefined;
+
         result = await ctx.ui.custom<PromptResult>(
           createPathAccessPromptComponent(
             event.toolName,
@@ -133,6 +138,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
+            commandDisplay?.trim() || undefined,
           ),
         );
       } finally {
