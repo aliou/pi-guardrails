@@ -4,6 +4,7 @@ import {
   createsPaths,
   effectiveCommandName,
   hasNonPathShape,
+  hasShellExpansion,
   isImplausibleLocalPath,
 } from "./plausibility";
 
@@ -59,6 +60,32 @@ describe("effectiveCommandName", () => {
 
   it("returns undefined for a missing command", () => {
     expect(effectiveCommandName(undefined)).toBeUndefined();
+  });
+});
+
+describe("hasShellExpansion", () => {
+  it.each([
+    "$SC/.env",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax
+    "${OUTSIDE}/key",
+    "$(pwd)/../../etc/shadow",
+    "$((1+1))/x",
+    "`pwd`/../etc/shadow",
+    "/tmp/$USER/data",
+    // `$b` really is an expansion in bash, even mid-token.
+    "/tmp/a$b",
+  ])("detects %s", (token) => {
+    expect(hasShellExpansion(token)).toBe(true);
+  });
+
+  it.each([
+    "/etc/passwd",
+    "~/.ssh/id_rsa",
+    "./src/index.ts",
+    "/tmp/a-b",
+    "a$",
+  ])("leaves %s alone", (token) => {
+    expect(hasShellExpansion(token)).toBe(false);
   });
 });
 
