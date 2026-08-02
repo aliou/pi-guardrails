@@ -72,10 +72,11 @@ function partHasExpansion(part: WordPart): boolean {
       return false;
     case "DblQuoted":
       return (part.parts ?? []).some(partHasExpansion);
-    case "ParamExp":
-    case "CmdSubst":
-    case "ArithExp":
-    case "ProcSubst":
+    // ParamExp, CmdSubst, ArithExp, ProcSubst, BraceExp, ExtGlob, and any
+    // part type a future @aliou/sh adds. Defaulting to `true` keeps the
+    // conservative stance when the AST grows: an unrecognised part is
+    // treated as unresolvable rather than silently proving a file absent.
+    default:
       return true;
   }
 }
