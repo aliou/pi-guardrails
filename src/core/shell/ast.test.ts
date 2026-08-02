@@ -29,6 +29,9 @@ describe("wordHasExpansion", () => {
     ['head "$(cat file)"', "command substitution"],
     ['head "$((1+1))"', "arithmetic"],
     ['head "$SC"suffix', "var adjacent to literal"],
+    // @aliou/sh 0.2.x parses this into its own WordPart kind; it does not
+    // resolve to a single path via wordToString, so it stays conservative.
+    ["head ?(secret)/.env", "extended glob"],
   ])("reports expansion for %j (%s)", (command) => {
     expect(wordHasExpansion(argWord(command))).toBe(true);
   });
