@@ -3,6 +3,12 @@ export type Action =
       kind: "file";
       path: string;
       origin?: string;
+      /**
+       * True when the path still contains an unexpanded shell expansion (e.g.
+       * `$VAR`, `$(...)`). Such paths can't be stat()'d reliably, so existence
+       * checks must not use them to suppress a match.
+       */
+      unresolved?: boolean;
     }
   | {
       kind: "command";
