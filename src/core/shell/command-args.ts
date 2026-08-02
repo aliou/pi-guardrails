@@ -33,11 +33,69 @@ export function classifyCommandArgs(
     return classifyInterpreterArgs(cmd, args);
   }
   if (cmd === "go") return classifyGoArgs(args);
+
+  if (cmd === "ctx7") return classifyCtx7Args(args);
+  if (isNodePackageRunner(cmd)) {
+    return classifyNodePackageRunnerArgs(cmd, args);
+  }
+
   if (cmd === "cut")
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
     return skipOptionValues(args, new Set(["-t", "--field-separator"]));
   if (cmd === "tr") return [];
+
+  return args.map((token) => ({ token }));
+}
+
+function isNodePackageRunner(command: string): boolean {
+  return ["pnpm", "npx", "bunx"].includes(command);
+}
+
+type NodePackageInvocation = {
+  packageName: string;
+  packageArgs: string[];
+};
+
+function classifyNodePackageRunnerArgs(
+  command: string,
+  args: string[],
+): ClassifiedArg[] {
+  const invocation = getNodePackageInvocation(command, args);
+  if (
+    invocation &&
+    (invocation.packageName === "ctx7" ||
+      invocation.packageName.startsWith("ctx7@"))
+  ) {
+    return classifyCtx7Args(invocation.packageArgs);
+  }
+
+  return args.map((token) => ({ token }));
+}
+
+function getNodePackageInvocation(
+  command: string,
+  args: string[],
+): NodePackageInvocation | undefined {
+  if (command === "pnpm") {
+    const dlxIndex = args.indexOf("dlx");
+    const packageName = args[dlxIndex + 1];
+
+    if (dlxIndex === -1 || packageName === undefined) return;
+
+    return { packageName, packageArgs: args.slice(dlxIndex + 2) };
+  }
+
+  if (["npx", "bunx"].includes(command)) {
+    const [packageName, ...packageArgs] = args;
+    if (packageName === undefined) return;
+
+    return { packageName, packageArgs };
+  }
+}
+
+function classifyCtx7Args(args: string[]): ClassifiedArg[] {
+  if (args[0] === "docs") return [];
 
   return args.map((token) => ({ token }));
 }

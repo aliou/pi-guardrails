@@ -27,6 +27,17 @@ describe("extractBashPathCandidates", () => {
     expect(result).toEqual([]);
   });
 
+  it.each([
+    "ctx7 docs /drizzle-team/drizzle-orm-docs 'SQLite inserts'",
+    "pnpm dlx ctx7@latest docs /drizzle-team/drizzle-orm-docs 'SQLite inserts'",
+    "npx ctx7@latest docs /drizzle-team/drizzle-orm-docs 'SQLite inserts'",
+    "bunx ctx7@latest docs /drizzle-team/drizzle-orm-docs 'SQLite inserts'",
+  ])("does not extract ctx7 docs repository identifiers", async (command) => {
+    const result = await extractBashPathCandidates(command, CWD);
+
+    expect(result).toEqual([]);
+  });
+
   describe("when a command has regular expression arguments", () => {
     it("ignores sed expressions and extracts file operands", async () => {
       const result = await extractBashPathCandidates(
