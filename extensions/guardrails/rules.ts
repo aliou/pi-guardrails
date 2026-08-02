@@ -105,7 +105,11 @@ export function createPolicyRules(
       if (policy.allowedPatterns.some((pattern) => pattern.test(path))) {
         return { kind: "pass" };
       }
-      if (policy.onlyIfExists && !(await fileExists(path, cwd))) {
+      if (
+        policy.onlyIfExists &&
+        !action.unresolved &&
+        !(await fileExists(path, cwd))
+      ) {
         return { kind: "pass" };
       }
       if (policy.protection === "none") return { kind: "pass" };

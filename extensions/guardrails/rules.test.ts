@@ -104,4 +104,20 @@ describe("createPolicyRules", () => {
       rule.check({ kind: "file", path: join(cwd, ".env") }),
     ).resolves.toMatchObject({ kind: "match" });
   });
+
+  it("matches unresolvable ($VAR) paths even with onlyIfExists true", async () => {
+    // A path like `$SC/.env` can't be stat()'d (the real path is unknown), so
+    // onlyIfExists must not be used to prove it doesn't exist. This is the
+    // escape hatch that previously let `head "$SC/.env"` through.
+    const rule = singleRule(cwd, {
+      id: "secrets",
+      name: "Secrets",
+      patterns: [{ pattern: ".env" }],
+      protection: "noAccess",
+    });
+
+    await expect(
+      rule.check({ kind: "file", path: "$SC/.env", unresolved: true }),
+    ).resolves.toMatchObject({ kind: "match" });
+  });
 });

@@ -43,7 +43,12 @@ function setupPolicyHook(pi: ExtensionAPI): void {
 
     for (const target of targets) {
       const safety = await checkAction(
-        { kind: "file", path: target, origin: event.toolName },
+        {
+          kind: "file",
+          path: target.path,
+          unresolved: target.unresolved,
+          origin: event.toolName,
+        },
         rules,
       );
       if (safety.kind === "safe") continue;

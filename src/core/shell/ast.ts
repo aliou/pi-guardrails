@@ -51,6 +51,36 @@ function partToString(part: WordPart): string {
 }
 
 /**
+ * Whether a word contains any shell expansion (parameter, command
+ * substitution, arithmetic, or process substitution) that can't be resolved
+ * statically.
+ *
+ * Such words can't be reliably stat()'d — we don't know what the variable or
+ * substitution resolves to — so existence-based decisions must not use them to
+ * prove a file *doesn't* exist. This mirrors ShellCheck's stance that
+ * indirection is "known to be unsolvable in the most general case": rather than
+ * attempt to expand, treat unresolvable references conservatively.
+ */
+export function wordHasExpansion(word: Word): boolean {
+  return (word.parts ?? []).some(partHasExpansion);
+}
+
+function partHasExpansion(part: WordPart): boolean {
+  switch (part.type) {
+    case "Literal":
+    case "SglQuoted":
+      return false;
+    case "DblQuoted":
+      return (part.parts ?? []).some(partHasExpansion);
+    case "ParamExp":
+    case "CmdSubst":
+    case "ArithExp":
+    case "ProcSubst":
+      return true;
+  }
+}
+
+/**
  * Walk the AST and call `callback` for every SimpleCommand found at any
  * nesting depth. Returns early if callback returns `true`.
  */
