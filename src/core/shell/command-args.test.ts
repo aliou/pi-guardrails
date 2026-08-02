@@ -13,48 +13,7 @@ describe("classifyCommandArgs", () => {
   });
 
   it("normalizes command basenames", () => {
-    expect(tokens("/usr/bin/awk", ["/aaa/{print}", "./input"])).toEqual([
-      "./input",
-    ]);
-  });
-
-  it("ignores awk inline program and keeps file operands", () => {
-    expect(tokens("awk", ["/aaa/{print}", "./input"])).toEqual(["./input"]);
-  });
-
-  it.each([
-    ["-f as separate option", ["-f", "./prog.awk", "./input"]],
-    ["-f as joined option", ["-f./prog.awk", "./input"]],
-  ])("keeps awk program files with %s", (_label, args) => {
-    expect(tokens("awk", args)).toEqual(["./prog.awk", "./input"]);
-  });
-
-  it("ignores sed inline scripts and keeps file operands", () => {
-    expect(tokens("sed", ["s#/old#/new#g", "./file"])).toEqual(["./file"]);
-  });
-
-  it.each([
-    ["-f as separate option", ["-f", "./script.sed", "./file"]],
-    ["--file as long option", ["--file", "./script.sed", "./file"]],
-    ["-f as joined option", ["-f./script.sed", "./file"]],
-  ])("keeps sed script files with %s", (_label, args) => {
-    expect(tokens("sed", args)).toEqual(["./script.sed", "./file"]);
-  });
-
-  it("ignores grep patterns and keeps file operands", () => {
-    expect(tokens("grep", ["/api/v1", "./src"])).toEqual(["./src"]);
-  });
-
-  it.each([
-    ["-f as separate option", ["-f", "./patterns", "./src"]],
-    ["--file as long option", ["--file", "./patterns", "./src"]],
-    ["-f as joined option", ["-f./patterns", "./src"]],
-  ])("keeps grep pattern files with %s", (_label, args) => {
-    expect(tokens("grep", args)).toEqual(["./patterns", "./src"]);
-  });
-
-  it("keeps find roots and ignores expression patterns", () => {
-    expect(tokens("find", ["./src", "-regex", ".*/test/.*"])).toEqual([
+    expect(tokens("/usr/bin/find", ["./src", "-name", "*.ts"])).toEqual([
       "./src",
     ]);
   });
@@ -94,125 +53,97 @@ describe("classifyCommandArgs", () => {
     ).toEqual(["./src", "./tests"]);
   });
 
-  it("ignores grep patterns containing escaped pipes", () => {
+  // xargs forwards args to a nested command; classification must apply to
+  // the wrapped command. With per-command pattern classifiers gone, what
+  // this still buys is interpreter handling behind the pipe.
+  it("classifies xargs-wrapped commands as their inner command", () => {
     expect(
-      tokens("grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"]),
-    ).toEqual(["./src"]);
+      classifyCommandArgs("xargs", ["bash", "-c", "cat /etc/passwd"]),
+    ).toEqual([{ token: "cat /etc/passwd", recurseShell: true }]);
   });
 
-  // xargs forwards args to a nested command; classification must apply to
-  // the wrapped command so its patterns are not treated as paths.
-  it("classifies xargs-wrapped commands as their inner command", () => {
-    expect(tokens("xargs", ["grep", "-l", "Hitbox\\|hitbox"])).toEqual([]);
+  it("skips xargs option values before the wrapped command", () => {
+    expect(
+      classifyCommandArgs("xargs", ["-I", "{}", "sh", "-c", "cat /etc/passwd"]),
+    ).toEqual([{ token: "cat /etc/passwd", recurseShell: true }]);
   });
 
   it("keeps xargs-wrapped file operands", () => {
-    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual(["./src"]);
-  });
-
-  it("ignores jq filters and keeps file operands", () => {
-    expect(tokens("jq", ['.path | test("^/tmp/")', "./data.json"])).toEqual([
-      "./data.json",
+    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual([
+      "pattern",
+      "./src",
     ]);
   });
 
+  // Pattern-shaped arguments are no longer special-cased per command. They are
+  // returned here and filtered downstream by shape/plausibility checks in
+  // extractBashPathCandidates, which covers every CLI rather than a list.
   it.each([
-    ["-f as separate option", ["-f", "./filter.jq", "./data.json"]],
-    [
-      "--from-file as long option",
-      ["--from-file", "./filter.jq", "./data.json"],
-    ],
-  ])("keeps jq filter files with %s", (_label, args) => {
-    expect(tokens("jq", args)).toEqual(["./filter.jq", "./data.json"]);
+    ["awk", ["/aaa/{print}", "./input"]],
+    ["sed", ["s#/old#/new#g", "./file"]],
+    ["grep", ["/api/v1", "./src"]],
+    ["grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"]],
+    ["rg", ["/api/v1", "./src"]],
+    ["jq", ['.path | test("^/tmp/")', "./data.json"]],
+    ["go", ["test", "./..."]],
+    ["ctx7", ["docs", "/websites/apisix"]],
+  ])("delegates %s arguments to downstream filtering", (command, args) => {
+    expect(tokens(command, args)).toEqual(args);
   });
 
-  it("extracts paths from interpreter inline code", () => {
-    expect(tokens("python3", ["-c", 'open("/etc/passwd")'])).toEqual([
-      "/etc/passwd",
-    ]);
-  });
-
-  it("marks shell -c code for recursion", () => {
-    expect(classifyCommandArgs("sh", ["-c", "cat /etc/passwd"])).toEqual([
-      { token: "cat /etc/passwd", recurseShell: true },
-    ]);
-  });
-
-  it("handles PowerShell flag casing and aliases", () => {
-    expect(tokens("powershell", ["-c", "Get-Content /etc/passwd"])).toEqual([
-      "/etc/passwd",
-    ]);
-    expect(tokens("pwsh", ["-COMMAND", "Get-Content /etc/passwd"])).toEqual([
-      "/etc/passwd",
-    ]);
-  });
-
-  it("skips PowerShell -EncodedCommand values", () => {
-    expect(tokens("powershell", ["-e", "ZgBvAG8A"])).toEqual([]);
-  });
-
-  it("keeps shell script operands", () => {
-    expect(tokens("bash", ["./setup.sh"])).toEqual(["./setup.sh"]);
-  });
-
-  it("keeps interpreter script operands", () => {
-    expect(tokens("python3", ["./script.py", "./data.json"])).toEqual([
-      "./script.py",
-      "./data.json",
-    ]);
-  });
-
-  it("ignores delimiter args", () => {
-    expect(tokens("cut", ["-d", "/", "./file"])).toEqual(["./file"]);
-    expect(tokens("sort", ["-t", "/", "./file"])).toEqual(["./file"]);
-    expect(tokens("tr", ["/", ":"])).toEqual([]);
-  });
-
-  describe("go subcommand", () => {
-    it("skips Go package wildcard patterns", () => {
-      expect(tokens("go", ["test", "./..."])).toEqual([]);
+  describe("find expressions", () => {
+    it("keeps find roots and ignores expression patterns", () => {
+      expect(tokens("find", ["./src", "-regex", ".*/test/.*"])).toEqual([
+        "./src",
+      ]);
     });
+  });
 
-    it("keeps go run .go file operands", () => {
-      expect(tokens("go", ["run", "main.go"])).toEqual(["main.go"]);
-    });
-
-    it("skips non-.go positionals for go run", () => {
-      expect(tokens("go", ["run", "-exec", "/bin/env", "main.go"])).toEqual([
-        "main.go",
+  describe("interpreters", () => {
+    it("extracts paths from interpreter inline code", () => {
+      expect(tokens("python3", ["-c", 'open("/etc/passwd")'])).toEqual([
+        "/etc/passwd",
       ]);
     });
 
-    it("skips package patterns for build/vet/list", () => {
-      expect(tokens("go", ["build", "./..."])).toEqual([]);
-      expect(tokens("go", ["vet", "./pkg/..."])).toEqual([]);
-      expect(tokens("go", ["list", "./..."])).toEqual([]);
-    });
-
-    it("keeps file-valued flags", () => {
-      expect(tokens("go", ["build", "-modfile", "./go.mod", "./..."])).toEqual([
-        "./go.mod",
+    it("marks shell -c code for recursion", () => {
+      expect(classifyCommandArgs("sh", ["-c", "cat /etc/passwd"])).toEqual([
+        { token: "cat /etc/passwd", recurseShell: true },
       ]);
     });
 
-    it("keeps -o flag value for go build", () => {
-      expect(tokens("go", ["build", "-o", "./bin/app", "./..."])).toEqual([
-        "./bin/app",
+    it("handles PowerShell flag casing and aliases", () => {
+      expect(tokens("powershell", ["-c", "Get-Content /etc/passwd"])).toEqual([
+        "/etc/passwd",
+      ]);
+      expect(tokens("pwsh", ["-COMMAND", "Get-Content /etc/passwd"])).toEqual([
+        "/etc/passwd",
       ]);
     });
 
-    it("handles -C global flag before subcommand", () => {
-      expect(tokens("go", ["-C", "/tmp", "test", "./..."])).toEqual([]);
+    it("skips PowerShell -EncodedCommand values", () => {
+      expect(tokens("powershell", ["-e", "ZgBvAG8A"])).toEqual([]);
     });
 
-    it("handles -C joined form before subcommand", () => {
-      expect(tokens("go", ["-C=/tmp", "test", "./..."])).toEqual([]);
+    it("keeps shell script operands", () => {
+      expect(tokens("bash", ["./setup.sh"])).toEqual(["./setup.sh"]);
     });
 
-    it("keeps go run .go file operands with -C", () => {
-      expect(tokens("go", ["-C", "/tmp", "run", "main.go"])).toEqual([
-        "main.go",
+    it("keeps interpreter script operands", () => {
+      expect(tokens("python3", ["./script.py", "./data.json"])).toEqual([
+        "./script.py",
+        "./data.json",
       ]);
+    });
+  });
+
+  describe("delimiter arguments", () => {
+    // A `/` delimiter exists on every filesystem, so no plausibility check can
+    // reject it. These stay hardcoded.
+    it("ignores delimiter args", () => {
+      expect(tokens("cut", ["-d", "/", "./file"])).toEqual(["./file"]);
+      expect(tokens("sort", ["-t", "/", "./file"])).toEqual(["./file"]);
+      expect(tokens("tr", ["/", ":"])).toEqual([]);
     });
   });
 });
