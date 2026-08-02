@@ -21,6 +21,7 @@ describe("targetsForTool", () => {
 
   it("extracts paths from PowerShell command strings", async () => {
     const path = "/home/user/.pi/agent/AGENTS.md";
+    vol.fromJSON({ [path]: "# global" });
 
     await expect(
       targetsForTool(
@@ -35,6 +36,7 @@ describe("targetsForTool", () => {
 
   it("extracts paths from Python command strings", async () => {
     const path = "/home/user/.pi/agent/AGENTS.md";
+    vol.fromJSON({ [path]: "# global" });
 
     await expect(
       targetsForTool(

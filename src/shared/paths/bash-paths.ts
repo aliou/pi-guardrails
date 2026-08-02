@@ -1,8 +1,21 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse } from "@aliou/sh";
-import { expandHomePath, maybePathLike } from "../../core/paths/path";
+import {
+  expandHomePath,
+  isWithinBoundary,
+  maybePathLike,
+} from "../../core/paths/path";
+import {
+  commandCreatesPaths,
+  hasNonPathShape,
+  isImplausibleLocalPath,
+} from "../../core/paths/plausibility";
 import { walkCommands, wordToString } from "../../core/shell/ast";
-import { classifyCommandArgs } from "../../core/shell/command-args";
+import {
+  classifyCommandArgs,
+  isInterpreterCommand,
+} from "../../core/shell/command-args";
 import { expandGlob, hasGlobChars } from "../glob";
 
 async function expandCandidate(
@@ -17,10 +30,23 @@ async function expandCandidate(
 /** Maximum nesting depth for recursive shell -c parsing. */
 const MAX_SHELL_DEPTH = 3;
 
+export type ExtractOptions = {
+  /** Nesting level for recursive shell `-c` parsing. Internal. */
+  depth?: number;
+  /** Filesystem existence probe. Injectable for tests. */
+  pathExists?: (path: string) => boolean;
+};
+
 /**
  * Extract path-like candidates from a bash command string.
  * Returns absolute paths. Best-effort: uses AST parsing with regex fallback.
  * Does NOT filter by any policy — returns all path-like arguments.
+ *
+ * Outside-workspace candidates are filtered by shape and filesystem
+ * plausibility (see `core/paths/plausibility`) so that identifier arguments
+ * such as `ctx7 docs /websites/apisix` do not read as filesystem access.
+ * In-workspace candidates are returned unfiltered: `checkPathAccess` allows
+ * them regardless, so noise there is cheaper than another heuristic.
  *
  * `depth` bounds recursion into nested shell `-c` programs to prevent
  * stack exhaustion on deeply nested agent-controlled commands.
@@ -28,21 +54,42 @@ const MAX_SHELL_DEPTH = 3;
 export async function extractBashPathCandidates(
   command: string,
   cwd: string,
-  depth = 0,
+  options: ExtractOptions = {},
 ): Promise<string[]> {
+  const { depth = 0, pathExists = existsSync } = options;
   const seen = new Set<string>();
   const results: string[] = [];
 
   const addCandidate = async (
     token: string,
     forcePath = false,
+    commandName?: string,
+    commandArgs: string[] = [],
   ): Promise<void> => {
     if (!token || token.startsWith("-")) return;
     if (!forcePath && !maybePathLike(token)) return;
+    if (!forcePath && hasNonPathShape(token)) return;
+
+    // Suppression is skipped whenever the command could create the missing
+    // parent itself: known path-creating commands (looked up through wrappers
+    // such as `sudo` or `npx`) and interpreters running arbitrary programs.
+    const skipImplausible =
+      forcePath ||
+      commandCreatesPaths(commandName, commandArgs) ||
+      (commandName !== undefined && isInterpreterCommand(commandName));
 
     const expanded = await expandCandidate(token, cwd);
     for (const file of expanded) {
       const abs = resolve(cwd, expandHomePath(file));
+      // Only outside-workspace candidates are filtered: in-workspace paths are
+      // always allowed downstream, so noise there cannot cause a prompt.
+      if (
+        !skipImplausible &&
+        !isWithinBoundary(abs, cwd) &&
+        isImplausibleLocalPath(abs, pathExists)
+      ) {
+        continue;
+      }
       if (!seen.has(abs)) {
         seen.add(abs);
         results.push(abs);
@@ -62,19 +109,27 @@ export async function extractBashPathCandidates(
           if (arg.recurseShell) {
             if (depth >= MAX_SHELL_DEPTH) continue;
             pending.push(
-              extractBashPathCandidates(arg.token, cwd, depth + 1).then(
-                (nested) => {
-                  for (const abs of nested) {
-                    if (!seen.has(abs)) {
-                      seen.add(abs);
-                      results.push(abs);
-                    }
+              extractBashPathCandidates(arg.token, cwd, {
+                depth: depth + 1,
+                pathExists,
+              }).then((nested) => {
+                for (const abs of nested) {
+                  if (!seen.has(abs)) {
+                    seen.add(abs);
+                    results.push(abs);
                   }
-                },
-              ),
+                }
+              }),
             );
           } else {
-            pending.push(addCandidate(arg.token, arg.forcePath));
+            pending.push(
+              addCandidate(
+                arg.token,
+                arg.forcePath,
+                commandName,
+                words.slice(1),
+              ),
+            );
           }
         }
       } else {
@@ -99,11 +154,18 @@ export async function extractBashPathCandidates(
     await Promise.all(pending);
     return results;
   } catch {
-    // Fallback: regex tokenization
+    // Fallback: regex tokenization. The command name is unreliable here, so
+    // only shape rejection applies; existence suppression stays off to keep
+    // the fallback fail-safe (extra candidates, never fewer).
     const tokenRegex = /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&]+)/g;
     for (const match of command.matchAll(tokenRegex)) {
       const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
-      if (token && !token.startsWith("-") && maybePathLike(token)) {
+      if (
+        token &&
+        !token.startsWith("-") &&
+        maybePathLike(token) &&
+        !hasNonPathShape(token)
+      ) {
         const expanded = await expandCandidate(token, cwd);
         for (const file of expanded) {
           const abs = resolve(cwd, expandHomePath(file));

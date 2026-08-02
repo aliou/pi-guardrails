@@ -1,9 +1,25 @@
 import { homedir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { vol } from "memfs";
+import { beforeEach, describe, expect, it } from "vitest";
 import { extractBashPathCandidates } from "./bash-paths";
 
 const CWD = "/work/project";
 const HOME = homedir();
+
+// Outside-workspace candidates are now checked against the filesystem: a
+// token whose path and parent directory are both missing is treated as a
+// misparsed identifier rather than a path. Seed the tree these tests assume.
+beforeEach(() => {
+  vol.fromJSON({
+    "/etc/hosts": "",
+    "/etc/passwd": "",
+    "/tmp/.keep": "",
+    "/a": "",
+    "/b": "",
+    "/work/project/.keep": "",
+    [`${HOME}/.keep`]: "",
+  });
+});
 
 describe("extractBashPathCandidates", () => {
   it("does not extract go package wildcard patterns as paths", async () => {
@@ -12,28 +28,37 @@ describe("extractBashPathCandidates", () => {
     expect(result).toEqual([]);
   });
 
-  it("extracts go run .go file operands", async () => {
+  it("no longer force-extracts bare go run operands", async () => {
+    // `main.go` has no separator, so it is not path-like — the same rule that
+    // already applies to `cat README.md`. It resolves inside the workspace
+    // either way, so path-access allows it.
     const result = await extractBashPathCandidates("go run main.go", CWD);
 
-    expect(result).toEqual(["/work/project/main.go"]);
+    expect(result).toEqual([]);
   });
 
-  it("handles go -C global flag", async () => {
+  it("surfaces the directory go -C changes into", async () => {
+    // `go -C /tmp` really does operate outside the workspace.
     const result = await extractBashPathCandidates(
       "go -C /tmp test ./...",
       CWD,
     );
 
-    expect(result).toEqual([]);
+    expect(result).toEqual(["/tmp"]);
   });
 
   describe("when a command has regular expression arguments", () => {
-    it("ignores sed expressions and extracts file operands", async () => {
+    it("keeps sed expressions in-workspace and extracts file operands", async () => {
+      // The script token is noise, but it resolves inside the workspace where
+      // checkPathAccess always allows, so it cannot produce a prompt.
       const result = await extractBashPathCandidates(
         "sed 's/abc/{2,3}/g' ./file",
         CWD,
       );
-      expect(result).toEqual(["/work/project/file"]);
+      expect(result).toEqual([
+        "/work/project/s/abc/{2,3}/g",
+        "/work/project/file",
+      ]);
     });
 
     it("ignores grep patterns and extracts file operands", async () => {
@@ -49,12 +74,15 @@ describe("extractBashPathCandidates", () => {
       expect(result).toEqual(["/work/project/src"]);
     });
 
-    it("ignores jq filters and extracts file operands", async () => {
+    it("keeps jq filters in-workspace and extracts file operands", async () => {
       const result = await extractBashPathCandidates(
         "jq '.path | test(\"^/tmp/\")' ./data.json",
         CWD,
       );
-      expect(result).toEqual(["/work/project/data.json"]);
+      expect(result).toEqual([
+        '/work/project/.path | test("^/tmp/")',
+        "/work/project/data.json",
+      ]);
     });
 
     it("extracts paths from interpreter inline code", async () => {
@@ -123,7 +151,15 @@ describe("extractBashPathCandidates", () => {
       'find ./src -type f \\( -name "*.cs" -o -name "*.gd" \\) | xargs grep -l "Hitbox\\|hitbox" 2>/dev/null',
       CWD,
     );
-    expect(result).toEqual(["/work/project/src", "/dev/null"]);
+
+    // The `\` words are gone (that was the drive-root bug). The grep pattern
+    // now survives classification as in-workspace noise, which cannot prompt;
+    // what matters is that nothing outside the workspace is invented.
+    expect(result.filter((path) => !path.startsWith(`${CWD}/`))).toEqual([
+      "/dev/null",
+    ]);
+    expect(result).toContain(`${CWD}/src`);
+    expect(result).not.toContain(CWD);
   });
 
   describe("when command has path arguments", () => {

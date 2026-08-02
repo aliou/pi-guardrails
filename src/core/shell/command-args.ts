@@ -16,6 +16,29 @@ function isOption(arg: string): boolean {
   return arg.startsWith("-") && arg !== "-" && arg !== "--";
 }
 
+/**
+ * Classify a command's argv into path candidates.
+ *
+ * Only four categories are special-cased, and each exists for a structural
+ * reason that no shape or filesystem heuristic can recover:
+ *
+ *  0. `xargs` \u2014 it runs a nested command, so its argv has to be re-classified
+ *     as that command's argv.
+ *  1. Interpreters — the program text is an opaque argv token that hides real
+ *     filesystem access (`python3 -c 'open("/etc/passwd")'`). Security
+ *     critical: this is the defense for the wrapper bypass in issue #76.
+ *  2. `find` — its expression grammar mixes roots, patterns, and shell
+ *     punctuation (`\`, `(`, `)`), and a stray `\` resolves to the drive root
+ *     on Windows (issue #79).
+ *  3. Delimiter arguments (`cut -d /`, `sort -t /`, `tr / :`) — the value is
+ *     literally `/`, which exists, so no existence check can reject it.
+ *
+ * Everything else returns every token and is filtered downstream by shape and
+ * plausibility checks in `extractBashPathCandidates`. Commands that merely
+ * take identifier-shaped or pattern-shaped arguments (awk, sed, grep, jq, go,
+ * ctx7, gh, docker, kubectl, …) deliberately have no entry here: enumerating
+ * them does not terminate.
+ */
 export function classifyCommandArgs(
   command: string,
   args: string[],
@@ -24,23 +47,13 @@ export function classifyCommandArgs(
 
   // xargs appends piped args to a nested command. Find the wrapped command
   // (first non-flag token, skipping option values that are not paths) and
-  // classify the remaining fixed args as that command's arguments so its
-  // patterns (e.g. `xargs grep -l "a\|b"`) are not treated as paths.
+  // classify the remaining fixed args as that command's arguments.
   if (cmd === "xargs") return classifyXargsArgs(args);
 
-  if (cmd === "awk" || cmd === "gawk" || cmd === "mawk" || cmd === "nawk") {
-    return classifyAwkArgs(args);
-  }
-  if (cmd === "sed" || cmd === "gsed") return classifySedArgs(args);
-  if (["grep", "egrep", "fgrep", "rg", "ripgrep", "ag", "ack"].includes(cmd)) {
-    return classifyGrepLikeArgs(args);
-  }
   if (cmd === "find" || cmd === "gfind") return classifyFindArgs(args);
-  if (cmd === "jq" || cmd === "yq") return classifyFilterCommandArgs(args);
   if (isInterpreter(cmd)) {
     return classifyInterpreterArgs(cmd, args);
   }
-  if (cmd === "go") return classifyGoArgs(args);
   if (cmd === "cut")
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
@@ -48,109 +61,6 @@ export function classifyCommandArgs(
   if (cmd === "tr") return [];
 
   return args.map((token) => ({ token }));
-}
-
-function classifyAwkArgs(args: string[]): ClassifiedArg[] {
-  const out: ClassifiedArg[] = [];
-  let sawProgram = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] as string;
-    if (arg === "--") continue;
-    if (arg === "-f") {
-      if (args[i + 1]) out.push({ token: args[++i] as string });
-      sawProgram = true;
-      continue;
-    }
-    if (arg === "-v" || arg === "-F") {
-      i++;
-      continue;
-    }
-    if (arg.startsWith("-f") && arg.length > 2) {
-      out.push({ token: arg.slice(2) });
-      sawProgram = true;
-      continue;
-    }
-    if (isOption(arg)) continue;
-    if (!sawProgram) {
-      sawProgram = true;
-      continue;
-    }
-    out.push({ token: arg });
-  }
-  return out;
-}
-
-function classifySedArgs(args: string[]): ClassifiedArg[] {
-  const out: ClassifiedArg[] = [];
-  let hasExplicitScript = false;
-  let skippedImplicitScript = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] as string;
-    if (arg === "-e" || arg === "--expression") {
-      hasExplicitScript = true;
-      i++;
-      continue;
-    }
-    if (arg === "-f" || arg === "--file") {
-      hasExplicitScript = true;
-      if (args[i + 1]) out.push({ token: args[++i] as string });
-      continue;
-    }
-    if (arg.startsWith("-e") && arg.length > 2) {
-      hasExplicitScript = true;
-      continue;
-    }
-    if (arg.startsWith("-f") && arg.length > 2) {
-      hasExplicitScript = true;
-      out.push({ token: arg.slice(2) });
-      continue;
-    }
-    if (isOption(arg)) continue;
-    if (!hasExplicitScript && !skippedImplicitScript) {
-      skippedImplicitScript = true;
-      continue;
-    }
-    out.push({ token: arg });
-  }
-  return out;
-}
-
-function classifyGrepLikeArgs(args: string[]): ClassifiedArg[] {
-  const out: ClassifiedArg[] = [];
-  let patternProvided = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] as string;
-    if (arg === "-e" || arg === "--regexp") {
-      patternProvided = true;
-      i++;
-      continue;
-    }
-    if (arg === "-f" || arg === "--file") {
-      patternProvided = true;
-      if (args[i + 1]) out.push({ token: args[++i] as string });
-      continue;
-    }
-    if (["-g", "--glob", "-t", "-T", "--type", "--type-not"].includes(arg)) {
-      i++;
-      continue;
-    }
-    if (arg.startsWith("-e") && arg.length > 2) {
-      patternProvided = true;
-      continue;
-    }
-    if (arg.startsWith("-f") && arg.length > 2) {
-      patternProvided = true;
-      out.push({ token: arg.slice(2) });
-      continue;
-    }
-    if (isOption(arg)) continue;
-    if (!patternProvided) {
-      patternProvided = true;
-      continue;
-    }
-    out.push({ token: arg });
-  }
-  return out;
 }
 
 function classifyFindArgs(args: string[]): ClassifiedArg[] {
@@ -214,26 +124,6 @@ function classifyXargsArgs(args: string[]): ClassifiedArg[] {
   return [];
 }
 
-function classifyFilterCommandArgs(args: string[]): ClassifiedArg[] {
-  const out: ClassifiedArg[] = [];
-  let sawFilter = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] as string;
-    if (arg === "-f" || arg === "--from-file") {
-      if (args[i + 1]) out.push({ token: args[++i] as string });
-      sawFilter = true;
-      continue;
-    }
-    if (isOption(arg)) continue;
-    if (!sawFilter) {
-      sawFilter = true;
-      continue;
-    }
-    out.push({ token: arg });
-  }
-  return out;
-}
-
 type InterpreterFlags = {
   /** Flags whose value is an embedded program; paths are extracted from it. */
   codeFlags: Set<string>;
@@ -281,6 +171,15 @@ const CODE_INTERPRETERS = new Set([
 
 function isInterpreter(cmd: string): boolean {
   return SHELL_INTERPRETERS.has(cmd) || CODE_INTERPRETERS.has(cmd);
+}
+
+/**
+ * True when the command runs an arbitrary program supplied on the command
+ * line. Such a program can create directories before writing to them, so its
+ * extracted paths must never be existence-suppressed.
+ */
+export function isInterpreterCommand(command: string): boolean {
+  return isInterpreter(normalizeCommandName(command));
 }
 
 function interpreterFlags(cmd: string): InterpreterFlags {
@@ -384,76 +283,6 @@ function skipOptionValues(
       continue;
     }
     out.push({ token: arg });
-  }
-  return out;
-}
-
-/**
- * Classify `go` subcommand arguments.
- *
- * Go commands take package patterns, not file paths, as positional args
- * for most subcommands. Package patterns like `./...`, `pkg/...`,
- * or `github.com/user/repo/...` use Go's `...` wildcard and are not
- * filesystem paths.
- *
- * `go run` is an exception: it takes .go file operands, emitted with
- * `forcePath` since bare filenames like `main.go` don't pass
- * `maybePathLike`.
- *
- * File-valued flags (e.g. `-o`, `-modfile`, `-overlay`) are kept
- * so that policy checks can still gate them.
- *
- * Global flags like `-C dir` are handled before subcommand detection
- * so their values aren't mistaken for the subcommand.
- */
-function classifyGoArgs(args: string[]): ClassifiedArg[] {
-  const out: ClassifiedArg[] = [];
-  const fileFlags = new Set(["-o", "-modfile", "-overlay"]);
-
-  // Global flags that consume a value and must be skipped before
-  // subcommand detection. E.g. `go -C /tmp test ./...`
-  const globalFlagsWithValues = new Set(["-C"]);
-
-  let subcommand: string | undefined;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] as string;
-
-    // Handle file-valued flags
-    if (fileFlags.has(arg)) {
-      if (args[i + 1]) out.push({ token: args[++i] as string });
-      continue;
-    }
-
-    // Handle joined file flags like -o=./bin/app
-    if (arg.startsWith("-o=")) {
-      out.push({ token: arg.slice(3) });
-      continue;
-    }
-
-    // Skip global flags with values before subcommand detection
-    if (!subcommand && globalFlagsWithValues.has(arg)) {
-      i++; // skip value
-      continue;
-    }
-    if (!subcommand && arg.startsWith("-C=")) {
-      // joined form -C=/tmp
-      continue;
-    }
-
-    if (isOption(arg)) continue;
-
-    // First non-flag positional is the subcommand
-    if (!subcommand) {
-      subcommand = arg;
-      continue;
-    }
-
-    // `go run` takes .go file operands; emit with forcePath since
-    // bare filenames like main.go don't pass maybePathLike.
-    // All other subcommands take package patterns; skip them.
-    if (subcommand === "run" && arg.endsWith(".go")) {
-      out.push({ token: arg, forcePath: true });
-    }
   }
   return out;
 }
