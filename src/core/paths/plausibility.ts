@@ -27,6 +27,9 @@ const URL_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 /** `user@host:/etc/passwd`, `git@github.com:owner/repo.git` — remote, not local. */
 const REMOTE_TARGET = /^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:/;
 
+/** `$VAR`, `${VAR}`, `$(cmd)`, `$((expr))`, `` `cmd` ``. */
+const SHELL_EXPANSION = /\$[A-Za-z_{(]|`/;
+
 /** Go package wildcard: `./...`, `./pkg/...`, `github.com/user/repo/...`. */
 const WILDCARD_SEGMENT = /(?:^|\/)\.\.\.(?:\/|$)/;
 
@@ -154,6 +157,19 @@ export function effectiveCommandName(
   }
 
   return cmd;
+}
+
+/**
+ * True when the token contains an unexpanded shell reference.
+ *
+ * Such a token cannot be resolved to a real path, so the filesystem says
+ * nothing about it: `cat "$(pwd)/../../etc/shadow"` resolves to a directory
+ * that does not exist while the command still reads a real file. Following the
+ * same stance as the `onlyIfExists` fix, an unresolvable reference is treated
+ * as suspicious rather than proven absent.
+ */
+export function hasShellExpansion(token: string): boolean {
+  return SHELL_EXPANSION.test(token);
 }
 
 export function createsPaths(commandName: string | undefined): boolean {

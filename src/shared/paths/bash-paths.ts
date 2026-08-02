@@ -9,6 +9,7 @@ import {
 import {
   commandCreatesPaths,
   hasNonPathShape,
+  hasShellExpansion,
   isImplausibleLocalPath,
 } from "../../core/paths/plausibility";
 import { walkCommands, wordToString } from "../../core/shell/ast";
@@ -70,11 +71,14 @@ export async function extractBashPathCandidates(
     if (!forcePath && !maybePathLike(token)) return;
     if (!forcePath && hasNonPathShape(token)) return;
 
-    // Suppression is skipped whenever the command could create the missing
-    // parent itself: known path-creating commands (looked up through wrappers
-    // such as `sudo` or `npx`) and interpreters running arbitrary programs.
+    // Suppression is skipped whenever the filesystem cannot settle the
+    // question: the command creates missing parents itself (known
+    // path-creating commands, looked up through wrappers such as `sudo` or
+    // `npx`), the command runs an arbitrary program, or the token still
+    // contains an unexpanded shell reference.
     const skipImplausible =
       forcePath ||
+      hasShellExpansion(token) ||
       commandCreatesPaths(commandName, commandArgs) ||
       (commandName !== undefined && isInterpreterCommand(commandName));
 

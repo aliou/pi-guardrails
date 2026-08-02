@@ -113,6 +113,34 @@ describe("outside-workspace plausibility filter", () => {
     });
   });
 
+  describe("unchanged behaviour for known regressions", () => {
+    it("still surfaces the interpreter wrapper bypass (issue #76)", async () => {
+      expect(
+        await extract(
+          `powershell -Command "Get-Content -Path '/etc/passwd' -TotalCount 1"`,
+        ),
+      ).toEqual(["/etc/passwd"]);
+    });
+
+    it("does not add outside-workspace candidates for find/xargs pipelines (issue #79)", async () => {
+      // The lone `\` and the escaped-pipe grep pattern resolve inside the
+      // workspace on POSIX. The Windows drive-root case in #79 is a
+      // tokenizer bug, fixed by the @aliou/sh bump in PR #82, not here.
+      const result = await extract(
+        'find ./src -type f \\( -name "*.cs" \\) | xargs grep -l "a\\|b"',
+      );
+
+      expect(result.filter((path) => !path.startsWith(`${CWD}/`))).toEqual([]);
+      expect(result).toContain(`${CWD}/src`);
+    });
+
+    it("leaves unexpanded policy targets in the workspace alone (PR #84)", async () => {
+      // `$SC/.env` stays a candidate so the policies feature can still judge
+      // it; plausibility filtering never runs on in-workspace tokens.
+      expect(await extract('head "$SC/.env"')).toEqual([`${CWD}/$SC/.env`]);
+    });
+  });
+
   describe("in-workspace noise is left alone", () => {
     // These tokens are not paths either, but they resolve inside the
     // workspace, where `checkPathAccess` always returns allow. Filtering them
@@ -224,6 +252,20 @@ describe("outside-workspace plausibility filter", () => {
       expect(
         await extract("sudo npx ctx7@latest docs /websites/apisix"),
       ).toEqual([]);
+    });
+
+    it.each([
+      // A `$(...)` that expands to a real location resolves, before
+      // expansion, to a directory that does not exist. The filesystem cannot
+      // rule the token out, so it must not be suppressed. Cf. the
+      // `onlyIfExists` bypass in PR #84.
+      'cat "$(pwd)/../../etc/shadow"',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax
+      'cat "${OUTSIDE}/../../../etc/shadow"',
+      "cat $SECRETS/../../../etc/shadow",
+      "cat `pwd`/../../etc/shadow",
+    ])("never suppresses an unexpanded shell reference: %s", async (cmd) => {
+      expect(await extract(cmd)).not.toEqual([]);
     });
 
     it("surfaces a colon-bearing path that really exists", async () => {
