@@ -1,8 +1,8 @@
-import { CURRENT_VERSION } from "./migration";
+import pkg from "../../../package.json" with { type: "json" };
 import type { ResolvedConfig } from "./types";
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
-  version: CURRENT_VERSION,
+  version: pkg.version,
   enabled: true,
   applyBuiltinDefaults: true,
   features: {

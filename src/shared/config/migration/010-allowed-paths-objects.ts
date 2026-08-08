@@ -1,5 +1,6 @@
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.14.0";
 
 /**
  * Migrate `pathAccess.allowedPaths` from the legacy flat `string[]` (where the
@@ -32,7 +33,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
           item !== null,
       );
   }
-  migrated.version = CURRENT_VERSION;
   return migrated as GuardrailsConfig;
 }
 

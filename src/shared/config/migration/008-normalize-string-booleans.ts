@@ -1,5 +1,6 @@
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.13.2";
 
 export function shouldRun(config: GuardrailsConfig): boolean {
   const features = config.features as Record<string, unknown> | undefined;
@@ -20,14 +21,12 @@ export function shouldRun(config: GuardrailsConfig): boolean {
 
 export function run(config: GuardrailsConfig): GuardrailsConfig {
   const migrated = structuredClone(config) as Record<string, unknown>;
-  let changed = false;
 
   const features = migrated.features as Record<string, unknown> | undefined;
   if (features) {
     for (const [key, value] of Object.entries(features)) {
       if (value === "enabled" || value === "disabled") {
         features[key] = value === "enabled";
-        changed = true;
       }
     }
   }
@@ -42,11 +41,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
   ) {
     permissionGate.requireConfirmation =
       permissionGate.requireConfirmation === "on";
-    changed = true;
-  }
-
-  if (changed) {
-    migrated.version = CURRENT_VERSION;
   }
 
   return migrated as GuardrailsConfig;

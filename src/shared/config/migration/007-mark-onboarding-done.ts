@@ -1,5 +1,7 @@
+import pkg from "../../../../package.json" with { type: "json" };
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.12.0";
 
 export function shouldRun(config: GuardrailsConfig): boolean {
   return (
@@ -14,8 +16,7 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
     ...(migrated.onboarding ?? {}),
     completed: true,
     completedAt: migrated.onboarding?.completedAt ?? new Date().toISOString(),
-    version: migrated.onboarding?.version ?? CURRENT_VERSION,
+    version: migrated.onboarding?.version ?? pkg.version,
   };
-  migrated.version = CURRENT_VERSION;
   return migrated;
 }

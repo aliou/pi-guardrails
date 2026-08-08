@@ -1,7 +1,5 @@
-import {
-  CURRENT_VERSION,
-  type GuardrailsConfig,
-} from "../../../../src/shared/config";
+import pkg from "../../../../package.json" with { type: "json" };
+import type { GuardrailsConfig } from "../../../../src/shared/config";
 import { DEFAULT_CONFIG } from "../../../../src/shared/config/defaults";
 
 export function buildOnboardedConfig(
@@ -9,12 +7,12 @@ export function buildOnboardedConfig(
   pathAccessEnabled?: boolean | null,
 ): GuardrailsConfig {
   const config: GuardrailsConfig = {
-    version: CURRENT_VERSION,
+    version: pkg.version,
     applyBuiltinDefaults,
     onboarding: {
       completed: true,
       completedAt: new Date().toISOString(),
-      version: CURRENT_VERSION,
+      version: pkg.version,
     },
   };
   if (pathAccessEnabled) {

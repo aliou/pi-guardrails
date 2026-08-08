@@ -79,7 +79,7 @@ export interface PathAccessConfig {
 export interface GuardrailsConfig {
   /** JSON Schema URL for editor autocomplete and validation. Added automatically when Guardrails writes the file. */
   $schema?: string;
-  /** Internal config schema marker for migration/debugging. Not tied to the package version. */
+  /** Package semver marker for migration/debugging. */
   version?: string;
   /** Enable or disable all Guardrails checks. */
   enabled?: boolean;
@@ -91,7 +91,7 @@ export interface GuardrailsConfig {
     completed?: boolean;
     /** ISO timestamp for when onboarding completed. */
     completedAt?: string;
-    /** Guardrails config schema marker used when onboarding completed. */
+    /** Package semver marker stored when onboarding completed. */
     version?: string;
   };
   /** Enable or disable individual Guardrails feature extensions. */

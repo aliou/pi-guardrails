@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GuardrailsConfig } from "../types";
 import { run, shouldRun } from "./010-allowed-paths-objects";
-import { CURRENT_VERSION } from "./version";
 
 function withAllowedPaths(allowedPaths: unknown[]): GuardrailsConfig {
   return {
@@ -81,9 +80,9 @@ describe("010-allowed-paths-objects", () => {
       expect(result.pathAccess?.allowedPaths).toEqual([]);
     });
 
-    it("stamps the current config version", () => {
+    it("does not stamp the version itself (the loader handles stamping)", () => {
       const result = run(withAllowedPaths(["/dev/null"]));
-      expect(result.version).toBe(CURRENT_VERSION);
+      expect(result.version).toBeUndefined();
     });
 
     it("leaves the rest of the config intact", () => {

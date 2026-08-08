@@ -1,5 +1,6 @@
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.14.0";
 
 const DEV_NULL = "/dev/null";
 
@@ -37,7 +38,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
     ...pathAccess,
     allowedPaths: [...allowedPaths, { kind: "file", path: DEV_NULL }],
   };
-  migrated.version = CURRENT_VERSION;
 
   return migrated;
 }

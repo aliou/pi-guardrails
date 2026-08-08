@@ -1,5 +1,6 @@
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.12.0";
 
 const REMOVED_PERMISSION_GATE_KEYS = [
   "explainCommands",
@@ -31,6 +32,5 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
       delete permissionGate[key];
     }
   }
-  cleaned.version = CURRENT_VERSION;
   return cleaned as GuardrailsConfig;
 }

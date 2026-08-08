@@ -37,7 +37,7 @@
     "!extensions/**/*.test.ts"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.17.0",
+    "@aliou/pi-utils-settings": "^0.19.1",
     "@aliou/sh": "^0.2.2"
   },
   "peerDependencies": {
@@ -61,8 +61,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "gen:schema": "ts-json-schema-generator --path src/shared/config/types.ts --type GuardrailsConfig --no-type-check -o schema.json",
-    "check:schema": "ts-json-schema-generator --path src/shared/config/types.ts --type GuardrailsConfig --no-type-check -o /tmp/pi-guardrails-schema-check.json && diff -q schema.json /tmp/pi-guardrails-schema-check.json",
+    "gen:schema": "pi-settings-schema -p src/shared/config/types.ts -t GuardrailsConfig -o schema.json --version 0.16.2",
+    "check:schema": "pi-settings-schema -p src/shared/config/types.ts -t GuardrailsConfig -o schema.json --version 0.16.2 --check",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check",
