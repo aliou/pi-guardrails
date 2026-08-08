@@ -5,7 +5,8 @@ import type {
   GuardrailsConfig,
   PatternConfig,
 } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.12.0";
 
 export function shouldRun(config: GuardrailsConfig): boolean {
   return config.version === undefined;
@@ -63,7 +64,6 @@ function migrateV0(config: GuardrailsConfig): GuardrailsConfig {
     }
   }
 
-  migrated.version = CURRENT_VERSION;
   return migrated;
 }
 

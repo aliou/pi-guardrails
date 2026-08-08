@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.17.0
-        version: 0.17.0(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)
+        specifier: ^0.19.1
+        version: 0.19.1(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)(ts-json-schema-generator@2.9.0)
       '@aliou/sh':
         specifier: ^0.2.2
         version: 0.2.2
@@ -62,12 +62,16 @@ packages:
     peerDependencies:
       '@biomejs/biome': '>=2.4.0'
 
-  '@aliou/pi-utils-settings@0.17.0':
-    resolution: {integrity: sha512-9HEowgN/qrRnXVtNpAHSkJdeid++C0JPNv8Z0R//uI5xMsWhDWDQtR6RJbRF0rNS1dvaw2FnjK7bX6bDdxuwzA==}
+  '@aliou/pi-utils-settings@0.19.1':
+    resolution: {integrity: sha512-bAx2v1GSiqhj+Z9eU+Ixn1NJDVRp6e/h8bBFcWrKl6CnfbD1AfFgT/I4nNOzwZy0VgxnZLAqPFHbV184Ii9vaw==}
+    hasBin: true
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.74.0 <1'
+      ts-json-schema-generator: '>=2.4.0 <3'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
+        optional: true
+      ts-json-schema-generator:
         optional: true
 
   '@aliou/pi-utils-ui@0.4.1':
@@ -1773,11 +1777,12 @@ snapshots:
     dependencies:
       '@biomejs/biome': 2.4.15
 
-  '@aliou/pi-utils-settings@0.17.0(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)':
+  '@aliou/pi-utils-settings@0.19.1(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)(ts-json-schema-generator@2.9.0)':
     dependencies:
       '@aliou/pi-utils-ui': 0.4.1(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 0.79.6(ws@8.19.0)(zod@3.25.76)
+      ts-json-schema-generator: 2.9.0
     transitivePeerDependencies:
       - '@earendil-works/pi-tui'
 

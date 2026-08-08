@@ -22,7 +22,7 @@ function ensureConfigVersion(config: GuardrailsConfig): GuardrailsConfig {
   if (typeof config.version === "string" && config.version.trim()) {
     return config;
   }
-  return { ...config, version: DEFAULT_CONFIG.version };
+  return { ...config, version: pkg.version };
 }
 
 export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {

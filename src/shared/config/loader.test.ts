@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { vol } from "memfs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import pkg from "../../../package.json" with { type: "json" };
 import { createGuardrailsConfigLoader } from "./loader";
-import { CURRENT_VERSION } from "./migration";
 
 describe("guardrails config persistence", () => {
   afterEach(() => {
@@ -30,7 +30,7 @@ describe("guardrails config persistence", () => {
     });
 
     const saved = JSON.parse(await readFile(configPath, "utf-8"));
-    expect(saved.version).toBe(CURRENT_VERSION);
+    expect(saved.version).toBe(pkg.version);
     expect(saved.pathAccess.allowedPaths).toEqual([
       { kind: "directory", path: "/tmp/outside" },
     ]);

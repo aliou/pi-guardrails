@@ -1,5 +1,6 @@
 import type { GuardrailsConfig } from "../types";
-import { CURRENT_VERSION } from "./version";
+
+export const version = "0.12.0";
 
 export function shouldRun(config: GuardrailsConfig): boolean {
   const raw = config as Record<string, unknown>;
@@ -79,7 +80,6 @@ export function run(config: GuardrailsConfig): GuardrailsConfig {
     delete raw.envFiles;
   }
 
-  raw.version = CURRENT_VERSION;
   return migrated as GuardrailsConfig;
 }
 
