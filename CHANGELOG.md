@@ -1,5 +1,46 @@
 # @aliou/pi-guardrails
 
+## 0.17.0
+
+### Minor Changes
+
+- ffc7ca7: path-access: filter non-path bash arguments by shape and filesystem
+  plausibility instead of per-command allow-lists.
+
+  Arguments that look like paths but are not (Context7 library IDs such as
+  `/websites/apisix`, Go package patterns like `./...`, URLs, `user@host:` remote
+  targets, `docker -v /src:/dst` volume specs) no longer trigger outside-workspace
+  prompts, for every CLI rather than an enumerated list.
+
+  Filtering never applies to redirect targets, interpreter programs, commands
+  that create missing parent directories, or tokens holding an unexpanded shell
+  reference, so real outside-workspace access is still surfaced.
+
+  The `awk`, `sed`, `grep`, `jq`, and `go` classifiers are removed as redundant.
+  Interpreter, `find`, and delimiter (`cut`/`sort`/`tr`) handling is unchanged.
+
+### Patch Changes
+
+- dcd815b: Make Pi documentation path grants optional so the extension loads in Oh My Pi.
+
+  `extensions/path-access/dynamic-resources.ts` no longer statically imports named `getReadmePath`, `getDocsPath`, and `getExamplesPath` helpers from `@earendil-works/pi-coding-agent`. When those helpers are unavailable (e.g. under Oh My Pi), documentation grants are skipped instead of failing extension validation.
+
+- ad2c8d7: Adopt @aliou/pi-utils-settings 0.19.1 and switch migrations to package semver versions.
+- 0a15f3f: Fix secret-files (and other `onlyIfExists`) policies being bypassed when a bash
+  target path contains an unexpanded shell expansion such as `$VAR`, `${VAR}`,
+  `$(...)`, `$((...))`, or process substitution.
+
+  Previously, a command like `head "$SC/.env"` extracted the literal target
+  `$SC/.env`. The `.env` basename matched the policy, but the policy's
+  `onlyIfExists` check then `stat()`'d `<cwd>/$SC/.env` — a path that never
+  exists — and let the read through.
+
+  Target extraction now marks such paths as unresolved, and the policy check no
+  longer applies `onlyIfExists` to them: a path we can't resolve can't be used to
+  prove a file doesn't exist. This follows ShellCheck's stance that shell
+  indirection is "known to be unsolvable in the most general case" — unresolved
+  references are treated conservatively rather than optimistically.
+
 ## 0.16.2
 
 ### Patch Changes
