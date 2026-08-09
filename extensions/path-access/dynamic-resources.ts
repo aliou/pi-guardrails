@@ -6,11 +6,7 @@
  * resolve them directly from Pi's package asset path helpers instead of
  * scraping the system prompt or persisting concrete paths in config.
  */
-import {
-  getDocsPath,
-  getExamplesPath,
-  getReadmePath,
-} from "@earendil-works/pi-coding-agent";
+import * as piCodingAgent from "@earendil-works/pi-coding-agent";
 import type { AllowedPath } from "../../src/core/paths";
 
 /**
@@ -27,8 +23,22 @@ import type { AllowedPath } from "../../src/core/paths";
  * and are fixed for the process lifetime — resolve once, no per-turn work.
  *
  * The README is a single file grant; docs and examples are directory grants.
+ *
+ * If the helpers are not exported by the runtime (e.g. Oh My Pi), this
+ * returns an empty array so the extension can still load and only the
+ * documentation grants are skipped.
  */
 export function piDocumentationPaths(): AllowedPath[] {
+  const { getReadmePath, getDocsPath, getExamplesPath } = piCodingAgent;
+
+  if (
+    typeof getReadmePath !== "function" ||
+    typeof getDocsPath !== "function" ||
+    typeof getExamplesPath !== "function"
+  ) {
+    return [];
+  }
+
   return [
     { kind: "file", path: getReadmePath() },
     { kind: "directory", path: getDocsPath() },
