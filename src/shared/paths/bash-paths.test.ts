@@ -14,9 +14,16 @@ beforeEach(() => {
     "/etc/hosts": "",
     "/etc/passwd": "",
     "/tmp/.keep": "",
+    "/var/log/system.log": "",
     "/a": "",
     "/b": "",
     "/work/project/.keep": "",
+    "/work/project/client.py": "",
+    "/work/project/deploy.py": "",
+    "/work/project/report.txt": "",
+    "/work/project/secrets.txt": "",
+    "/work/project/scripts/call_api.js": "",
+    "/work/project/scripts/read_file.js": "",
     [`${HOME}/.keep`]: "",
   });
 });
@@ -131,6 +138,68 @@ describe("extractBashPathCandidates", () => {
     });
   });
 
+  describe("when command has interpreter arguments", () => {
+    it("ignores an API endpoint passed to a Node script", async () => {
+      const command =
+        "node ./scripts/call_api.js --endpoint /safety/location/record/add --payload '{}'";
+
+      expect(await extractBashPathCandidates(command, CWD)).toEqual([
+        `${CWD}/scripts/call_api.js`,
+      ]);
+      expect(
+        await extractBashPathCandidates(
+          "node ./scripts/call_api.js --endpoint '/safety/location/record/add' --payload '{}'",
+          CWD,
+        ),
+      ).toEqual([`${CWD}/scripts/call_api.js`]);
+    });
+
+    it("ignores an API path passed to a Python script", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "python3 ./client.py /v1/users/me",
+          CWD,
+        ),
+      ).toEqual([`${CWD}/client.py`]);
+    });
+
+    it("applies the same filtering inside a nested shell", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "bash -c 'node ./scripts/call_api.js --endpoint /safety/location/record/add'",
+          CWD,
+        ),
+      ).toEqual([`${CWD}/scripts/call_api.js`]);
+    });
+
+    it("keeps inline program paths separate from script argv", async () => {
+      expect(
+        await extractBashPathCandidates(
+          `python3 -c 'open("/exfil/sub/data", "w")' --endpoint /v1/users/me`,
+          CWD,
+        ),
+      ).toEqual(["/exfil/sub/data"]);
+    });
+
+    it("still surfaces an existing path passed as script argv", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "node ./scripts/read_file.js /etc/passwd",
+          CWD,
+        ),
+      ).toEqual([`${CWD}/scripts/read_file.js`, "/etc/passwd"]);
+    });
+
+    it("treats missing script argv like other command arguments", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "python3 ./deploy.py /exfil/new/data",
+          CWD,
+        ),
+      ).toEqual([`${CWD}/deploy.py`]);
+    });
+  });
+
   // Regression: github issue #32 — awk regex patterns should not be
   // treated as file paths.
   it("does not extract awk regex patterns as paths", async () => {
@@ -174,6 +243,36 @@ describe("extractBashPathCandidates", () => {
         "/a",
         "/b",
       ]);
+    });
+
+    it.each([
+      ["cat ./secrets.txt /etc/passwd", [`${CWD}/secrets.txt`, "/etc/passwd"]],
+      [
+        "awk '/root/ { print }' ./secrets.txt /etc/passwd",
+        [`${CWD}/secrets.txt`, "/etc/passwd"],
+      ],
+      [
+        "grep root ./secrets.txt /etc/passwd",
+        [`${CWD}/secrets.txt`, "/etc/passwd"],
+      ],
+      [
+        "diff -u ./report.txt /var/log/system.log",
+        [`${CWD}/report.txt`, "/var/log/system.log"],
+      ],
+      [
+        "cp ./secrets.txt /tmp/secrets-copy.txt",
+        [`${CWD}/secrets.txt`, "/tmp/secrets-copy.txt"],
+      ],
+      [
+        "install -m 600 ./secrets.txt /tmp/secrets-installed.txt",
+        [`${CWD}/secrets.txt`, "/tmp/secrets-installed.txt"],
+      ],
+      [
+        "tar -cf /tmp/project-secret.tar ./secrets.txt",
+        ["/tmp/project-secret.tar", `${CWD}/secrets.txt`],
+      ],
+    ])("extracts every path operand in %s", async (command, expected) => {
+      expect(await extractBashPathCandidates(command, CWD)).toEqual(expected);
     });
 
     it("resolves a relative path with ./ against cwd", async () => {

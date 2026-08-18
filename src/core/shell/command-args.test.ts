@@ -135,6 +135,25 @@ describe("classifyCommandArgs", () => {
         "./data.json",
       ]);
     });
+
+    it("marks only inline code paths as program text", () => {
+      expect(
+        classifyCommandArgs("node", [
+          "./scripts/call_api.js",
+          "--endpoint",
+          "/safety/location/record/add",
+          "--payload",
+          "{}",
+        ]),
+      ).toEqual([
+        { token: "./scripts/call_api.js" },
+        { token: "/safety/location/record/add" },
+        { token: "{}" },
+      ]);
+      expect(
+        classifyCommandArgs("python3", ["-c", 'open("/etc/passwd")']),
+      ).toEqual([{ token: "/etc/passwd", programText: true }]);
+    });
   });
 
   describe("delimiter arguments", () => {

@@ -4,6 +4,8 @@ import { maybePathLike } from "../paths/path";
 export type ClassifiedArg = {
   token: string;
   forcePath?: boolean;
+  /** Token came from interpreter program text. */
+  programText?: boolean;
   /** Token is an embedded shell program; re-parse and recurse. */
   recurseShell?: boolean;
 };
@@ -236,7 +238,7 @@ function extractPathsFromCode(code: string): ClassifiedArg[] {
     const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
     if (!token || token.startsWith("-")) continue;
     if (!maybePathLike(token)) continue;
-    out.push({ token });
+    out.push({ token, programText: true });
   }
   return out;
 }
