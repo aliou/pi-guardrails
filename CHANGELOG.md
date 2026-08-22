@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.17.1
+
+### Patch Changes
+
+- 0f5d007: Fix path-access filtering for interpreter arguments so API-style paths passed to scripts are not treated as outside-workspace filesystem access while inline interpreter code remains guarded.
+
 ## 0.17.0
 
 ### Minor Changes
