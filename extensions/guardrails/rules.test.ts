@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { vol } from "memfs";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { compilePolicies, createPolicyRules, normalizeTarget } from "./rules";
 
 function singleRule(
@@ -103,6 +103,72 @@ describe("createPolicyRules", () => {
     await expect(
       rule.check({ kind: "file", path: join(cwd, ".env") }),
     ).resolves.toMatchObject({ kind: "match" });
+  });
+
+  describe("respectCwd", () => {
+    const home = "/home/dev";
+    const cwd = join(home, "work", "app");
+
+    beforeEach(() => {
+      vi.stubEnv("HOME", home);
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    const treeRule = (respectCwd?: boolean) =>
+      singleRule(cwd, {
+        id: "ro-tree",
+        patterns: [{ pattern: "~/work" }, { pattern: "~/work/**" }],
+        protection: "readOnly",
+        onlyIfExists: false,
+        respectCwd,
+      });
+
+    it("does not match ~/ -spelled paths inside the cwd by default", async () => {
+      await expect(
+        treeRule().check({
+          kind: "file",
+          path: "~/work/app/foo.txt",
+        }),
+      ).resolves.toEqual({ kind: "pass" });
+    });
+
+    it("still matches ~/ -spelled paths outside the cwd", async () => {
+      await expect(
+        treeRule().check({ kind: "file", path: "~/work/other/foo.txt" }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("enforces anchored patterns inside the cwd when respectCwd is false", async () => {
+      await expect(
+        treeRule(false).check({
+          kind: "file",
+          path: "~/work/app/foo.txt",
+        }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("still matches basename and regex patterns inside the cwd", async () => {
+      const rule = singleRule(cwd, {
+        id: "secrets-in-cwd",
+        patterns: [
+          { pattern: "~/work/**" },
+          { pattern: ".env" },
+          { pattern: "\\.pem$", regex: true },
+        ],
+        protection: "readOnly",
+        onlyIfExists: false,
+      });
+
+      await expect(
+        rule.check({ kind: "file", path: ".env" }),
+      ).resolves.toMatchObject({ kind: "match" });
+      await expect(
+        rule.check({ kind: "file", path: "certs/server.pem" }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
   });
 
   it("matches unresolvable ($VAR) paths even with onlyIfExists true", async () => {

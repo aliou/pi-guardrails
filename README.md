@@ -41,6 +41,8 @@ The `guardrails` extension owns file protection policies and the user-facing com
 
 Use it to protect files like `.env`, private keys, local credentials, generated logs, database dumps, or any project-specific path you do not want Pi to read or modify without clear intent.
 
+Policy rules respect the working directory by default (`respectCwd: true`): a location-anchored pattern (`~`- or `/`-prefixed glob such as `~/work/**`) that happens to contain the session's cwd does not neuter the workspace. Name-based patterns (`.env`), relative path globs, and regex patterns still apply inside the cwd, so secrets stay protected. Set `respectCwd: false` on a rule to enforce anchored patterns everywhere.
+
 [![Guardrails policies and settings walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/policies.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/policies.mp4)
 
 Useful commands:
