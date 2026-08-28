@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+if [ ! -f .envrc ]; then
+  printf 'use nix\n' > .envrc
+fi
+direnv allow
+
+direnv exec . pnpm install

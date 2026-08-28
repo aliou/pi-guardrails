@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+git fetch --all --prune --quiet || true
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+if [ -n "$upstream" ] \
+  && [ -z "$(git status --porcelain --untracked-files=no)" ] \
+  && git merge-base --is-ancestor HEAD "$upstream" 2>/dev/null \
+  && [ "$(git rev-list --count "..$upstream")" -gt 0 ]; then
+  git merge --ff-only "$upstream" --quiet || true
+fi
+
+./.agents/setup
