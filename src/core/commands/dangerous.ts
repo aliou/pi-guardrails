@@ -419,6 +419,9 @@ export function checkDangerousCommand({
       parsedSuccessfully = true;
       let match: DangerousCommandMatch | undefined;
       walkCommands(ast, (cmd) => {
+        // Skip compound-node redirect callbacks (cmd === undefined): command
+        // matchers match on words, not redirect targets.
+        if (!cmd) return false;
         const words = (cmd.words ?? []).map(wordToString);
         const result = matchBuiltinDangerous(words);
         if (result) {

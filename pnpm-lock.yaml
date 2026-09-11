@@ -12,8 +12,8 @@ importers:
         specifier: ^0.19.1
         version: 0.19.1(@earendil-works/pi-coding-agent@0.79.6(ws@8.19.0)(zod@3.25.76))(@earendil-works/pi-tui@0.79.6)(ts-json-schema-generator@2.9.0)
       '@aliou/sh':
-        specifier: ^0.2.2
-        version: 0.2.2
+        specifier: ^0.3.1
+        version: 0.3.1
     devDependencies:
       '@aliou/biome-plugins':
         specifier: ^0.8.1
@@ -85,9 +85,9 @@ packages:
       '@earendil-works/pi-tui':
         optional: true
 
-  '@aliou/sh@0.2.2':
-    resolution: {integrity: sha512-fHcGEFDzRSv+z2r+ysWw47NlhaYrU2FujwMviWtyaZ71bHDXz8FI9VcP3jEkL5b2Otx2fc/QahyouaY0xV96Mw==}
-    engines: {node: '>=22'}
+  '@aliou/sh@0.3.1':
+    resolution: {integrity: sha512-Hv/aEdmU4UZ1uFvJCXK98W0wvFW3zUIgu9M2PmD9w3HlF9rNxAGo/7D5YKelbGfa2VVBYjQw4OlS+99M1yJeYw==}
+    engines: {node: '>=24'}
 
   '@anthropic-ai/sdk@0.91.1':
     resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
@@ -1791,7 +1791,7 @@ snapshots:
       '@earendil-works/pi-coding-agent': 0.79.6(ws@8.19.0)(zod@3.25.76)
       '@earendil-works/pi-tui': 0.79.6
 
-  '@aliou/sh@0.2.2': {}
+  '@aliou/sh@0.3.1': {}
 
   '@anthropic-ai/sdk@0.91.1(zod@3.25.76)':
     dependencies:

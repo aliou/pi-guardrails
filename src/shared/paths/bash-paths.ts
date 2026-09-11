@@ -12,7 +12,11 @@ import {
   hasShellExpansion,
   isImplausibleLocalPath,
 } from "../../core/paths/plausibility";
-import { walkCommands, wordToString } from "../../core/shell/ast";
+import {
+  isFdDuplicationRedirect,
+  walkCommands,
+  wordToString,
+} from "../../core/shell/ast";
 import { classifyCommandArgs } from "../../core/shell/command-args";
 import { expandGlob, hasGlobChars } from "../glob";
 
@@ -100,8 +104,14 @@ export async function extractBashPathCandidates(
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
 
-    walkCommands(ast, (cmd) => {
-      const words = (cmd.words ?? []).map(wordToString);
+    walkCommands(ast, (cmd, redirects) => {
+      for (const redir of redirects ?? []) {
+        // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
+        // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
+        if (isFdDuplicationRedirect(redir)) continue;
+        pending.push(addCandidate(wordToString(redir.target), true));
+      }
+      const words = (cmd?.words ?? []).map(wordToString);
       const commandName = words[0];
       if (commandName) {
         for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
@@ -144,9 +154,6 @@ export async function extractBashPathCandidates(
           if (word.startsWith("-") && word !== "-" && word !== "--") continue;
           pending.push(addCandidate(word));
         }
-      }
-      for (const redir of cmd.redirects ?? []) {
-        pending.push(addCandidate(wordToString(redir.target), true));
       }
       return false;
     });

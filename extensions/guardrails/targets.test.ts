@@ -113,4 +113,63 @@ describe("extractTargets", () => {
       ),
     ).resolves.toEqual([{ path: ".env", unresolved: false }]);
   });
+
+  it("extracts redirect targets attached to compound commands", async () => {
+    const cwd = "/repo";
+    vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+    const policies = compilePolicies([
+      {
+        id: "secret-files",
+        name: "Secret Files",
+        patterns: [{ pattern: ".env" }],
+        protection: "noAccess",
+      },
+    ]);
+
+    // @aliou/sh ≤0.2.2 surfaced compound trailing redirects as an anonymous
+    // SimpleCommand; 0.3.x attaches them to the compound node. Either way the
+    // target must still surface.
+    for (const command of [
+      "{ echo hi; } > .env",
+      "( echo hi ) > .env",
+      "if true; then echo hi; fi > .env",
+    ]) {
+      await expect(
+        extractTargets({ toolName: "bash", input: { command } }, cwd, policies),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    }
+  });
+
+  it("does not extract file-descriptor duplication targets", async () => {
+    const cwd = "/repo";
+    vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+    const policies = compilePolicies([
+      {
+        id: "secret-files",
+        name: "Secret Files",
+        patterns: [{ pattern: ".env" }],
+        protection: "noAccess",
+      },
+    ]);
+
+    for (const command of [
+      "echo hi 2>&1",
+      "echo hi 1>&2",
+      "echo hi 3>&-",
+      "cat .env 3<&0",
+    ]) {
+      const result = await extractTargets(
+        { toolName: "bash", input: { command } },
+        cwd,
+        policies,
+      );
+      // Only the .env in `cat .env 3<&0` matches; `0`/`1`/`-` never become
+      // targets.
+      if (command.startsWith("cat")) {
+        expect(result).toEqual([{ path: ".env", unresolved: false }]);
+      } else {
+        expect(result).toEqual([]);
+      }
+    }
+  });
 });
