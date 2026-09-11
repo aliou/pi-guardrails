@@ -1,6 +1,7 @@
 import { parse } from "@aliou/sh";
 import { maybePathLike } from "../../src/core/paths";
 import {
+  isFdDuplicationRedirect,
   walkCommands,
   wordHasExpansion,
   wordToString,
@@ -62,11 +63,13 @@ export async function extractTargets(
   try {
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
-    walkCommands(ast, (cmd) => {
-      for (const word of (cmd.words ?? []).slice(1)) {
+    walkCommands(ast, (cmd, redirects) => {
+      for (const word of (cmd?.words ?? []).slice(1)) {
         pending.push(maybeAdd(wordToString(word), wordHasExpansion(word)));
       }
-      for (const redir of cmd.redirects ?? []) {
+      for (const redir of redirects ?? []) {
+        // Fd duplications (`2>&1`) have no filesystem target.
+        if (isFdDuplicationRedirect(redir)) continue;
         pending.push(
           maybeAdd(wordToString(redir.target), wordHasExpansion(redir.target)),
         );

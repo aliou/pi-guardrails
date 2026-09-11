@@ -105,7 +105,7 @@ describe("extractBashPathCandidates", () => {
         "sh -c 'cat /etc/passwd > /tmp/x'",
         CWD,
       );
-      expect(result).toEqual(["/etc/passwd", "/tmp/x"]);
+      expect(result).toEqual(["/tmp/x", "/etc/passwd"]);
     });
 
     it("extracts paths from ash -c programs", async () => {
@@ -322,7 +322,32 @@ describe("extractBashPathCandidates", () => {
           "cat ./input && grep needle /tmp/log > ./out",
           CWD,
         ),
-      ).toEqual(["/work/project/input", "/tmp/log", "/work/project/out"]);
+      ).toEqual(["/work/project/input", "/work/project/out", "/tmp/log"]);
+    });
+
+    it("extracts trailing redirects attached to compound commands", async () => {
+      // @aliou/sh ≤0.2.2 surfaced compound trailing redirects as an
+      // anonymous SimpleCommand; 0.3.x attaches them to the compound node.
+      for (const command of [
+        "{ echo hi; } > /tmp/out",
+        "( echo hi ) > /tmp/out",
+        "if true; then echo hi; fi > /tmp/out",
+        'while read l; do echo "$l"; done < /tmp/hosts',
+      ]) {
+        const result = await extractBashPathCandidates(command, CWD);
+        expect(result.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("ignores file-descriptor duplication redirects", async () => {
+      // `2>&1` and friends target fds, not files — must not extract `1`.
+      expect(await extractBashPathCandidates("echo hi 2>&1", CWD)).toEqual([]);
+      expect(await extractBashPathCandidates("cat file 3<&0", CWD)).toEqual([]);
+      expect(await extractBashPathCandidates("exec 3>&-", CWD)).toEqual([]);
+      // `&>` redirects stdout AND stderr to a real file — keep it.
+      expect(
+        await extractBashPathCandidates("echo hi &> /tmp/log", CWD),
+      ).toEqual(["/tmp/log"]);
     });
   });
 
