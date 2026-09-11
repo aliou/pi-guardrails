@@ -38,7 +38,7 @@
   ],
   "dependencies": {
     "@aliou/pi-utils-settings": "^0.19.1",
-    "@aliou/sh": "^0.2.2"
+    "@aliou/sh": "^0.3.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

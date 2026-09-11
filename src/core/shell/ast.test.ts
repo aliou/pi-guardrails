@@ -1,6 +1,6 @@
 import { parse } from "@aliou/sh";
 import { describe, expect, it } from "vitest";
-import { wordHasExpansion } from "./ast";
+import { isFdDuplicationRedirect, walkCommands, wordHasExpansion } from "./ast";
 
 /** Parse a one-liner and return the first argument word (words[1]). */
 function argWord(command: string) {
@@ -38,5 +38,32 @@ describe("wordHasExpansion", () => {
 
   it("returns false for a plain double-quoted literal", () => {
     expect(wordHasExpansion(argWord('head "config/.env"'))).toBe(false);
+  });
+});
+
+describe("isFdDuplicationRedirect", () => {
+  it.each([
+    ["echo hi 2>&1", true],
+    ["echo hi 1>&2", true],
+    ["echo hi 3>&-", true],
+    ["cat file 3<&0", true],
+    ["echo hi >&2", true],
+    ["echo hi > /tmp/x", false],
+    ["echo hi >> /tmp/x", false],
+    ["echo hi < /tmp/x", false],
+    ["echo hi &> /tmp/x", false],
+    ["echo hi 3> /tmp/x", false],
+  ])("classifies %j", (command, expected) => {
+    let found = false;
+    let result: boolean | undefined;
+    walkCommands(parse(command).ast, (_cmd, redirects) => {
+      for (const r of redirects ?? []) {
+        found = true;
+        result = isFdDuplicationRedirect(r);
+      }
+      return false;
+    });
+    expect(found).toBe(true);
+    expect(result).toBe(expected);
   });
 });

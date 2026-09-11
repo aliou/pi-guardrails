@@ -431,6 +431,40 @@ describe("checkDangerousCommand", () => {
     });
   });
 
+  it("matches dangerous commands that follow a heredoc", () => {
+    // @aliou/sh 0.2.x folded the statement after a heredoc body into the
+    // heredoc command's words, so `rm -rf …` never surfaced as its own
+    // SimpleCommand and the structural matcher missed it.
+    const result = checkDangerousCommand({
+      command: "cat <<EOF\nbody\nEOF\nrm -rf /tmp/example\n",
+      patterns: [],
+      useBuiltinMatchers: true,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toEqual({
+      description: "recursive force delete",
+      pattern: "(structural)",
+    });
+  });
+
+  it.each([
+    ["multiple heredocs", "cat <<A <<B\nfoo\nA\nbar\nB\nrm -rf /tmp/x\n"],
+    ["heredoc before a pipe", "cat <<EOF | wc -l\nbody\nEOF\nrm -rf /tmp/x\n"],
+  ])("matches dangerous commands after %s", (_label, command) => {
+    const result = checkDangerousCommand({
+      command,
+      patterns: [],
+      useBuiltinMatchers: true,
+      fallbackPatterns: [],
+    });
+
+    expect(result).toEqual({
+      description: "recursive force delete",
+      pattern: "(structural)",
+    });
+  });
+
   it.each([
     ["logical command", "echo ok && sudo true", "superuser command"],
     ["pipeline", "echo ok | sudo tee /tmp/out", "superuser command"],
