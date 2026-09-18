@@ -21,6 +21,7 @@ export type CompiledPolicy = {
   patterns: CompiledPattern[];
   allowedPatterns: CompiledPattern[];
   onlyIfExists: boolean;
+  respectCwd: boolean;
   blockMessage: string;
 };
 
@@ -48,6 +49,7 @@ export function compilePolicies(rules: PolicyRule[]): CompiledPolicy[] {
       patterns: compileFilePatterns(rule.patterns),
       allowedPatterns: compileFilePatterns(rule.allowedPatterns ?? []),
       onlyIfExists: rule.onlyIfExists ?? true,
+      respectCwd: rule.respectCwd ?? true,
       blockMessage:
         rule.blockMessage ?? DEFAULT_BLOCK_MESSAGES[rule.protection],
     }));
@@ -81,6 +83,19 @@ export function normalizeTarget(filePath: string, cwd: string): string {
   return normalizeFilePath(absolute);
 }
 
+/** Glob patterns anchored to an absolute location (`~` or `/`). */
+function isLocationAnchored(pattern: CompiledPattern): boolean {
+  if (pattern.source.regex) return false;
+  const value = normalizeFilePath(pattern.source.pattern);
+  return value === "~" || value.startsWith("~/") || value.startsWith("/");
+}
+
+function isWithinCwd(filePath: string, cwd: string): boolean {
+  const absolute = resolve(cwd, expandHomePath(filePath));
+  const rel = relative(cwd, absolute);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
 async function fileExists(filePath: string, cwd: string): Promise<boolean> {
   try {
     await stat(resolve(cwd, expandHomePath(filePath)));
@@ -99,7 +114,12 @@ export function createPolicyRules(
     async check(action: Action) {
       if (action.kind !== "file") return { kind: "pass" };
       const path = normalizeTarget(action.path, cwd);
-      if (!policy.patterns.some((pattern) => pattern.test(path))) {
+      // Unresolved shell expansions keep full enforcement.
+      const patterns =
+        policy.respectCwd && !action.unresolved && isWithinCwd(action.path, cwd)
+          ? policy.patterns.filter((pattern) => !isLocationAnchored(pattern))
+          : policy.patterns;
+      if (!patterns.some((pattern) => pattern.test(path))) {
         return { kind: "pass" };
       }
       if (policy.allowedPatterns.some((pattern) => pattern.test(path))) {

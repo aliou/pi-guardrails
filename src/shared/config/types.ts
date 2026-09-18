@@ -58,6 +58,12 @@ export interface PolicyRule {
   protection: Protection;
   /** Block only when file exists on disk. Default true. */
   onlyIfExists?: boolean;
+  /**
+   * Skip location-anchored patterns (`~`- or `/`-prefixed globs) for targets
+   * inside the session's cwd. Basename globs, relative path globs, and regex
+   * patterns still apply. Default true.
+   */
+  respectCwd?: boolean;
   /** Message shown when blocked; supports {file} placeholder. */
   blockMessage?: string;
   /** Per-rule toggle. Default true. */
