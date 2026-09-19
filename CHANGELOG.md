@@ -1,5 +1,12 @@
 # @aliou/pi-guardrails
 
+## 0.18.1
+
+### Patch Changes
+
+- c6a7be7: Treat `>& file` as a file redirect instead of file-descriptor duplication.
+- 101d143: Match session command grants against the exact command that was approved.
+
 ## 0.18.0
 
 ### Minor Changes
