@@ -25,6 +25,18 @@ function ensureConfigVersion(config: GuardrailsConfig): GuardrailsConfig {
   return { ...config, version: pkg.version };
 }
 
+function mergePatternArrays<T extends { pattern: string }>(
+  ...lists: (T[] | undefined)[]
+): T[] {
+  const merged = new Map<string, T>();
+  for (const list of lists) {
+    for (const entry of list ?? []) {
+      merged.set(entry.pattern, entry);
+    }
+  }
+  return [...merged.values()];
+}
+
 export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
   return new GuardrailsConfigLoader("guardrails", DEFAULT_CONFIG, {
     scopes: ["global", "local", "memory"],
@@ -55,6 +67,8 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
       }
       resolved.policies.rules = [...ruleMap.values()];
 
+      // Pattern arrays union across scopes by `pattern`; customPatterns
+      // still replaces patterns wholesale.
       const customPatterns =
         memory?.permissionGate?.customPatterns ??
         local?.permissionGate?.customPatterns ??
@@ -62,7 +76,26 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
       if (customPatterns) {
         resolved.permissionGate.patterns = customPatterns;
         resolved.permissionGate.useBuiltinMatchers = false;
+      } else {
+        resolved.permissionGate.patterns = mergePatternArrays(
+          DEFAULT_CONFIG.permissionGate.patterns,
+          global?.permissionGate?.patterns,
+          local?.permissionGate?.patterns,
+          memory?.permissionGate?.patterns,
+        );
       }
+
+      resolved.permissionGate.allowedPatterns = mergePatternArrays(
+        global?.permissionGate?.allowedPatterns,
+        local?.permissionGate?.allowedPatterns,
+        memory?.permissionGate?.allowedPatterns,
+      );
+
+      resolved.permissionGate.autoDenyPatterns = mergePatternArrays(
+        global?.permissionGate?.autoDenyPatterns,
+        local?.permissionGate?.autoDenyPatterns,
+        memory?.permissionGate?.autoDenyPatterns,
+      );
 
       const mergedPaths = new Map<string, AllowedPath>();
       for (const paths of [

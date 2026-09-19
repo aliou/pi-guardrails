@@ -98,4 +98,139 @@ describe("guardrails config persistence", () => {
     // Draining clears the queue.
     expect(configLoader.drainMessages()).toEqual([]);
   });
+
+  it("notifies about permission gate pattern merging once per config", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-pattern-merge-notice");
+
+    const cwd = process.cwd();
+    const configPath = join(cwd, ".pi/extensions/guardrails.json");
+    vol.fromJSON({
+      [configPath]: JSON.stringify({
+        version: "0.17.1",
+        permissionGate: {
+          autoDenyPatterns: [{ pattern: "foo", regex: true }],
+        },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    const messages = configLoader.drainMessages();
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("merged across global and project configs");
+
+    // Config without any pattern arrays does not get the notice.
+    vol.reset();
+    vol.fromJSON({
+      [configPath]: JSON.stringify({ version: "0.17.1", enabled: true }),
+    });
+    const otherLoader = createGuardrailsConfigLoader();
+    await otherLoader.load();
+    expect(otherLoader.drainMessages()).toEqual([]);
+
+    // Config already stamped at/after 0.19.0 does not re-trigger, even with
+    // patterns (e.g. the user added them after the migration shipped).
+    vol.reset();
+    vol.fromJSON({
+      [configPath]: JSON.stringify({
+        version: "0.19.0",
+        permissionGate: {
+          autoDenyPatterns: [{ pattern: "foo", regex: true }],
+        },
+      }),
+    });
+    const freshLoader = createGuardrailsConfigLoader();
+    await freshLoader.load();
+    expect(freshLoader.drainMessages()).toEqual([]);
+  });
+});
+
+describe("permission gate pattern merging across scopes", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  it("unions permissionGate.autoDenyPatterns from global and local scopes", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-auto-deny-merge");
+
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-auto-deny-merge/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          permissionGate: {
+            autoDenyPatterns: [
+              {
+                pattern: "\\\\bfind\\\\s+/(?=\\\\s|$)",
+                regex: true,
+                description: "global find /",
+              },
+            ],
+          },
+        }),
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        permissionGate: {
+          autoDenyPatterns: [
+            {
+              pattern: "project-skills-cli",
+              regex: true,
+              description: "local skills cli",
+            },
+          ],
+        },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    const config = configLoader.getConfig();
+
+    const patterns = config.permissionGate.autoDenyPatterns.map(
+      (p) => p.pattern,
+    );
+    expect(patterns).toContain("\\\\bfind\\\\s+/(?=\\\\s|$)");
+    expect(patterns).toContain("project-skills-cli");
+  });
+
+  it("unions permissionGate.allowedPatterns and patterns, deduped by pattern", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-patterns-merge");
+
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-patterns-merge/extensions/guardrails.json": JSON.stringify(
+        {
+          version: pkg.version,
+          permissionGate: {
+            patterns: [{ pattern: "global-only" }],
+            allowedPatterns: [{ pattern: "allowed-a" }],
+          },
+        },
+      ),
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        permissionGate: {
+          patterns: [{ pattern: "global-only" }, { pattern: "local-only" }],
+          allowedPatterns: [{ pattern: "allowed-b" }],
+        },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    const config = configLoader.getConfig();
+
+    // Defaults are included (same as builtin policy rules); scope arrays are
+    // unioned by pattern, so "global-only" survives the local override.
+    const patterns = config.permissionGate.patterns.map((p) => p.pattern);
+    expect(patterns).toContain("global-only");
+    expect(patterns).toContain("local-only");
+    expect(patterns).toContain("rm -rf");
+    expect(patterns.filter((p) => p === "global-only")).toHaveLength(1);
+    expect(
+      config.permissionGate.allowedPatterns.map((p) => p.pattern).sort(),
+    ).toEqual(["allowed-a", "allowed-b"]);
+  });
 });
