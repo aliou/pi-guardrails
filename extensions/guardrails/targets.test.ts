@@ -193,4 +193,60 @@ describe("extractTargets", () => {
       }
     }
   });
+
+  describe("comments and heredocs in bash commands", () => {
+    const cwd = "/repo";
+    const policies = (pattern: string) =>
+      compilePolicies([
+        {
+          id: "lock",
+          name: "Lock",
+          patterns: [{ pattern }],
+          protection: "noAccess",
+        },
+      ]);
+
+    it.fails("does not treat comment text after an operator as file access", async () => {
+      // A `#` comment after | continues the pipeline on the next line in
+      // real bash; policy extraction must never see the comment's text.
+      // Needs @aliou/sh with the operator-continuation parser fix
+      // (aliou/sh#24); it.fails flips red when that release is pinned.
+      vol.fromJSON({ "/repo/rotate-me.yaml": "{}" });
+      await expect(
+        extractTargets(
+          {
+            toolName: "bash",
+            input: { command: "echo ok | # rotate ./rotate-me.yaml\ntrue" },
+          },
+          cwd,
+          policies("rotate-me.yaml"),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("does not treat a heredoc delimiter as a file target", async () => {
+      vol.fromJSON({ "/repo/EOF": "token" });
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "cat <<EOF\nbody\nEOF" } },
+          cwd,
+          policies("EOF"),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("still matches a redirect target alongside a heredoc", async () => {
+      vol.fromJSON({ "/repo/out.txt": "token" });
+      await expect(
+        extractTargets(
+          {
+            toolName: "bash",
+            input: { command: "cat > out.txt <<EOF\nbody\nEOF" },
+          },
+          cwd,
+          policies("out.txt"),
+        ),
+      ).resolves.toEqual([{ path: "out.txt", unresolved: false }]);
+    });
+  });
 });

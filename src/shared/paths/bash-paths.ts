@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { parse as parsePath, resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import {
   expandHomePath,
@@ -14,6 +14,7 @@ import {
 } from "../../core/paths/plausibility";
 import {
   isFdDuplicationRedirect,
+  isHeredocRedirect,
   walkCommands,
   wordToString,
 } from "../../core/shell/ast";
@@ -84,6 +85,9 @@ export async function extractBashPathCandidates(
     const expanded = await expandCandidate(token, cwd);
     for (const file of expanded) {
       const abs = resolve(cwd, expandHomePath(file));
+      // Tokens with repeated separators (`//`, `cat .//`) collapse to the
+      // filesystem root, which is never a meaningful prompt target.
+      if (parsePath(abs).root === abs) continue;
       // Only outside-workspace candidates are filtered: in-workspace paths are
       // always allowed downstream, so noise there cannot cause a prompt.
       if (
@@ -109,6 +113,8 @@ export async function extractBashPathCandidates(
         // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
         // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
         if (isFdDuplicationRedirect(redir)) continue;
+        // Heredoc delimiters and here-strings are text, not file targets.
+        if (isHeredocRedirect(redir)) continue;
         pending.push(addCandidate(wordToString(redir.target), true));
       }
       const words = (cmd?.words ?? []).map(wordToString);

@@ -354,6 +354,61 @@ describe("extractBashPathCandidates", () => {
     });
   });
 
+  describe("when a command uses heredocs", () => {
+    it("does not treat heredoc delimiters as paths", async () => {
+      expect(
+        await extractBashPathCandidates("cat <<'EOF'\nnot a path\nEOF", CWD),
+      ).toEqual([]);
+      expect(
+        await extractBashPathCandidates(
+          "cat > out.txt <<'EOF'\ntext\nEOF",
+          CWD,
+        ),
+      ).toEqual(["/work/project/out.txt"]);
+    });
+
+    it("does not extract paths written inside heredoc bodies", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "cat <<'EOF'\nread /etc/hosts here\nEOF",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a command uses comments", () => {
+    // Valid bash: a `#` comment after |, && or || continues the pipeline on
+    // the next line. Extraction must ignore the comment's text and keep the
+    // command that continues after it. Comment extraction here relies on
+    // @aliou/sh accepting operator continuations (fixed upstream in
+    // aliou/sh#24); it.fails flips red once the dependency bump to that
+    // release makes the expectation pass, telling us to drop the marker.
+    it.fails("ignores comment text after an operator, keeping the continuation", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "echo ok && # see /secret/db.pem\ncat /tmp/log",
+          CWD,
+        ),
+      ).toEqual(["/tmp/log"]);
+    });
+
+    it("does not treat URL fragments as paths", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "open https://example.com/#/helm/state-backend",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when tokens resolve to the filesystem root", () => {
+    it("never returns the root as a prompt target", async () => {
+      expect(await extractBashPathCandidates("cat //", CWD)).toEqual([]);
+    });
+  });
+
   describe("when command has no path-like tokens", () => {
     it("returns an empty array for bare filenames (no separators)", async () => {
       expect(await extractBashPathCandidates("cat README.md", CWD)).toEqual([]);
