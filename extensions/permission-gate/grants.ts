@@ -14,8 +14,13 @@ export async function saveCommandSessionGrant(command: string): Promise<void> {
     permissionGate: {
       allowedPatterns: [
         ...resolved.permissionGate.allowedPatterns,
-        { pattern: command },
+        { pattern: exactCommandPattern(command), regex: true },
       ],
     },
   });
+}
+
+function exactCommandPattern(command: string): string {
+  const escaped = command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return `^(?:${escaped})(?![\\s\\S])`;
 }
