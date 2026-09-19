@@ -2,6 +2,7 @@ import { parse } from "@aliou/sh";
 import { maybePathLike } from "../../src/core/paths";
 import {
   isFdDuplicationRedirect,
+  takesNoFileOperands,
   walkCommands,
   wordHasExpansion,
   wordToString,
@@ -64,8 +65,16 @@ export async function extractTargets(
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
     walkCommands(ast, (cmd, redirects) => {
-      for (const word of (cmd?.words ?? []).slice(1)) {
-        pending.push(maybeAdd(wordToString(word), wordHasExpansion(word)));
+      const words = cmd?.words ?? [];
+      // Commands with no file operands (`echo`, `printf`, `tr` — a set closed
+      // by their POSIX grammars) take their argv as pure text: a protected
+      // file name passed as data, e.g. `printf '%s\n' '.env'`, is not file
+      // access. Redirects on the same command still surface below.
+      const commandName = words[0] ? wordToString(words[0]) : "";
+      if (!takesNoFileOperands(commandName)) {
+        for (const word of words.slice(1)) {
+          pending.push(maybeAdd(wordToString(word), wordHasExpansion(word)));
+        }
       }
       for (const redir of redirects ?? []) {
         // Fd duplications (`2>&1`) have no filesystem target.

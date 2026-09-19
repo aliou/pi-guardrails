@@ -193,4 +193,61 @@ describe("extractTargets", () => {
       }
     }
   });
+
+  describe("protected names passed as text-only argv", () => {
+    const cwd = "/repo";
+    const policies = () =>
+      compilePolicies([
+        {
+          id: "secret-files",
+          name: "Secret Files",
+          patterns: [{ pattern: ".env" }],
+          protection: "noAccess",
+        },
+      ]);
+
+    it("does not treat a printf argument as a file target", async () => {
+      vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "printf '%s\\n' '.env'" } },
+          cwd,
+          policies(),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("does not treat an echoed string as a file target", async () => {
+      vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "echo .env | wc -c" } },
+          cwd,
+          policies(),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("still blocks reading .env as a file operand", async () => {
+      vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "cat .env" } },
+          cwd,
+          policies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    });
+
+    it("still blocks writing .env through a redirect on a text-only command", async () => {
+      vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "printf '%s\\n' x > .env" } },
+          cwd,
+          policies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    });
+  });
 });
