@@ -140,6 +140,27 @@ describe("extractTargets", () => {
     }
   });
 
+  it("extracts file targets from >& redirects", async () => {
+    const cwd = "/repo";
+    vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
+    const policies = compilePolicies([
+      {
+        id: "secret-files",
+        name: "Secret Files",
+        patterns: [{ pattern: ".env" }],
+        protection: "noAccess",
+      },
+    ]);
+
+    await expect(
+      extractTargets(
+        { toolName: "bash", input: { command: "printf OK >& .env" } },
+        cwd,
+        policies,
+      ),
+    ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+  });
+
   it("does not extract file-descriptor duplication targets", async () => {
     const cwd = "/repo";
     vol.fromJSON({ "/repo/.env": "TOKEN=secret" });
