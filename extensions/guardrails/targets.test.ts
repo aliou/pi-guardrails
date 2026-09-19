@@ -185,11 +185,10 @@ describe("extractTargets", () => {
         },
       ]);
 
-    it.fails("does not treat comment text after an operator as file access", async () => {
+    it("does not treat comment text after an operator as file access", async () => {
       // A `#` comment after | continues the pipeline on the next line in
-      // real bash; policy extraction must never see the comment's text.
-      // Needs @aliou/sh with the operator-continuation parser fix
-      // (aliou/sh#24); it.fails flips red when that release is pinned.
+      // real bash (@aliou/sh 0.3.3, aliou/sh#24); policy extraction must
+      // never see the comment's text.
       vol.fromJSON({ "/repo/rotate-me.yaml": "{}" });
       await expect(
         extractTargets(

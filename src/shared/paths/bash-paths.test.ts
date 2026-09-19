@@ -377,11 +377,9 @@ describe("extractBashPathCandidates", () => {
   describe("when a command uses comments", () => {
     // Valid bash: a `#` comment after |, && or || continues the pipeline on
     // the next line. Extraction must ignore the comment's text and keep the
-    // command that continues after it. Comment extraction here relies on
-    // @aliou/sh accepting operator continuations (fixed upstream in
-    // aliou/sh#24); it.fails flips red once the dependency bump to that
-    // release makes the expectation pass, telling us to drop the marker.
-    it.fails("ignores comment text after an operator, keeping the continuation", async () => {
+    // command that continues after it. Relies on @aliou/sh 0.3.3 accepting
+    // operator continuations (aliou/sh#24).
+    it("ignores comment text after an operator, keeping the continuation", async () => {
       expect(
         await extractBashPathCandidates(
           "echo ok && # see /secret/db.pem\ncat /tmp/log",
@@ -403,6 +401,27 @@ describe("extractBashPathCandidates", () => {
   describe("when tokens resolve to the filesystem root", () => {
     it("never returns the root as a prompt target", async () => {
       expect(await extractBashPathCandidates("cat //", CWD)).toEqual([]);
+    });
+  });
+
+  describe("when a command runs on a remote host", () => {
+    it("does not treat ssh remote argv as local paths", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "ssh -i ~/.ssh/id user@host 'cat /etc/passwd'",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+
+    it("does not surface argv kubectl passes to the pod command", async () => {
+      const result = await extractBashPathCandidates(
+        "kubectl exec -it pod/one -- ls -l /app",
+        CWD,
+      );
+      // The in-pod path is dropped; the resource name stays as an
+      // in-workspace candidate, which path-access allows silently.
+      expect(result).not.toContain("/app");
     });
   });
 

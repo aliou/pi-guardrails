@@ -34,6 +34,13 @@ function isOption(arg: string): boolean {
  *     on Windows (issue #79).
  *  3. Delimiter arguments (`cut -d /`, `sort -t /`, `tr / :`) — the value is
  *     literally `/`, which exists, so no existence check can reject it.
+ *  4. Remote command runners — argv that names paths on *another* machine
+ *     must not read as local filesystem access. Both rules lean on the
+ *     command's own documented contract instead of option tables we would
+ *     have to track: for `ssh`, anything from the destination on runs
+ *     remotely and option values stay unparsed (identity files named by `-i`
+ *     are read locally but shelve with the destination by design); for
+ *     `kubectl`, argv after `--` belongs to the pod's command.
  *
  * Everything else returns every token and is filtered downstream by shape and
  * plausibility checks in `extractBashPathCandidates`. Commands that merely
@@ -61,6 +68,21 @@ export function classifyCommandArgs(
   if (cmd === "sort")
     return skipOptionValues(args, new Set(["-t", "--field-separator"]));
   if (cmd === "tr") return [];
+
+  // Everything an ssh argv carries past its own options runs on the remote
+  // host, and the options themselves are names, not local paths. Without an
+  // ssh option table we cannot reliably locate `-i` identity files either,
+  // so no ssh argv token is a reliably-local path and all of argv drops.
+  if (cmd === "ssh") return [];
+
+  // kubectl passes argv after `--` to the container command per its CLI
+  // contract; those words are in-pod paths, not local filesystem access.
+  if (cmd === "kubectl") {
+    const tail = args.indexOf("--");
+    return (tail === -1 ? args : args.slice(0, tail)).map((token) => ({
+      token,
+    }));
+  }
 
   return args.map((token) => ({ token }));
 }
