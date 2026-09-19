@@ -8,6 +8,10 @@ export const GUARDRAILS_FEATURE_REQUEST_EVENT = "guardrails:feature:request";
 export const GUARDRAILS_FEATURE_REGISTER_EVENT = "guardrails:feature:register";
 export const GUARDRAILS_PROMPT_OPENED_EVENT = "guardrails:prompt:opened";
 export const GUARDRAILS_PROMPT_CLOSED_EVENT = "guardrails:prompt:closed";
+export const GUARDRAILS_CLASSIFY_REQUEST_EVENT = "guardrails:classify:request";
+export const GUARDRAILS_CLASSIFY_CHECK_EVENT = "guardrails:classify:check";
+export const GUARDRAILS_CLASSIFY_DECISION_EVENT =
+  "guardrails:classify:decision";
 /** @deprecated Use GUARDRAILS_PROMPT_OPENED_EVENT. */
 export const GUARDRAILS_ACTION_PROMPTED_EVENT = "guardrails:action:prompted";
 
@@ -30,6 +34,67 @@ export interface GuardrailsFeatureRegisterPayload {
   feature: {
     id: GuardrailsFeatureId;
   };
+}
+
+/**
+ * Description of an action offered to classifiers for a second opinion.
+ * Defined here (rather than reusing the core Action type) so that external
+ * classifier extensions can answer the contract without importing guardrails
+ * internals.
+ */
+export type GuardrailsClassifyAction = {
+  kind: "command";
+  command: string;
+  origin?: string;
+};
+
+/** Identity a classifier registers with. */
+export interface GuardrailsClassifierRegistration {
+  /** Stable identifier for the classifier extension, e.g. "pi-jev". */
+  id: string;
+  /** Human-readable name for notifications and settings UI. */
+  name: string;
+}
+
+/**
+ * Registration handshake. Guardrails emits this on session_start; each
+ * classifier extension present answers by calling `answer` with its
+ * registration. A fresh request is emitted every session and replaces the
+ * previous roster.
+ */
+export interface GuardrailsClassifyRequestPayload {
+  source: "guardrails";
+  timestamp: string;
+  /** Call once with the classifier's registration. */
+  answer: (registration: GuardrailsClassifierRegistration) => void;
+}
+
+/**
+ * One classification request, emitted for an action the deterministic
+ * pipeline considers safe. Every registered classifier receives it and must
+ * reply with exactly one GUARDRAILS_CLASSIFY_DECISION_EVENT for this
+ * requestId, even to pass.
+ */
+export interface GuardrailsClassifyCheckPayload {
+  source: "guardrails";
+  timestamp: string;
+  /** Correlates this check with its decisions. */
+  requestId: string;
+  action: GuardrailsClassifyAction;
+  cwd: string;
+}
+
+/**
+ * A classifier's answer to a check. Escalate-only: `reason` present means
+ * "show the user this confirmation text"; absent means no objection. The
+ * first decision carrying a reason wins and the rest are discarded.
+ */
+export interface GuardrailsClassifyDecisionPayload {
+  requestId: string;
+  /** `id` from the answering classifier's registration. */
+  classifierId: string;
+  /** Why the user should confirm this action. Omit to pass. */
+  reason?: string;
 }
 
 export type GuardrailsBlockSource =
@@ -121,6 +186,30 @@ export function createFeatureRegisterPayload(
     source: "guardrails",
     timestamp: timestamp(),
     feature: { id: feature },
+  };
+}
+
+export function createClassifyRequestPayload(
+  answer: GuardrailsClassifyRequestPayload["answer"],
+): GuardrailsClassifyRequestPayload {
+  return {
+    source: "guardrails",
+    timestamp: timestamp(),
+    answer,
+  };
+}
+
+export function createClassifyCheckPayload(
+  requestId: string,
+  action: GuardrailsClassifyAction,
+  cwd: string,
+): GuardrailsClassifyCheckPayload {
+  return {
+    source: "guardrails",
+    timestamp: timestamp(),
+    requestId,
+    action,
+    cwd,
   };
 }
 

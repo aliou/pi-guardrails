@@ -38,6 +38,7 @@ src/
     paths/                # Path access rules and normalization
     shell/                # Shell argument parsing helpers
   shared/                 # Pi-extension shared infra and adapters
+    classify.ts           # Classifier handshake/check client (escalate-only second opinions)
     config/               # Config loading, defaults, migrations
     events.ts             # Public event definitions and emitters
     matching.ts           # Pattern matching helpers
@@ -83,7 +84,9 @@ The package registers four independent extensions. The three Guardrails features
 - Config migrations are predicate-based (`shouldRun`) using structural checks; do not rely on lexicographic version string comparisons.
 - Runtime code must only handle current config/core shapes. Old config shapes belong exclusively in migrations; do not add runtime compatibility branches for legacy config.
 - `config.version` is a schema marker for debugging/inspection, not the package version.
-- Events emitted on the pi event bus for inter-extension communication are defined in `src/shared/events.ts`. Current public events are `guardrails:action:blocked`, `guardrails:prompt:opened`, `guardrails:prompt:closed`, `guardrails:risk:detected`, `guardrails:feature:request`, and `guardrails:feature:register`. `guardrails:action:prompted` is a deprecated alias for `guardrails:prompt:opened`.
+- Events emitted on the pi event bus for inter-extension communication are defined in `src/shared/events.ts`. Current public events are `guardrails:action:blocked`, `guardrails:prompt:opened`, `guardrails:prompt:closed`, `guardrails:risk:detected`, `guardrails:feature:request`, `guardrails:feature:register`, `guardrails:classify:request`, `guardrails:classify:check`, and `guardrails:classify:decision`. `guardrails:action:prompted` is a deprecated alias for `guardrails:prompt:opened`.
+
+The classify events are an escalate-only contract for external classifier extensions: register on `request`, answer every `check` with one `decision`, and a `decision` carrying a `reason` escalates the command into the permission prompt. Checks fail open on timeout (`src/shared/classify.ts`).
 
 ## Documentation
 

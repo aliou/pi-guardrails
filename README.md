@@ -84,6 +84,29 @@ Guardrails emits paired prompt lifecycle events on Pi's shared event bus:
 
 Both events include the same `prompt.id` for correlation.
 
+### Classifiers
+
+An extension can offer a second opinion on bash commands that the deterministic
+rules consider safe. Classifiers are escalate-only: the only thing they can do
+is ask Guardrails to confirm a command with the user. They cannot approve,
+suppress, or override anything.
+
+The handshake runs over three events:
+
+1. On every session start Guardrails emits `guardrails:classify:request`. The
+   payload carries an `answer(registration)` callback; call it once with a
+   stable `{ id, name }` to join. Each request replaces the previous roster.
+2. For every command the rules pass, Guardrails emits
+   `guardrails:classify:check` with a `requestId`, the `action`, and the `cwd`.
+3. Each registered classifier must reply once per check by emitting
+   `guardrails:classify:decision` with `{ requestId, classifierId }`. Include a
+   `reason` to flag the command; omit it to pass.
+
+The check settles on the first flagged reply, or once every classifier has
+replied. A flag becomes the reason shown in the standard permission prompt.
+Checks fail open: a classifier that does not reply within 30 seconds is skipped,
+and after three consecutive misses it is dropped for the rest of the session.
+
 ## Configuration
 
 Most configuration should happen through the interactive settings UI:

@@ -3,6 +3,10 @@ import {
   isToolCallEventType,
 } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
+import {
+  createClassifyClient,
+  GUARDRAILS_CLASSIFY_MAX_MISSES,
+} from "../../src/shared/classify";
 import { configLoader } from "../../src/shared/config";
 import {
   createFeatureRegisterPayload,
@@ -35,6 +39,14 @@ export default async function permissionGate(pi: ExtensionAPI) {
   });
   setupLegacyPromptEventAlias(pi, "permissionGate");
 
+  const classify = createClassifyClient(pi);
+  pi.on("session_start", () => {
+    classify.requestClassifiers();
+  });
+  pi.on("session_shutdown", () => {
+    classify.dispose();
+  });
+
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
     if (!config.enabled || !config.features.permissionGate) return;
@@ -63,12 +75,37 @@ export default async function permissionGate(pi: ExtensionAPI) {
       return { block: true, reason };
     }
 
-    const safety = await checkAction(action, [
+    let safety = await checkAction(action, [
       createPermissionGateRule({
         patterns: config.permissionGate.patterns,
         useBuiltinMatchers: config.permissionGate.useBuiltinMatchers,
       }),
     ]);
+    if (safety.kind === "safe" && classify.hasClassifiers()) {
+      const flag = await classify.requestCheck({
+        action,
+        cwd: ctx.cwd,
+        onDropped: (classifier) => {
+          ctx.ui.notify(
+            `Classifier "${classifier.name}" disabled after ${GUARDRAILS_CLASSIFY_MAX_MISSES} unanswered checks`,
+            "warning",
+          );
+        },
+      });
+      if (flag) {
+        safety = {
+          kind: "dangerous",
+          action,
+          key: flag.classifierId,
+          reason: `Classifier "${flag.classifierId}" flagged this command: ${flag.reason}`,
+          metadata: {
+            command,
+            description: flag.reason,
+            pattern: `classifier:${flag.classifierId}`,
+          },
+        };
+      }
+    }
     if (safety.kind === "safe") return;
 
     emitRiskDetected(pi, {
