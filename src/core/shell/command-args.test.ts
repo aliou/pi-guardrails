@@ -165,4 +165,23 @@ describe("classifyCommandArgs", () => {
       expect(tokens("tr", ["/", ":"])).toEqual([]);
     });
   });
+
+  describe("remote command runners", () => {
+    // Argv naming paths on another machine is not local filesystem access;
+    // the rules lean on each command's own contract, not option tables.
+    it("drops ssh argv entirely", () => {
+      expect(
+        tokens("ssh", ["-i", "~/.ssh/id", "user@host", "cat", "/etc/passwd"]),
+      ).toEqual([]);
+      expect(tokens("ssh", ["user@host"])).toEqual([]);
+    });
+
+    it("drops kubectl argv passed through -- to the pod command", () => {
+      expect(
+        tokens("kubectl", ["exec", "-it", "pod/one", "--", "ls", "/app"]),
+      ).toEqual(["exec", "-it", "pod/one"]);
+      // Without `--` the argv is kubectl's own and stays classified as-is.
+      expect(tokens("kubectl", ["get", "pods"])).toEqual(["get", "pods"]);
+    });
+  });
 });
