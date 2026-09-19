@@ -76,6 +76,16 @@ export function isFdDuplicationRedirect(redirect: Redirect): boolean {
   return redirect.op === ">&" || redirect.op === "<&";
 }
 
+/**
+ * Whether a redirect feeds inline text rather than naming a file: heredocs
+ * (`<<EOF`, `<<-EOF`) and here-strings (`<<<word`). Their `target` is a
+ * delimiter or the text itself — never a filesystem path — so path
+ * extraction must skip them.
+ */
+export function isHeredocRedirect(redirect: Redirect): boolean {
+  return redirect.op === "<<" || redirect.op === "<<-" || redirect.op === "<<<";
+}
+
 function partHasExpansion(part: WordPart): boolean {
   switch (part.type) {
     case "Literal":
