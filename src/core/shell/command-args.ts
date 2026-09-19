@@ -34,7 +34,10 @@ function isOption(arg: string): boolean {
  *     on Windows (issue #79).
  *  3. Delimiter arguments (`cut -d /`, `sort -t /`, `tr / :`) — the value is
  *     literally `/`, which exists, so no existence check can reject it.
- *  4. Remote command runners — argv that names paths on *another* machine
+ *  4. Commands with no file operands at all (`echo`, `printf`, `tr`) — POSIX
+ *     defines their grammars as pure text, so no operand can be a file and a
+ *     protected name passed as data cannot read as file access.
+ *  5. Remote command runners — argv that names paths on *another* machine
  *     must not read as local filesystem access. Both rules lean on the
  *     command's own documented contract instead of option tables we would
  *     have to track: for `ssh`, anything from the destination on runs
@@ -67,7 +70,7 @@ export function classifyCommandArgs(
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
     return skipOptionValues(args, new Set(["-t", "--field-separator"]));
-  if (cmd === "tr") return [];
+  if (NO_FILE_OPERAND_COMMANDS.has(cmd)) return [];
 
   // Everything an ssh argv carries past its own options runs on the remote
   // host, and the options themselves are names, not local paths. Without an
@@ -85,6 +88,20 @@ export function classifyCommandArgs(
   }
 
   return args.map((token) => ({ token }));
+}
+
+/**
+ * Commands whose grammar takes no file operands at all (POSIX: `echo
+ * [ARGUMENT]…`, `printf FORMAT [ARGUMENT]…`, `tr STRING1 STRING2`). Every
+ * non-option argument is pure text, so a token that names a protected file
+ * is data, never file access. This set is closed — it follows the fixed
+ * POSIX grammar of each utility, not CLI dialects we'd have to track.
+ */
+const NO_FILE_OPERAND_COMMANDS = new Set(["echo", "printf", "tr"]);
+
+/** Whether a command's argv can never contain a file operand. */
+export function takesNoFileOperands(command: string): boolean {
+  return NO_FILE_OPERAND_COMMANDS.has(normalizeCommandName(command));
 }
 
 function classifyFindArgs(args: string[]): ClassifiedArg[] {

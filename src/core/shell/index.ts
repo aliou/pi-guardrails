@@ -6,4 +6,8 @@ export {
   wordHasExpansion,
   wordToString,
 } from "./ast";
-export { type ClassifiedArg, classifyCommandArgs } from "./command-args";
+export {
+  type ClassifiedArg,
+  classifyCommandArgs,
+  takesNoFileOperands,
+} from "./command-args";
