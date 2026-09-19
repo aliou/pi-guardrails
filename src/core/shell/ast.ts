@@ -68,12 +68,16 @@ export function wordHasExpansion(word: Word): boolean {
 
 /**
  * Whether a redirect is a file-descriptor duplication (`2>&1`, `3<&0`,
- * `>&-`). Its target is an fd number, `-` (close), or `NAME` (bash
- * `{var}>&1` style allocation) — never a filesystem path — so path
- * extraction must skip it.
+ * `>&-`). Bash also accepts `>& file` as a file redirect when no source fd is
+ * specified, so the operator alone is not enough to classify it.
  */
 export function isFdDuplicationRedirect(redirect: Redirect): boolean {
-  return redirect.op === ">&" || redirect.op === "<&";
+  if (redirect.op === "<&") return true;
+  if (redirect.op !== ">&") return false;
+  if (redirect.fd !== undefined) return true;
+
+  const target = wordToString(redirect.target);
+  return target === "-" || /^\d+$/.test(target);
 }
 
 function partHasExpansion(part: WordPart): boolean {

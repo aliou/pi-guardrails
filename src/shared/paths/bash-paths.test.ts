@@ -314,6 +314,9 @@ describe("extractBashPathCandidates", () => {
       expect(
         await extractBashPathCandidates("echo foo > /tmp/out", CWD),
       ).toEqual(["/tmp/out"]);
+      expect(
+        await extractBashPathCandidates("echo foo >& /tmp/out", CWD),
+      ).toEqual(["/tmp/out"]);
     });
 
     it("extracts paths from multiple commands and redirects", async () => {
