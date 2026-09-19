@@ -375,6 +375,84 @@ describe("extractBashPathCandidates", () => {
     });
   });
 
+  describe("issue #105: comments, root tokens, heredocs, remote argv, URL fragments", () => {
+    it("strips comments the parser rejects instead of tokenizing their text", async () => {
+      // `@aliou/sh` throws on `cmd && # comment`, so the regex fallback runs;
+      // naive pair-matching turned the comment into garbage candidates.
+      const command =
+        "cd \"/etc/hosts\" && # don't forget /etc/hosts today's run\ncd /etc/hosts";
+      expect(await extractBashPathCandidates(command, CWD)).toEqual([
+        "/etc/hosts",
+      ]);
+    });
+
+    it("does not report the filesystem root for a pattern token like //", async () => {
+      // `//` resolves to `/`, which is un-grantable, so prompts would never
+      // go away for commands carrying grep/jq/sed `//` operators.
+      const result = await extractBashPathCandidates("grep // report.txt", CWD);
+      expect(result).not.toContain("/");
+    });
+
+    it("still reports an explicitly written filesystem root", async () => {
+      expect(await extractBashPathCandidates("rm -rf /", CWD)).toEqual(["/"]);
+    });
+
+    it("does not treat a heredoc delimiter as a redirect target", async () => {
+      expect(
+        await extractBashPathCandidates("cat <<'EOF'\nbody\nEOF", CWD),
+      ).toEqual([]);
+    });
+
+    it("keeps extracting real redirect targets around heredocs", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "cat <<'EOF' > /tmp/out\nbody\nEOF",
+          CWD,
+        ),
+      ).toEqual(["/tmp/out"]);
+    });
+
+    it("does not treat ssh remote argv as local paths", async () => {
+      expect(
+        await extractBashPathCandidates("ssh somehost cat /etc/passwd", CWD),
+      ).toEqual([]);
+      // Local identity files stay genuine local access.
+      expect(
+        await extractBashPathCandidates(
+          "ssh -i /work/project/key.pem somehost cat /etc/passwd",
+          CWD,
+        ),
+      ).toEqual(["/work/project/key.pem"]);
+    });
+
+    it("does not treat kubectl exec argv as local paths", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "kubectl exec -n search pod-x -- du -sh /app",
+          CWD,
+        ),
+      ).toEqual([]);
+      // Redirects across the exec boundary are still local writes.
+      expect(
+        await extractBashPathCandidates(
+          "kubectl exec -n search pod-x -- cat /etc/shadow > /tmp/out",
+          CWD,
+        ),
+      ).toEqual(["/tmp/out"]);
+    });
+
+    it("does not treat URL path fragments inside program text as paths", async () => {
+      // The leading-slash token is a substring of a URL literal in the same
+      // program text, not a filesystem location.
+      const command = [
+        'python3 -c "',
+        "mdtxt = 'https://www.reddit.com/r/selfhosted/comments/abc/post_title/'",
+        "print((mdtxt or '').count('/r/selfhosted/comments/'))\"",
+      ].join("\n");
+      expect(await extractBashPathCandidates(command, CWD)).toEqual([]);
+    });
+  });
+
   describe("when command is malformed", () => {
     it("falls back to regex tokenization on parse failure", async () => {
       // Unbalanced quote triggers parse error; regex fallback still finds paths

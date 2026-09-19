@@ -76,6 +76,15 @@ export function isFdDuplicationRedirect(redirect: Redirect): boolean {
   return redirect.op === ">&" || redirect.op === "<&";
 }
 
+/**
+ * Whether a redirect is a heredoc (`<<`, `<<-`) or herestring (`<<<`).
+ * Its target word is the delimiter or the fed string — program text, never a
+ * filesystem path — so path extraction must skip it (issue #105).
+ */
+export function isHeredocRedirect(redirect: Redirect): boolean {
+  return redirect.op === "<<" || redirect.op === "<<-" || redirect.op === "<<<";
+}
+
 function partHasExpansion(part: WordPart): boolean {
   switch (part.type) {
     case "Literal":

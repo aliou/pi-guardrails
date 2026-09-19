@@ -5,6 +5,53 @@ const tokens = (command: string, args: string[]) =>
   classifyCommandArgs(command, args).map((arg) => arg.token);
 
 describe("classifyCommandArgs", () => {
+  describe("ssh (issue #105)", () => {
+    it("drops the remote argv", () => {
+      expect(tokens("ssh", ["somehost", "cat", "/etc/passwd"])).toEqual([]);
+    });
+
+    it("keeps option values that are local files", () => {
+      expect(tokens("ssh", ["-i", "key.pem", "somehost", "true"])).toEqual([
+        "key.pem",
+      ]);
+    });
+
+    it("drops options and their values", () => {
+      expect(tokens("ssh", ["-p", "2222", "somehost", "ls"])).toEqual([]);
+    });
+  });
+
+  describe("kubectl (issue #105)", () => {
+    it("drops everything for remote subcommands", () => {
+      expect(
+        tokens("kubectl", [
+          "exec",
+          "-n",
+          "search",
+          "pod",
+          "--",
+          "du",
+          "-sh",
+          "/app",
+        ]),
+      ).toEqual([]);
+    });
+
+    it("handles global options before the subcommand", () => {
+      expect(tokens("kubectl", ["-n", "search", "exec", "pod", "ls"])).toEqual(
+        [],
+      );
+    });
+
+    it("fall back to generic classification for local subcommands", () => {
+      expect(tokens("kubectl", ["cp", "pod:/x", "./y"])).toEqual([
+        "cp",
+        "pod:/x",
+        "./y",
+      ]);
+    });
+  });
+
   it("keeps unknown command arguments unchanged", () => {
     expect(tokens("cat", ["/etc/hosts", "./file"])).toEqual([
       "/etc/hosts",

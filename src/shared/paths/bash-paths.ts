@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { parse } from "@aliou/sh";
 import {
   expandHomePath,
@@ -14,10 +14,12 @@ import {
 } from "../../core/paths/plausibility";
 import {
   isFdDuplicationRedirect,
+  isHeredocRedirect,
   walkCommands,
   wordToString,
 } from "../../core/shell/ast";
 import { classifyCommandArgs } from "../../core/shell/command-args";
+import { stripBashComments } from "../../core/shell/comments";
 import { expandGlob, hasGlobChars } from "../glob";
 
 async function expandCandidate(
@@ -84,6 +86,14 @@ export async function extractBashPathCandidates(
     const expanded = await expandCandidate(token, cwd);
     for (const file of expanded) {
       const abs = resolve(cwd, expandHomePath(file));
+      // A token like the alternative operator `//` resolves to the filesystem
+      // root, which cannot be scoped to a grant (`isGrantTooBroad`), turning
+      // every command that carries it into a permanent re-prompt. Keep the
+      // root only when it was written out explicitly (`rm -rf /`).
+      const resolvesToRoot = dirname(abs) === abs;
+      const explicitRoot =
+        file === "/" || file === "\\" || /^[A-Za-z]:[\\/]$/.test(file);
+      if (resolvesToRoot && !explicitRoot) continue;
       // Only outside-workspace candidates are filtered: in-workspace paths are
       // always allowed downstream, so noise there cannot cause a prompt.
       if (
@@ -106,9 +116,12 @@ export async function extractBashPathCandidates(
 
     walkCommands(ast, (cmd, redirects) => {
       for (const redir of redirects ?? []) {
-        // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
+        // Fd duplications (`2>&1`, `<&-`) have no filesystem target, and
+        // heredoc/herestring targets are delimiters or program text, not
+        // paths.
         // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
-        if (isFdDuplicationRedirect(redir)) continue;
+        if (isFdDuplicationRedirect(redir) || isHeredocRedirect(redir))
+          continue;
         pending.push(addCandidate(wordToString(redir.target), true));
       }
       const words = (cmd?.words ?? []).map(wordToString);
@@ -161,11 +174,16 @@ export async function extractBashPathCandidates(
     await Promise.all(pending);
     return results;
   } catch {
-    // Fallback: regex tokenization. The command name is unreliable here, so
-    // only shape rejection applies; existence suppression stays off to keep
-    // the fallback fail-safe (extra candidates, never fewer).
+    // Fallback: regex tokenization over comment-stripped text. `@aliou/sh`
+    // throws on some comment placements (`cmd && # note`), and naive
+    // tokenization pairs quotes inside comment text into garbage candidates —
+    // stripping the comment removes the whole class (issue #105). The command
+    // name is unreliable here, so only shape rejection applies; existence
+    // suppression stays off to keep the fallback fail-safe (extra candidates,
+    // never fewer).
+    const stripped = stripBashComments(command);
     const tokenRegex = /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&]+)/g;
-    for (const match of command.matchAll(tokenRegex)) {
+    for (const match of stripped.matchAll(tokenRegex)) {
       const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
       if (
         token &&

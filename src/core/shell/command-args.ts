@@ -61,6 +61,8 @@ export function classifyCommandArgs(
   if (cmd === "sort")
     return skipOptionValues(args, new Set(["-t", "--field-separator"]));
   if (cmd === "tr") return [];
+  if (cmd === "ssh") return classifySshArgs(args);
+  if (cmd === "kubectl") return classifyKubectlArgs(args);
 
   return args.map((token) => ({ token }));
 }
@@ -124,6 +126,75 @@ function classifyXargsArgs(args: string[]): ClassifiedArg[] {
     return classifyCommandArgs(arg, args.slice(i + 1));
   }
   return [];
+}
+
+/**
+ * ssh options whose value is a local file — still genuine local access.
+ * Every other ssh option value is connection plumbing (ports, user names),
+ * and its shape filtering is left to the caller.
+ */
+const SSH_FILE_FLAGS = new Set(["-i", "-F"]);
+
+/**
+ * ssh executes everything after the connection destination on a *remote*
+ * host. Remote argv is filesystem access on another machine, which no local
+ * shape or existence heuristic can distinguish from local access, so tokens
+ * after the destination are dropped entirely (issue #105).
+ */
+function classifySshArgs(args: string[]): ClassifiedArg[] {
+  const out: ClassifiedArg[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (isOption(arg)) {
+      if (SSH_FILE_FLAGS.has(arg) && args[i + 1] !== undefined) {
+        out.push({ token: args[++i] as string });
+      }
+      continue;
+    }
+    // First non-option token is the destination; everything after it is
+    // a remote command.
+    break;
+  }
+  return out;
+}
+
+/** kubectl options that may appear before the subcommand and take a value. */
+const KUBECTL_GLOBAL_VALUE_FLAGS = new Set([
+  "-n",
+  "-c",
+  "-s",
+  "--context",
+  "--namespace",
+  "--cluster",
+  "--user",
+  "--kubeconfig",
+  "--server",
+]);
+
+/**
+ * kubectl subcommands that operate entirely on remote containers or hosts —
+ * nothing in their argv addresses the local filesystem (issue #105).
+ */
+const KUBECTL_REMOTE_SUBCOMMANDS = new Set(["exec", "attach", "debug"]);
+
+/**
+ * kubectl's remote-subcommand argv runs in a container: it is not local
+ * filesystem access and no shape heuristic can recover that — it is an
+ * execution-context property. Drop those subtrees entirely; redirects around
+ * them (e.g. `kubectl exec … > /tmp/out`) are still extracted by the caller.
+ */
+function classifyKubectlArgs(args: string[]): ClassifiedArg[] {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (isOption(arg)) {
+      if (KUBECTL_GLOBAL_VALUE_FLAGS.has(arg)) i++;
+      continue;
+    }
+    if (KUBECTL_REMOTE_SUBCOMMANDS.has(arg)) return [];
+    // Any other subcommand: fall through to generic handling.
+    break;
+  }
+  return args.map((token) => ({ token }));
 }
 
 type InterpreterFlags = {
@@ -232,12 +303,26 @@ function interpreterFlags(cmd: string): InterpreterFlags {
 const CODE_TOKEN_REGEX =
   /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&(){}[\]]+)/g;
 
+/**
+ * A URL in program text: either a full scheme (`https://…`) or
+ * protocol-relative (`//…`). Path fragments carved out of these are string
+ * data, not filesystem locations (issue #105).
+ */
+const URL_SPAN_REGEX = /(?:[a-z][a-z0-9+.-]*:)?\/\/[^\s'"`<>()\\]+/gi;
+
 function extractPathsFromCode(code: string): ClassifiedArg[] {
   const out: ClassifiedArg[] = [];
+  const urls = [...code.matchAll(URL_SPAN_REGEX)].map((m) => m[0]);
   for (const match of code.matchAll(CODE_TOKEN_REGEX)) {
     const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
     if (!token || token.startsWith("-")) continue;
     if (!maybePathLike(token)) continue;
+    // A leading-slash token that appears inside a URL literal in the same
+    // program text is string data — the program treats it as a remote
+    // location, not something it will open (issue #105).
+    if (token.startsWith("/") && urls.some((url) => url.includes(token))) {
+      continue;
+    }
     out.push({ token, programText: true });
   }
   return out;
