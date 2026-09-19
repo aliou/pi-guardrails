@@ -15,6 +15,7 @@ import * as normalizeStringBooleans from "./008-normalize-string-booleans";
 import * as allowDevNull from "./009-allow-dev-null";
 import * as allowedPathsObjects from "./010-allowed-paths-objects";
 import * as normalizeVersionStamp from "./011-normalize-version-stamp";
+import * as notePermissionGatePatternMerge from "./012-note-permission-gate-pattern-merge";
 
 interface MigrationModule<TConfig> {
   version: string;
@@ -122,6 +123,13 @@ export const migrations: Migration<GuardrailsConfig>[] = [
     version: normalizeVersionStamp.version,
     shouldRun: normalizeVersionStamp.shouldRun,
     run: normalizeVersionStamp.run,
+  },
+  {
+    name: "note-permission-gate-pattern-merge",
+    version: notePermissionGatePatternMerge.version,
+    shouldRun: notePermissionGatePatternMerge.shouldRun,
+    run: notePermissionGatePatternMerge.run,
+    message: notePermissionGatePatternMerge.message,
   },
 ];
 
