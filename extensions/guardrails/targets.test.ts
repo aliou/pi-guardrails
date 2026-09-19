@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { vol } from "memfs";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { compilePolicies } from "./rules";
 import { extractTargets } from "./targets";
 
@@ -171,5 +171,114 @@ describe("extractTargets", () => {
         expect(result).toEqual([]);
       }
     }
+  });
+
+  describe("issue #107: protected filename used as a non-path argument", () => {
+    const cwd = "/repo";
+
+    function envPolicies() {
+      return compilePolicies([
+        {
+          id: "secret-files",
+          name: "Secret Files",
+          patterns: [{ pattern: ".env" }],
+          protection: "noAccess",
+        },
+      ]);
+    }
+
+    beforeEach(() => {
+      vol.fromJSON({ "/repo/.env": "TOKEN=secret", "/repo/src/main.ts": "" });
+    });
+
+    it("does not treat a printf argument as a file target", async () => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "printf '%s\\n' '.env'" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("does not treat an echoed string as a file target", async () => {
+      await expect(
+        extractTargets(
+          {
+            toolName: "bash",
+            input: { command: "echo '.env' | grep -f - README.md" },
+          },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("does not treat a grep search term as a file target", async () => {
+      await expect(
+        extractTargets(
+          {
+            toolName: "bash",
+            input: { command: "grep -c '.env' src/main.ts" },
+          },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([]);
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "rg '.env' src/main.ts" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([]);
+    });
+
+    it("still blocks actually reading .env", async () => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "cat .env" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    });
+
+    it("still blocks grep reading .env as a file operand", async () => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "grep x .env" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "cat .env | grep x" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    });
+
+    it("still blocks reads nested in an interpreter program", async () => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command: "bash -c 'cat .env'" } },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+      await expect(
+        extractTargets(
+          {
+            toolName: "bash",
+            input: { command: "python3 -c 'open(\"/repo/.env\")'" },
+          },
+          cwd,
+          envPolicies(),
+        ),
+      ).resolves.toEqual([{ path: "/repo/.env", unresolved: false }]);
+    });
   });
 });

@@ -63,6 +63,8 @@ export function classifyCommandArgs(
   if (cmd === "tr") return [];
   if (cmd === "ssh") return classifySshArgs(args);
   if (cmd === "kubectl") return classifyKubectlArgs(args);
+  if (isGrepLike(cmd)) return classifyGrepLikeArgs(cmd, args);
+  if (TEXT_ONLY_COMMANDS.has(cmd)) return [];
 
   return args.map((token) => ({ token }));
 }
@@ -141,6 +143,94 @@ const SSH_FILE_FLAGS = new Set(["-i", "-F"]);
  * shape or existence heuristic can distinguish from local access, so tokens
  * after the destination are dropped entirely (issue #105).
  */
+/**
+ * Commands whose non-option arguments are pure text, never file operands
+ * (issue #107). Both are POSIX-defined command grammars with no file operands
+ * at all — `printf FORMAT [ARGUMENT]`, `echo [ARGUMENT]…` — so no shape or
+ * existence heuristic can rescue a protected name passed as data.
+ */
+const TEXT_ONLY_COMMANDS = new Set(["echo", "printf"]);
+
+/**
+ * Pattern-first search commands: `grep [OPTIONS] PATTERN [FILE…]` and
+ * equivalents. The first non-option argument is the pattern, not a file
+ * operand; with `-e`/`--regexp` no non-option argument is a pattern.
+ *
+ * File-operand arguments are still returned, so reading a protected file
+ * through one of these stays blocked (issue #107).
+ */
+const GREP_LIKE_COMMANDS = new Set(["grep", "egrep", "fgrep", "rg"]);
+
+/** Options that take a *pattern-ish* value, never a file operand. */
+const GREP_VALUE_FLAGS = new Set([
+  "-e",
+  "--regexp",
+  "-m",
+  "--max-count",
+  "-A",
+  "--after-context",
+  "-B",
+  "--before-context",
+  "-C",
+  "--context",
+  "--include",
+  "--exclude",
+  "--exclude-dir",
+  "--label",
+]);
+
+/** Flags exclusive to ripgrep that take a pattern-ish, non-file value. */
+const RG_VALUE_FLAGS = new Set([
+  "-g",
+  "--glob",
+  "-t",
+  "--type",
+  "--type-add",
+  "--type-clear",
+  "-r",
+  "--replace",
+]);
+
+/** Options whose value is a file containing patterns — a real file operand. */
+const GREP_FILE_VALUE_FLAGS = new Set(["-f", "--file"]);
+
+function isGrepLike(cmd: string): boolean {
+  return GREP_LIKE_COMMANDS.has(cmd);
+}
+
+function classifyGrepLikeArgs(cmd: string, args: string[]): ClassifiedArg[] {
+  const valueFlags = cmd === "rg" ? RG_VALUE_FLAGS : GREP_VALUE_FLAGS;
+  const out: ClassifiedArg[] = [];
+  let sawPatternFlag = false;
+  const operands: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (isOption(arg)) {
+      if (valueFlags.has(arg) || GREP_VALUE_FLAGS.has(arg)) {
+        if (arg === "-e" || arg === "--regexp") sawPatternFlag = true;
+        i++;
+        continue;
+      }
+      if (GREP_FILE_VALUE_FLAGS.has(arg)) {
+        // A pattern file is a genuine file read. It also means the patterns
+        // come from the file, so every later non-option argument is a file
+        // operand too.
+        sawPatternFlag = true;
+        if (args[i + 1] !== undefined)
+          out.push({ token: args[++i] as string, forcePath: true });
+        continue;
+      }
+      continue;
+    }
+    operands.push(arg);
+  }
+  // Without an explicit pattern flag the first non-option argument is the
+  // pattern itself; with one, every non-option argument is a file operand.
+  const skip = !sawPatternFlag && operands.length > 0 ? 1 : 0;
+  for (const token of operands.slice(skip)) out.push({ token });
+  return out;
+}
+
 function classifySshArgs(args: string[]): ClassifiedArg[] {
   const out: ClassifiedArg[] = [];
   for (let i = 0; i < args.length; i++) {

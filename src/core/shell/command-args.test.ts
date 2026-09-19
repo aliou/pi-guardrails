@@ -5,6 +5,66 @@ const tokens = (command: string, args: string[]) =>
   classifyCommandArgs(command, args).map((arg) => arg.token);
 
 describe("classifyCommandArgs", () => {
+  // Pattern-shaped arguments of other CLIs are not special-cased. They are
+  // returned here and filtered downstream by shape/plausibility checks in
+  // extractBashPathCandidates, which covers every CLI rather than a list.
+  it.each([
+    ["awk", ["/aaa/{print}", "./input"]],
+    ["sed", ["s#/old#/new#g", "./file"]],
+    ["jq", ['.path | test("^/tmp/")', "./data.json"]],
+    ["go", ["test", "./..."]],
+    ["ctx7", ["docs", "/websites/apisix"]],
+  ])("delegates %s arguments to downstream filtering", (command, args) => {
+    expect(tokens(command, args)).toEqual(args);
+  });
+
+  describe("text-only commands (issue #107)", () => {
+    it("returns no arguments for echo and printf", () => {
+      expect(tokens("echo", [".env"])).toEqual([]);
+      expect(tokens("printf", ["%s\\n", ".env"])).toEqual([]);
+    });
+
+    it("still classifies piped commands that consume the output", () => {
+      // Piping into echo changes nothing: the nested command is classified
+      // on its own name.
+      expect(tokens("tee", [".env"])).toEqual([".env"]);
+    });
+  });
+
+  describe("grep-like commands (issue #107)", () => {
+    it("skips the pattern and keeps file operands", () => {
+      expect(tokens("grep", ["root", "./secrets.txt", "/etc/passwd"])).toEqual([
+        "./secrets.txt",
+        "/etc/passwd",
+      ]);
+    });
+
+    it("skips -e pattern values but keeps later operands", () => {
+      expect(tokens("grep", ["-e", ".env", "src/main.ts"])).toEqual([
+        "src/main.ts",
+      ]);
+    });
+
+    it("keeps pattern files from -f as force-path operands", () => {
+      const classified = classifyCommandArgs("grep", ["-f", ".patterns", "x"]);
+      expect(classified).toEqual([
+        { token: ".patterns", forcePath: true },
+        { token: "x" },
+      ]);
+    });
+
+    it("treats context and count values as non-paths", () => {
+      expect(tokens("grep", ["-m", "2", "pattern", "file"])).toEqual(["file"]);
+      expect(tokens("grep", ["-c", ".env", "src/main.ts"])).toEqual([
+        "src/main.ts",
+      ]);
+    });
+
+    it("applies the same grammar to the grep family", () => {
+      expect(tokens("rg", ["-t", "ts", "pattern", "./src"])).toEqual(["./src"]);
+    });
+  });
+
   describe("ssh (issue #105)", () => {
     it("drops the remote argv", () => {
       expect(tokens("ssh", ["somehost", "cat", "/etc/passwd"])).toEqual([]);
@@ -116,26 +176,21 @@ describe("classifyCommandArgs", () => {
   });
 
   it("keeps xargs-wrapped file operands", () => {
-    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual([
-      "pattern",
-      "./src",
-    ]);
+    // The wrapped grep treats `pattern` as its pattern argument, not a file.
+    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual(["./src"]);
   });
 
-  // Pattern-shaped arguments are no longer special-cased per command. They are
-  // returned here and filtered downstream by shape/plausibility checks in
-  // extractBashPathCandidates, which covers every CLI rather than a list.
+  // The first non-option argument of a pattern-first search command is its
+  // pattern — structurally part of the command grammar, like `find` roots or
+  // interpreter program text — never a file operand. A protected file name
+  // passed as the search term must not read as file access (issue #107);
+  // `-f` pattern files and later file operands are still classified.
   it.each([
-    ["awk", ["/aaa/{print}", "./input"]],
-    ["sed", ["s#/old#/new#g", "./file"]],
-    ["grep", ["/api/v1", "./src"]],
-    ["grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"]],
-    ["rg", ["/api/v1", "./src"]],
-    ["jq", ['.path | test("^/tmp/")', "./data.json"]],
-    ["go", ["test", "./..."]],
-    ["ctx7", ["docs", "/websites/apisix"]],
-  ])("delegates %s arguments to downstream filtering", (command, args) => {
-    expect(tokens(command, args)).toEqual(args);
+    ["grep", ["/api/v1", "./src"], ["./src"]],
+    ["grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"], ["./src"]],
+    ["rg", ["/api/v1", "./src"], ["./src"]],
+  ])("treats %s patterns as non-paths", (command, args, expected) => {
+    expect(tokens(command, args)).toEqual(expected);
   });
 
   describe("find expressions", () => {
