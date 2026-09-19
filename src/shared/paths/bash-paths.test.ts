@@ -354,6 +354,80 @@ describe("extractBashPathCandidates", () => {
     });
   });
 
+  describe("when a command uses heredocs", () => {
+    it("does not treat heredoc delimiters as paths", async () => {
+      expect(
+        await extractBashPathCandidates("cat <<'EOF'\nnot a path\nEOF", CWD),
+      ).toEqual([]);
+      expect(
+        await extractBashPathCandidates(
+          "cat > out.txt <<'EOF'\ntext\nEOF",
+          CWD,
+        ),
+      ).toEqual(["/work/project/out.txt"]);
+    });
+
+    it("does not extract paths written inside heredoc bodies", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "cat <<'EOF'\nread /etc/hosts here\nEOF",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a command uses comments", () => {
+    // Valid bash: a `#` comment after |, && or || continues the pipeline on
+    // the next line. Extraction must ignore the comment's text and keep the
+    // command that continues after it. Relies on @aliou/sh 0.3.3 accepting
+    // operator continuations (aliou/sh#24).
+    it("ignores comment text after an operator, keeping the continuation", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "echo ok && # see /secret/db.pem\ncat /tmp/log",
+          CWD,
+        ),
+      ).toEqual(["/tmp/log"]);
+    });
+
+    it("does not treat URL fragments as paths", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "open https://example.com/#/helm/state-backend",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when tokens resolve to the filesystem root", () => {
+    it("never returns the root as a prompt target", async () => {
+      expect(await extractBashPathCandidates("cat //", CWD)).toEqual([]);
+    });
+  });
+
+  describe("when a command runs on a remote host", () => {
+    it("does not treat ssh remote argv as local paths", async () => {
+      expect(
+        await extractBashPathCandidates(
+          "ssh -i ~/.ssh/id user@host 'cat /etc/passwd'",
+          CWD,
+        ),
+      ).toEqual([]);
+    });
+
+    it("does not surface argv kubectl passes to the pod command", async () => {
+      const result = await extractBashPathCandidates(
+        "kubectl exec -it pod/one -- ls -l /app",
+        CWD,
+      );
+      // The in-pod path is dropped; the resource name stays as an
+      // in-workspace candidate, which path-access allows silently.
+      expect(result).not.toContain("/app");
+    });
+  });
+
   describe("when command has no path-like tokens", () => {
     it("returns an empty array for bare filenames (no separators)", async () => {
       expect(await extractBashPathCandidates("cat README.md", CWD)).toEqual([]);
