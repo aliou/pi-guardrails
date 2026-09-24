@@ -262,6 +262,10 @@
             "$ref": "#/definitions/AllowedPath"
           },
           "description": "Paths always allowed, regardless of cwd. Each entry carries an explicit `kind`: `file` matches the exact path, `directory` matches the directory and its descendants."
+        },
+        "alwaysScope": {
+          "$ref": "#/definitions/PathAccessAlwaysScope",
+          "description": "Config scope used when the user picks \"Allow … always\" in the prompt. Default: \"local\"."
         }
       },
       "additionalProperties": false
@@ -312,6 +316,14 @@
         }
       ],
       "description": "A path grant with an explicit kind.\n\n`file` matches the exact path only. `directory` matches the directory itself and any descendant (boundary/prefix match).\n\nThis replaces the previous trailing-slash convention on a flat `string[]`, where the kind was inferred from whether a path ended in `/`."
+    },
+    "PathAccessAlwaysScope": {
+      "type": "string",
+      "enum": [
+        "local",
+        "global"
+      ],
+      "description": "Where \"Allow … always\" grants from the prompt are persisted.\n- `local`: project config (`{project}/.pi/extensions/guardrails.json`).\n- `global`: user-wide config (`~/.pi/agent/extensions/guardrails.json`),   so the same grant applies in every project."
     },
     "DangerousPattern": {
       "type": "object",

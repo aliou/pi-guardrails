@@ -146,6 +146,85 @@ describe("guardrails config persistence", () => {
   });
 });
 
+describe("pathAccess.alwaysScope resolution", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  it('defaults to "local" when no scope sets alwaysScope', async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-always-scope-default");
+    vol.fromJSON({ "/tmp/pi-agent-always-scope-default/.keep": "" });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("local");
+  });
+
+  it('resolves to "global" when the global config sets alwaysScope', async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-always-scope-global");
+    vol.fromJSON({
+      "/tmp/pi-agent-always-scope-global/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          pathAccess: { alwaysScope: "global" },
+        }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("global");
+  });
+
+  it("prefers local over global, and memory over local", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-always-scope-precedence");
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-always-scope-precedence/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          pathAccess: { alwaysScope: "global" },
+        }),
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        pathAccess: { alwaysScope: "local" },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("local");
+
+    await configLoader.save("memory", {
+      pathAccess: { alwaysScope: "global" },
+    });
+    expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("global");
+  });
+
+  it("ignores invalid alwaysScope values", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-always-scope-invalid");
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-always-scope-invalid/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          pathAccess: { alwaysScope: "global" },
+        }),
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        pathAccess: { alwaysScope: "bogus" },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("global");
+  });
+});
+
 describe("permission gate pattern merging across scopes", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

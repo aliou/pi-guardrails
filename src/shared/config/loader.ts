@@ -113,6 +113,14 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
       }
       resolved.pathAccess.allowedPaths = [...mergedPaths.values()];
 
+      // alwaysScope: highest-priority scope wins (memory > local > global).
+      // Invalid values are ignored so they cannot leak through the base
+      // deep merge into the resolved config.
+      const alwaysScope = [memory, local, global]
+        .map((scope) => scope?.pathAccess?.alwaysScope)
+        .find((value) => value === "local" || value === "global");
+      resolved.pathAccess.alwaysScope = alwaysScope ?? "local";
+
       return resolved;
     },
   });
