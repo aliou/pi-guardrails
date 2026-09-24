@@ -65,29 +65,36 @@ export async function extractTargets(
   try {
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
-    walkCommands(ast, (cmd, redirects) => {
-      const words = cmd?.words ?? [];
-      // Commands with no file operands (`echo`, `printf`, `tr` — a set closed
-      // by their POSIX grammars) take their argv as pure text: a protected
-      // file name passed as data, e.g. `printf '%s\n' '.env'`, is not file
-      // access. Redirects on the same command still surface below.
-      const commandName = words[0] ? wordToString(words[0]) : "";
-      if (!takesNoFileOperands(commandName)) {
-        for (const word of words.slice(1)) {
-          pending.push(maybeAdd(wordToString(word), wordHasExpansion(word)));
+    walkCommands(
+      ast,
+      (cmd, redirects) => {
+        const words = cmd?.words ?? [];
+        // Commands with no file operands (`echo`, `printf`, `tr` — a set closed
+        // by their POSIX grammars) take their argv as pure text: a protected
+        // file name passed as data, e.g. `printf '%s\n' '.env'`, is not file
+        // access. Redirects on the same command still surface below.
+        const commandName = words[0] ? wordToString(words[0]) : "";
+        if (!takesNoFileOperands(commandName)) {
+          for (const word of words.slice(1)) {
+            pending.push(maybeAdd(wordToString(word), wordHasExpansion(word)));
+          }
         }
-      }
-      for (const redir of redirects ?? []) {
-        // Fd duplications (`2>&1`) have no filesystem target.
-        if (isFdDuplicationRedirect(redir)) continue;
-        // Heredoc delimiters and here-strings are text, not file targets.
-        if (isHeredocRedirect(redir)) continue;
-        pending.push(
-          maybeAdd(wordToString(redir.target), wordHasExpansion(redir.target)),
-        );
-      }
-      return false;
-    });
+        for (const redir of redirects ?? []) {
+          // Fd duplications (`2>&1`) have no filesystem target.
+          if (isFdDuplicationRedirect(redir)) continue;
+          // Heredoc delimiters and here-strings are text, not file targets.
+          if (isHeredocRedirect(redir)) continue;
+          pending.push(
+            maybeAdd(
+              wordToString(redir.target),
+              wordHasExpansion(redir.target),
+            ),
+          );
+        }
+        return false;
+      },
+      { includeSubstitutions: true },
+    );
     await Promise.all(pending);
   } catch {
     const tokenRegex = /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&]+)/g;

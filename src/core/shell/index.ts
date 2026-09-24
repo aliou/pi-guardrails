@@ -2,6 +2,7 @@ export {
   type CommandCallback,
   isFdDuplicationRedirect,
   isHeredocRedirect,
+  type WalkCommandsOptions,
   walkCommands,
   wordHasExpansion,
   wordToString,

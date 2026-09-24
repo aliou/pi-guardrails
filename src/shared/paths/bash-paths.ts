@@ -108,61 +108,65 @@ export async function extractBashPathCandidates(
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
 
-    walkCommands(ast, (cmd, redirects) => {
-      for (const redir of redirects ?? []) {
-        // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
-        // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
-        if (isFdDuplicationRedirect(redir)) continue;
-        // Heredoc delimiters and here-strings are text, not file targets.
-        if (isHeredocRedirect(redir)) continue;
-        pending.push(addCandidate(wordToString(redir.target), true));
-      }
-      const words = (cmd?.words ?? []).map(wordToString);
-      const commandName = words[0];
-      if (commandName) {
-        for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
-          if (arg.recurseShell) {
-            if (depth >= MAX_SHELL_DEPTH) continue;
-            pending.push(
-              extractBashPathCandidates(arg.token, cwd, {
-                depth: depth + 1,
-                pathExists,
-              }).then((nested) => {
-                for (const abs of nested) {
-                  if (!seen.has(abs)) {
-                    seen.add(abs);
-                    results.push(abs);
+    walkCommands(
+      ast,
+      (cmd, redirects) => {
+        for (const redir of redirects ?? []) {
+          // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
+          // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
+          if (isFdDuplicationRedirect(redir)) continue;
+          // Heredoc delimiters and here-strings are text, not file targets.
+          if (isHeredocRedirect(redir)) continue;
+          pending.push(addCandidate(wordToString(redir.target), true));
+        }
+        const words = (cmd?.words ?? []).map(wordToString);
+        const commandName = words[0];
+        if (commandName) {
+          for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
+            if (arg.recurseShell) {
+              if (depth >= MAX_SHELL_DEPTH) continue;
+              pending.push(
+                extractBashPathCandidates(arg.token, cwd, {
+                  depth: depth + 1,
+                  pathExists,
+                }).then((nested) => {
+                  for (const abs of nested) {
+                    if (!seen.has(abs)) {
+                      seen.add(abs);
+                      results.push(abs);
+                    }
                   }
-                }
-              }),
-            );
-          } else {
-            pending.push(
-              addCandidate(
-                arg.token,
-                arg.forcePath,
-                commandName,
-                words.slice(1),
-                arg.programText,
-              ),
-            );
+                }),
+              );
+            } else {
+              pending.push(
+                addCandidate(
+                  arg.token,
+                  arg.forcePath,
+                  commandName,
+                  words.slice(1),
+                  arg.programText,
+                ),
+              );
+            }
+          }
+        } else {
+          // Subshell fragments (e.g. the `\( ... \)` group of a find
+          // expression) arrive as commands with no name: the "words" are
+          // flags, patterns, and shell punctuation, not paths. Only keep
+          // tokens that look like real paths; skip lone `\` from escaped
+          // parens, which resolves to the drive root on Windows (issue #79).
+          for (const word of words) {
+            if (word === "\\" || word === "(" || word === ")" || word === "!")
+              continue;
+            if (word.startsWith("-") && word !== "-" && word !== "--") continue;
+            pending.push(addCandidate(word));
           }
         }
-      } else {
-        // Subshell fragments (e.g. the `\( ... \)` group of a find
-        // expression) arrive as commands with no name: the "words" are
-        // flags, patterns, and shell punctuation, not paths. Only keep
-        // tokens that look like real paths; skip lone `\` from escaped
-        // parens, which resolves to the drive root on Windows (issue #79).
-        for (const word of words) {
-          if (word === "\\" || word === "(" || word === ")" || word === "!")
-            continue;
-          if (word.startsWith("-") && word !== "-" && word !== "--") continue;
-          pending.push(addCandidate(word));
-        }
-      }
-      return false;
-    });
+        return false;
+      },
+      { includeSubstitutions: true },
+    );
 
     await Promise.all(pending);
     return results;
