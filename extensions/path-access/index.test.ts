@@ -5,7 +5,7 @@ import type {
   ReadToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
 import { createMock, type DeepMocked } from "@golevelup/ts-vitest";
-import { assert, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GUARDRAILS_PROMPT_CLOSED_EVENT,
   GUARDRAILS_PROMPT_OPENED_EVENT,
@@ -14,14 +14,30 @@ import {
 import pathAccess from "./index";
 import type { createPathAccessPromptComponent } from "./prompt";
 
+const mockState: {
+  pathAccess: {
+    mode: "allow" | "ask" | "block";
+    allowedPaths: never[];
+    alwaysScope: "local" | "global";
+  };
+  saves: Array<{ scope: string; config: Record<string, unknown> }>;
+} = {
+  pathAccess: { mode: "ask", allowedPaths: [], alwaysScope: "local" },
+  saves: [],
+};
+
 vi.mock("../../src/shared/config", () => ({
   configLoader: {
     load: vi.fn(async () => undefined),
     getConfig: vi.fn(() => ({
       enabled: true,
       features: { pathAccess: true },
-      pathAccess: { mode: "ask", allowedPaths: [] },
+      pathAccess: mockState.pathAccess,
     })),
+    getRawConfig: vi.fn(() => null),
+    save: vi.fn(async (scope: string, config: Record<string, unknown>) => {
+      mockState.saves.push({ scope, config });
+    }),
   },
 }));
 
@@ -83,6 +99,15 @@ function registeredExtensionHandler(
 }
 
 describe("pathAccess extension hook", () => {
+  beforeEach(() => {
+    mockState.pathAccess = {
+      mode: "ask",
+      allowedPaths: [],
+      alwaysScope: "local",
+    };
+    mockState.saves = [];
+  });
+
   it("emits a correlated lifecycle around an outside-path prompt", async () => {
     const pi = createMock<ExtensionAPI>();
     const ctx = createMock<ExtensionContext>({
@@ -157,5 +182,131 @@ describe("pathAccess extension hook", () => {
     expect(renderPromptComponent(promptComponent)).toContain(
       "Command: cat /outside/secret.txt",
     );
+  });
+
+  it("persists 'allow file always' to the local scope by default", async () => {
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-always");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(mockState.saves).toHaveLength(1);
+    expect(mockState.saves[0].scope).toBe("local");
+    const saved = mockState.saves[0].config as {
+      pathAccess: { allowedPaths: unknown[] };
+    };
+    expect(saved.pathAccess.allowedPaths).toEqual([
+      { kind: "file", path: "/outside/secret.txt" },
+    ]);
+  });
+
+  it("persists 'allow file always' to the global scope when alwaysScope is global", async () => {
+    mockState.pathAccess.alwaysScope = "global";
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-always");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(mockState.saves).toHaveLength(1);
+    expect(mockState.saves[0].scope).toBe("global");
+    const saved = mockState.saves[0].config as {
+      pathAccess: { allowedPaths: unknown[] };
+    };
+    expect(saved.pathAccess.allowedPaths).toEqual([
+      { kind: "file", path: "/outside/secret.txt" },
+    ]);
+  });
+
+  it("persists 'allow directory always' to the global scope when alwaysScope is global", async () => {
+    mockState.pathAccess.alwaysScope = "global";
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-dir-always");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(mockState.saves).toHaveLength(1);
+    expect(mockState.saves[0].scope).toBe("global");
+    const saved = mockState.saves[0].config as {
+      pathAccess: { allowedPaths: unknown[] };
+    };
+    expect(saved.pathAccess.allowedPaths).toEqual([
+      { kind: "directory", path: "/outside" },
+    ]);
+  });
+
+  it("persists session grants to memory regardless of alwaysScope", async () => {
+    mockState.pathAccess.alwaysScope = "global";
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-session");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(mockState.saves).toHaveLength(1);
+    expect(mockState.saves[0].scope).toBe("memory");
+  });
+
+  it("does not persist 'allow once' grants", async () => {
+    mockState.pathAccess.alwaysScope = "global";
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(mockState.saves).toHaveLength(0);
   });
 });

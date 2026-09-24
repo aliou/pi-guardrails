@@ -9,7 +9,7 @@ import { configLoader } from "../../src/shared/config";
 export type PendingPathGrant = {
   kind: "file" | "directory";
   storageGrant: AllowedPath;
-  scope: "memory" | "local";
+  scope: "memory" | "local" | "global";
   absolutePath: string;
 };
 
@@ -38,7 +38,7 @@ export function isGrantTooBroad(absPath: string): boolean {
 export function createPendingGrant(
   absolutePath: string,
   isDirectory: boolean,
-  scope: "memory" | "local",
+  scope: "memory" | "local" | "global",
 ): PendingPathGrant {
   return {
     kind: isDirectory ? "directory" : "file",

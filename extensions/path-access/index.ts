@@ -153,7 +153,9 @@ export default async function pathAccess(pi: ExtensionAPI) {
         const grant = createPendingGrant(
           absolutePath,
           false,
-          result === "allow-file-session" ? "memory" : "local",
+          result === "allow-file-session"
+            ? "memory"
+            : config.pathAccess.alwaysScope,
         );
         acceptedGrants.push(grant);
         await persistGrant(grant);
@@ -172,7 +174,9 @@ export default async function pathAccess(pi: ExtensionAPI) {
         const grant = createPendingGrant(
           dirPath,
           true,
-          result === "allow-dir-session" ? "memory" : "local",
+          result === "allow-dir-session"
+            ? "memory"
+            : config.pathAccess.alwaysScope,
         );
         acceptedGrants.push(grant);
         await persistGrant(grant);

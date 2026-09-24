@@ -58,4 +58,13 @@ describe("path access grants", () => {
       storageGrant: { kind: "directory", path: "/tmp/logs" },
     });
   });
+
+  it("creates pending grants for the global scope", () => {
+    expect(createPendingGrant("/tmp/logs", true, "global")).toEqual({
+      kind: "directory",
+      absolutePath: "/tmp/logs",
+      scope: "global",
+      storageGrant: { kind: "directory", path: "/tmp/logs" },
+    });
+  });
 });

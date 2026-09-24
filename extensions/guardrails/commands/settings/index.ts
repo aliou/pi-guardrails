@@ -545,6 +545,16 @@ export function registerGuardrailsSettings(
                 "Allowed Paths",
               ),
             },
+            {
+              id: "pathAccess.alwaysScope",
+              label: "Always-grant scope",
+              description:
+                "Where 'Allow … always' grants are saved. local: this project only, global: every project",
+              currentValue:
+                scopedConfig.pathAccess?.alwaysScope ??
+                `inherited: ${resolved.pathAccess.alwaysScope}`,
+              values: ["local", "global"],
+            },
           ],
         },
         {
