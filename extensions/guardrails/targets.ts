@@ -2,6 +2,7 @@ import { parse } from "@aliou/sh";
 import { maybePathLike } from "../../src/core/paths";
 import {
   isFdDuplicationRedirect,
+  isHeredocRedirect,
   walkCommands,
   wordHasExpansion,
   wordToString,
@@ -70,6 +71,8 @@ export async function extractTargets(
       for (const redir of redirects ?? []) {
         // Fd duplications (`2>&1`) have no filesystem target.
         if (isFdDuplicationRedirect(redir)) continue;
+        // Heredoc delimiters and here-strings are text, not file targets.
+        if (isHeredocRedirect(redir)) continue;
         pending.push(
           maybeAdd(wordToString(redir.target), wordHasExpansion(redir.target)),
         );
