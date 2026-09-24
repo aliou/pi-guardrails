@@ -162,6 +162,15 @@ describe("classifyCommandArgs", () => {
     it("ignores delimiter args", () => {
       expect(tokens("cut", ["-d", "/", "./file"])).toEqual(["./file"]);
       expect(tokens("sort", ["-t", "/", "./file"])).toEqual(["./file"]);
+    });
+  });
+
+  describe("commands without file operands", () => {
+    // POSIX defines these grammars as pure text; argv tokens that name real
+    // files are data, not file access.
+    it("ignores every argument", () => {
+      expect(tokens("echo", [".env", "/etc/hosts"])).toEqual([]);
+      expect(tokens("printf", ["%s\\n", ".env"])).toEqual([]);
       expect(tokens("tr", ["/", ":"])).toEqual([]);
     });
   });
