@@ -1,5 +1,18 @@
 # @aliou/pi-guardrails
 
+## 0.19.0
+
+### Minor Changes
+
+- ef9db31: Merge Permission Gate pattern arrays (`patterns`, `allowedPatterns`, `autoDenyPatterns`) across config scopes instead of a project config replacing global entries. Previously, defining one of these arrays in `.pi/extensions/guardrails.json` silently dropped every global pattern, including auto-deny rules. Affected configs print a one-time notice on next load.
+- 585841e: Add per-rule `respectCwd` option (default `true`) so path-tree `readOnly`/`noAccess` policies no longer neuter the session working directory. Location-anchored patterns (`~`- or `/`-prefixed globs like `~/work/**`) are skipped for targets inside the cwd, while basename globs, relative path globs, and regex patterns keep applying, so secrets stay protected everywhere. Set `respectCwd: false` on a rule to restore strict enforcement. Fixes #100.
+
+### Patch Changes
+
+- 1aacdb1: Path extraction no longer treats non-file text as file access. Heredoc delimiters and here-strings (`cat <<'EOF'`) are skipped instead of surfacing the delimiter as a path; tokens that collapse to the filesystem root (`cat //`) are dropped; and `#` comments written after `|`, `&&` or `||` parse as the line continuations they are (via `@aliou/sh` 0.3.3, aliou/sh#24), so comment text and paths mentioned in it never surface as candidates or false policy blocks.
+- 1aacdb1: Remote command argv no longer reads as local filesystem access. Path extraction drops ssh argv entirely — nothing in it is reliably a local path (`-i` identity files stay unprompted as a consequence) — and drops the kubectl tail after `--`, which kubectl passes to the container command per its CLI contract. `ssh user@host 'cat /etc/passwd'` and `kubectl exec -it pod/one -- ls /app` no longer prompt for `/etc/passwd` or `/app` as local paths.
+- ac36ad9: Stop blocking bash commands when a protected file name is passed as pure text. `echo`, `printf`, and `tr` take no file operands by their POSIX grammars, so `printf '%s\n' '.env'` or `echo .env` no longer trigger the protected-file policy. Actual file operands keep working: reading `.env` with `cat`, or redirecting to it (`printf … > .env`), stays blocked.
+
 ## 0.18.1
 
 ### Patch Changes
