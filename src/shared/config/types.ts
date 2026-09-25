@@ -72,6 +72,14 @@ export interface PolicyRule {
 
 export type PathAccessMode = "allow" | "ask" | "block";
 
+/**
+ * Where "Allow … always" grants from the prompt are persisted.
+ * - `local`: project config (`{project}/.pi/extensions/guardrails.json`).
+ * - `global`: user-wide config (`~/.pi/agent/extensions/guardrails.json`),
+ *   so the same grant applies in every project.
+ */
+export type PathAccessAlwaysScope = "local" | "global";
+
 export interface PathAccessConfig {
   mode?: PathAccessMode;
   /**
@@ -80,6 +88,8 @@ export interface PathAccessConfig {
    * and its descendants.
    */
   allowedPaths?: AllowedPath[];
+  /** Config scope used when the user picks "Allow … always" in the prompt. Default: "local". */
+  alwaysScope?: PathAccessAlwaysScope;
 }
 
 export interface GuardrailsConfig {
@@ -147,6 +157,7 @@ export interface ResolvedConfig {
   pathAccess: {
     mode: PathAccessMode;
     allowedPaths: AllowedPath[];
+    alwaysScope: PathAccessAlwaysScope;
   };
   permissionGate: {
     patterns: DangerousPattern[];
