@@ -5,6 +5,7 @@ import {
   type AllowedPath,
   normalizeForDisplay,
   type PathAccessState,
+  resolveFromCwd,
 } from "../../src/core/paths";
 import { configLoader } from "../../src/shared/config";
 import {
@@ -18,6 +19,7 @@ import {
   GUARDRAILS_PROMPT_OPENED_EVENT,
   setupLegacyPromptEventAlias,
 } from "../../src/shared/events";
+import { createToolRegistry } from "../../src/shared/tool-registry";
 import { piDocumentationPaths } from "./dynamic-resources";
 import {
   createPendingGrant,
@@ -58,6 +60,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "pathAccess");
+  const registry = createToolRegistry(pi, "pathAccess");
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -70,11 +73,35 @@ export default async function pathAccess(pi: ExtensionAPI) {
     }
 
     const input = event.input as Record<string, unknown>;
+    // Registered tools (src/shared/tool-registry.ts): command targets are
+    // checked like `bash`, file targets like the built-in file tools.
+    const resolution = await registry.resolve(event.toolName, input, ctx.cwd);
+    if (resolution.kind === "none") return;
+    if (resolution.kind === "error") {
+      return { block: true, reason: resolution.reason };
+    }
+    const registered =
+      resolution.kind === "targets" ? resolution.targets : undefined;
     const bashCommand =
-      event.toolName === "bash" ? String(input.command ?? "") : undefined;
-    const targets = [
-      ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
-    ];
+      registered?.kind === "command"
+        ? registered.command
+        : event.toolName === "bash"
+          ? String(input.command ?? "")
+          : undefined;
+    const rawTargets =
+      registered === undefined
+        ? await targetsForTool(event.toolName, input, ctx.cwd)
+        : registered.kind === "command"
+          ? await targetsForTool(
+              "bash",
+              { command: registered.command },
+              ctx.cwd,
+            )
+          : registered.paths
+              .map((entry) => entry.path.trim())
+              .filter((path) => path !== "")
+              .map((path) => resolveFromCwd(path, ctx.cwd));
+    const targets = [...new Set(rawTargets)];
     const acceptedGrants: PendingPathGrant[] = [];
 
     for (const absolutePath of targets) {

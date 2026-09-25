@@ -86,6 +86,39 @@ Guardrails emits paired prompt lifecycle events on Pi's shared event bus:
 
 Both events include the same `prompt.id` for correlation.
 
+## Guarding tools from other extensions
+
+Guardrails gates the built-in tools (`read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`) out of the box. Another extension can opt its own tools in over Pi's shared event bus, without depending on this package:
+
+```ts
+const registration = {
+  toolName: "structural_replace",
+  // Return what one call touches, or undefined when there is nothing to check.
+  resolveTargets: ({ input }) => ({
+    kind: "files",
+    access: input.apply ? "write" : "read",
+    paths: input.paths.map((path) => ({ path })),
+  }),
+  // Optional: "policies" | "permissionGate" | "pathAccess" (default: all).
+  // features: ["policies"],
+};
+
+export default function (pi) {
+  pi.events.emit("guardrails:register-tool", registration);
+  // Re-register when Guardrails loads after this extension.
+  pi.events.on("guardrails:request-tools", () =>
+    pi.events.emit("guardrails:register-tool", registration),
+  );
+}
+```
+
+`resolveTargets` returns one of:
+
+- `{ kind: "files", access: "read" | "write", paths: [{ path, unresolved? }] }` — checked like `read` (read access: only `noAccess` policies apply) or like `write`/`edit` (write access: `noAccess` and `readOnly`), plus path access.
+- `{ kind: "command", command }` — checked exactly like `bash`: permission gate, policy target extraction, and path access.
+
+A resolver that throws or returns a malformed value blocks the call (fail closed). Registrations for built-in tool names are ignored.
+
 ## Configuration
 
 Most configuration should happen through the interactive settings UI:

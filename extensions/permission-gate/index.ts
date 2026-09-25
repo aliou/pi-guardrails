@@ -16,6 +16,7 @@ import {
   GUARDRAILS_PROMPT_OPENED_EVENT,
   setupLegacyPromptEventAlias,
 } from "../../src/shared/events";
+import { createToolRegistry } from "../../src/shared/tool-registry";
 import { isCommandAllowed, saveCommandSessionGrant } from "./grants";
 import { createPermissionGateConfirmComponent } from "./prompt";
 import {
@@ -34,14 +35,37 @@ export default async function permissionGate(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "permissionGate");
+  const registry = createToolRegistry(pi, "permissionGate");
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
     if (!config.enabled || !config.features.permissionGate) return;
-    if (!isToolCallEventType("bash", event)) return;
 
-    const command = event.input.command;
-    const action = { kind: "command" as const, command, origin: "bash" };
+    const input = event.input as Record<string, unknown>;
+    let command: string;
+    if (isToolCallEventType("bash", event)) {
+      command = event.input.command;
+    } else {
+      // Registered tools (src/shared/tool-registry.ts) with a command target
+      // are gated like bash; file targets are not this feature's concern.
+      const resolution = await registry.resolve(event.toolName, input, ctx.cwd);
+      if (resolution.kind === "error") {
+        return { block: true, reason: resolution.reason };
+      }
+      if (
+        resolution.kind !== "targets" ||
+        resolution.targets.kind !== "command"
+      ) {
+        return;
+      }
+      command = resolution.targets.command;
+    }
+
+    const action = {
+      kind: "command" as const,
+      command,
+      origin: event.toolName,
+    };
     if (isCommandAllowed(command)) return;
 
     const autoDenyMatch = matchCommandPattern(
@@ -57,7 +81,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action,
         reason,
         block: { source: "permission", metadata: autoDenyMatch },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName: event.toolName, input },
       });
 
       return { block: true, reason };
@@ -74,7 +98,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
     emitRiskDetected(pi, {
       feature: "permissionGate",
       risk: safety,
-      context: { toolName: "bash", input: event.input },
+      context: { toolName: event.toolName, input },
     });
 
     if (!config.permissionGate.requireConfirmation) {
@@ -89,7 +113,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason,
         block: { source: "nonInteractive", metadata: safety.metadata },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName: event.toolName, input },
       });
       return { block: true, reason };
     }
@@ -103,7 +127,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         kind: "permission",
         metadata: safety.metadata,
       },
-      context: { toolName: "bash", input: event.input },
+      context: { toolName: event.toolName, input },
     });
     pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
@@ -145,7 +169,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason,
         block: { source: "user-stop", metadata: safety.metadata },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName: event.toolName, input },
       });
       ctx.abort();
       return { block: true, reason };
@@ -157,7 +181,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
       action: safety.action,
       reason,
       block: { source: "user", metadata: safety.metadata },
-      context: { toolName: "bash", input: event.input },
+      context: { toolName: event.toolName, input },
     });
     return { block: true, reason };
   });
