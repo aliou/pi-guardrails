@@ -5,6 +5,55 @@ import { compilePolicies } from "./rules";
 import { extractTargets } from "./targets";
 
 describe("extractTargets", () => {
+  describe("executable substitutions", () => {
+    const policies = compilePolicies([
+      {
+        id: "secret-files",
+        patterns: [{ pattern: ".env" }],
+        protection: "noAccess",
+      },
+    ]);
+
+    it.each([
+      'echo "$(cat .env)"',
+      "echo `cat .env`",
+      "cat <(cat .env)",
+      "echo ok > >(cat .env)",
+      'echo "$(echo "$(cat .env)")"',
+      'echo "$(echo hi > .env)"',
+      'echo ok <<< "$(cat .env)"',
+      '{ echo ok; } > "$(cat .env)"',
+      "value=$(cat .env)",
+      "export value=$(cat .env)",
+      'ssh host "$(cat .env)"',
+    ])("extracts the inner file access in %j", async (command) => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command } },
+          "/repo",
+          policies,
+        ),
+      ).resolves.toEqual([{ path: ".env", unresolved: false }]);
+    });
+
+    it.each([
+      'echo "$(echo .env)"',
+      'echo "$(printf %s .env)"',
+      'echo "$(tr .env x)"',
+      "echo '$(cat .env)'",
+      "cat <<'EOF'\n$(cat .env)\nEOF\n",
+      "cat <<$(cat .env)\nbody\n$(cat .env)\n",
+    ])("does not turn non-file text into a target in %j", async (command) => {
+      await expect(
+        extractTargets(
+          { toolName: "bash", input: { command } },
+          "/repo",
+          policies,
+        ),
+      ).resolves.toEqual([]);
+    });
+  });
+
   it("returns direct file tool targets", async () => {
     await expect(
       extractTargets(

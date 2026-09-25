@@ -29,6 +29,57 @@ beforeEach(() => {
 });
 
 describe("extractBashPathCandidates", () => {
+  describe("executable substitutions", () => {
+    it.each([
+      'echo "$(cat /etc/passwd)"',
+      "echo `cat /etc/passwd`",
+      "cat <(cat /etc/passwd)",
+      'echo "$(echo "$(cat /etc/passwd)")"',
+      'echo "$(echo hi > /etc/passwd)"',
+      'echo ok <<< "$(cat /etc/passwd)"',
+      'ssh host "$(cat /etc/passwd)"',
+      'kubectl exec pod -- echo "$(cat /etc/passwd)"',
+      "value=$(cat /etc/passwd)",
+      "export value=$(cat /etc/passwd)",
+    ])("extracts the locally accessed path in %j", async (command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+        "/etc/passwd",
+      ]);
+    });
+
+    it("extracts paths inside output process substitutions", async () => {
+      // The existing extractor also returns the unresolved redirect target.
+      const paths = await extractBashPathCandidates(
+        "echo ok > >(cat /etc/passwd)",
+        CWD,
+      );
+      expect(paths).toContain("/etc/passwd");
+    });
+
+    it.each([
+      'echo "$(echo /etc/passwd)"',
+      'echo "$(printf %s /etc/passwd)"',
+      'echo "$(tr /etc/passwd x)"',
+      "echo '$(cat /etc/passwd)'",
+      "cat <<'EOF'\n$(cat /etc/passwd)\nEOF\n",
+      "cat <<$(cat /etc/passwd)\nbody\n$(cat /etc/passwd)\n",
+    ])("keeps non-file text excluded in %j", async (command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        [],
+      );
+    });
+
+    it("keeps plausibility filtering for inner file operands", async () => {
+      await expect(
+        extractBashPathCandidates(
+          'echo "$(cat /missing-directory/file)"',
+          CWD,
+          { pathExists: () => false },
+        ),
+      ).resolves.toEqual([]);
+    });
+  });
+
   it("does not extract go package wildcard patterns as paths", async () => {
     const result = await extractBashPathCandidates("go test ./...", CWD);
 

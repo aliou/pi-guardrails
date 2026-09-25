@@ -6,11 +6,16 @@
  */
 
 import type {
+  ArithExpr,
+  ArrayElem,
+  ArrayExpr,
+  Assignment,
   Command,
   Program,
   Redirect,
   SimpleCommand,
   Statement,
+  TestExpr,
   Word,
   WordPart,
 } from "@aliou/sh";
@@ -124,36 +129,66 @@ export type CommandCallback = (
   redirects?: Redirect[],
 ) => boolean | undefined;
 
+export type WalkCommandsOptions = {
+  /** Visit executable substitutions in words; literal text is never reparsed. */
+  includeSubstitutions?: boolean;
+};
+
 /**
- * Walk the AST and call `callback` for every SimpleCommand found at any
- * nesting depth, plus once per compound node that carries its own redirects
- * (with `cmd === undefined`). Returns early if callback returns `true`.
+ * Walk statement bodies and call `callback` for every SimpleCommand, plus
+ * once per compound node that carries its own redirects (cmd === undefined).
+ * Optionally descend into executable substitutions in word-bearing fields.
+ * This is structural traversal, not shell evaluation or execution order.
+ * Returns early if callback returns `true`.
  */
-export function walkCommands(node: Program, callback: CommandCallback): void {
-  for (const stmt of node.body) {
-    if (walkStatement(stmt, callback)) return;
-  }
+export function walkCommands(
+  node: Program,
+  callback: CommandCallback,
+  options: WalkCommandsOptions = {},
+): void {
+  walkStatements(node.body, callback, options);
 }
 
 function hasRedirect(redirects: Redirect[] | undefined): boolean {
   return redirects !== undefined && redirects.length > 0;
 }
 
-function walkStatement(stmt: Statement, callback: CommandCallback): boolean {
-  return walkCommand(stmt.command, callback);
+function walkStatement(
+  stmt: Statement,
+  callback: CommandCallback,
+  options: WalkCommandsOptions,
+): boolean {
+  return walkCommand(stmt.command, callback, options);
 }
 
 function walkStatements(
   stmts: Statement[],
   callback: CommandCallback,
+  options: WalkCommandsOptions,
 ): boolean {
   for (const stmt of stmts) {
-    if (walkStatement(stmt, callback)) return true;
+    if (walkStatement(stmt, callback, options)) return true;
   }
   return false;
 }
 
-function walkCommand(cmd: Command, callback: CommandCallback): boolean {
+function walkCommand(
+  cmd: Command,
+  callback: CommandCallback,
+  options: WalkCommandsOptions,
+): boolean {
+  return (
+    walkCommandBody(cmd, callback, options) ||
+    (options.includeSubstitutions === true &&
+      walkSubstitutions(cmd, callback, options))
+  );
+}
+
+function walkCommandBody(
+  cmd: Command,
+  callback: CommandCallback,
+  options: WalkCommandsOptions,
+): boolean {
   // Compound nodes may attach trailing redirects (`{ …; } > out`). Collect
   // them before descending so the caller sees the redirect even when the
   // callback would stop the walk inside the body.
@@ -164,11 +199,12 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
       return callback(cmd, redirects) === true;
 
     case "Pipeline":
-      return walkStatements(cmd.commands, callback);
+      return walkStatements(cmd.commands, callback, options);
 
     case "Logical":
       return (
-        walkStatement(cmd.left, callback) || walkStatement(cmd.right, callback)
+        walkStatement(cmd.left, callback, options) ||
+        walkStatement(cmd.right, callback, options)
       );
 
     case "Subshell":
@@ -176,16 +212,16 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
         return true;
       }
-      return walkStatements(cmd.body, callback);
+      return walkStatements(cmd.body, callback, options);
 
     case "IfClause":
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
         return true;
       }
       return (
-        walkStatements(cmd.cond, callback) ||
-        walkStatements(cmd.then, callback) ||
-        (cmd.else ? walkStatements(cmd.else, callback) : false)
+        walkStatements(cmd.cond, callback, options) ||
+        walkStatements(cmd.then, callback, options) ||
+        (cmd.else ? walkStatements(cmd.else, callback, options) : false)
       );
 
     case "ForClause":
@@ -196,8 +232,8 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
       }
       const cond = "cond" in cmd ? cmd.cond : undefined;
       return (
-        (cond ? walkStatements(cond, callback) : false) ||
-        walkStatements(cmd.body, callback)
+        (cond ? walkStatements(cond, callback, options) : false) ||
+        walkStatements(cmd.body, callback, options)
       );
     }
 
@@ -206,7 +242,7 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
         return true;
       }
       for (const item of cmd.items) {
-        if (walkStatements(item.body, callback)) return true;
+        if (walkStatements(item.body, callback, options)) return true;
       }
       return false;
 
@@ -214,22 +250,22 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
         return true;
       }
-      return walkStatements(cmd.body, callback);
+      return walkStatements(cmd.body, callback, options);
 
     case "TimeClause":
-      return walkStatement(cmd.command, callback);
+      return walkStatement(cmd.command, callback, options);
 
     case "CoprocClause":
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
         return true;
       }
-      return walkStatement(cmd.body, callback);
+      return walkStatement(cmd.body, callback, options);
 
     case "CStyleLoop":
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
         return true;
       }
-      return walkStatements(cmd.body, callback);
+      return walkStatements(cmd.body, callback, options);
 
     case "TestClause":
       if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
@@ -237,10 +273,96 @@ function walkCommand(cmd: Command, callback: CommandCallback): boolean {
       }
       return false;
 
-    // These contain neither nested commands nor redirects
+    // No statement bodies to visit; substitutions are handled separately.
     case "ArithCmd":
     case "DeclClause":
     case "LetClause":
+      return false;
+  }
+}
+
+type SubstitutionNode =
+  | Command
+  | Word
+  | WordPart
+  | Redirect
+  | Assignment
+  | ArrayExpr
+  | ArrayElem
+  | ArithExpr
+  | TestExpr;
+
+/**
+ * Visit only word-bearing fields here. Statement bodies belong to
+ * walkCommandBody; revisiting them would duplicate callbacks. Literal text
+ * (including the parser's raw heredoc bodies) is never parsed as shell code.
+ */
+function walkSubstitutions(
+  node: SubstitutionNode,
+  callback: CommandCallback,
+  options: WalkCommandsOptions,
+): boolean {
+  const visit = (...children: (SubstitutionNode | undefined)[]): boolean =>
+    children.some(
+      (child) =>
+        child !== undefined && walkSubstitutions(child, callback, options),
+    );
+
+  if ("redirects" in node && visit(...(node.redirects ?? []))) return true;
+
+  switch (node.type) {
+    case "CmdSubst":
+    case "ProcSubst":
+      return walkStatements(node.stmts, callback, options);
+    case "Word":
+    case "DblQuoted":
+      return visit(...node.parts);
+    case "ParamExp":
+      return visit(
+        node.index,
+        node.exp?.word,
+        node.slice?.offset,
+        node.slice?.length,
+        node.replace?.orig,
+        node.replace?.with,
+      );
+    case "BraceExp":
+      return visit(...node.elems);
+    case "Redirect":
+      // Heredoc delimiters undergo quote removal, not command substitution.
+      // Here-string targets, in contrast, are expanded by the shell.
+      return node.op !== "<<" && node.op !== "<<-" && visit(node.target);
+    case "SimpleCommand":
+      return visit(...(node.words ?? []), ...(node.assignments ?? []));
+    case "DeclClause":
+      return visit(...(node.args ?? []), ...(node.assigns ?? []));
+    case "Assignment":
+      return visit(node.value, node.array);
+    case "ArrayExpr":
+      return visit(...node.elems);
+    case "ArrayElem":
+      return visit(node.index, node.value);
+    case "ForClause":
+    case "SelectClause":
+      return visit(...(node.items ?? []));
+    case "CaseClause":
+      return visit(node.word, ...node.items.flatMap((item) => item.patterns));
+    case "CStyleLoop":
+      return visit(node.init, node.cond, node.post);
+    case "LetClause":
+      return visit(...node.exprs);
+    case "ArithCmd":
+    case "ArithExp":
+    case "ParenArithm":
+    case "UnaryArithm":
+    case "TestClause":
+    case "ParenTest":
+    case "UnaryTest":
+      return visit(node.x);
+    case "BinaryArithm":
+    case "BinaryTest":
+      return visit(node.x, node.y);
+    default:
       return false;
   }
 }

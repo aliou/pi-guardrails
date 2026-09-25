@@ -418,18 +418,22 @@ export function checkDangerousCommand({
       const { ast } = parse(command);
       parsedSuccessfully = true;
       let match: DangerousCommandMatch | undefined;
-      walkCommands(ast, (cmd) => {
-        // Skip compound-node redirect callbacks (cmd === undefined): command
-        // matchers match on words, not redirect targets.
-        if (!cmd) return false;
-        const words = (cmd.words ?? []).map(wordToString);
-        const result = matchBuiltinDangerous(words);
-        if (result) {
-          match = result;
-          return true;
-        }
-        return false;
-      });
+      walkCommands(
+        ast,
+        (cmd) => {
+          // Skip compound-node redirect callbacks (cmd === undefined): command
+          // matchers match on words, not redirect targets.
+          if (!cmd) return false;
+          const words = (cmd.words ?? []).map(wordToString);
+          const result = matchBuiltinDangerous(words);
+          if (result) {
+            match = result;
+            return true;
+          }
+          return false;
+        },
+        { includeSubstitutions: true },
+      );
       if (match) return match;
     } catch {
       for (const pattern of fallbackPatterns) {
