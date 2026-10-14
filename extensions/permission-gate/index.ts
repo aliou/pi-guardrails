@@ -114,8 +114,11 @@ export default async function permissionGate(pi: ExtensionAPI) {
       );
 
       if (customResult === undefined) {
+        // RPC clients only see this title, so it carries the command. Each line is indented
+        // four spaces: readable as plain text, and a code block to clients that render Markdown.
+        const indentedCommand = command.replace(/^/gm, "    ");
         const selection = await ctx.ui.select(
-          `Dangerous command: ${safety.reason}`,
+          `Dangerous command: ${safety.reason}\n\n${indentedCommand}`,
           ["Allow once", "Allow for session", "Deny", "Decline and stop"],
         );
         if (selection === "Allow once") result = "allow";
