@@ -248,6 +248,25 @@ describe("permissionGate extension hook", () => {
     expect(ctx.abort).toHaveBeenCalledTimes(1);
   });
 
+  it("RPC fallback title shows the command, indented on every line", async () => {
+    assert(toolCallHandler, "tool_call handler should be registered");
+
+    const select = vi.fn().mockResolvedValue("Deny");
+    const ctx = createCtx({
+      ui: { custom: vi.fn().mockResolvedValue(undefined), select },
+    });
+
+    await toolCallHandler(
+      { ...DANGEROUS_EVENT, input: { command: "dangerous-cmd \\\n  --force" } },
+      ctx,
+    );
+
+    const [title] = select.mock.calls[0] ?? [];
+    expect(title).toBe(
+      "Dangerous command: test danger\n\n    dangerous-cmd \\\n      --force",
+    );
+  });
+
   it("non-interactive (no UI) blocks with nonInteractive source and does not abort", async () => {
     assert(toolCallHandler, "tool_call handler should be registered");
 

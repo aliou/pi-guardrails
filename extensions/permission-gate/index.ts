@@ -114,8 +114,9 @@ export default async function permissionGate(pi: ExtensionAPI) {
       );
 
       if (customResult === undefined) {
+        const indentedCommand = command.replace(/^/gm, "    ");
         const selection = await ctx.ui.select(
-          `Dangerous command: ${safety.reason}`,
+          `Dangerous command: ${safety.reason}\n\n${indentedCommand}`,
           ["Allow once", "Allow for session", "Deny", "Decline and stop"],
         );
         if (selection === "Allow once") result = "allow";
