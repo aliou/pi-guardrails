@@ -31,8 +31,10 @@ export function pendingAllowedPaths(grants: PendingPathGrant[]): AllowedPath[] {
 }
 
 export function isGrantTooBroad(absPath: string): boolean {
+  // Stripping trailing separators reduces the filesystem root ("/", "//",
+  // "\\") to the empty string, so check for it after normalizing.
   const normalized = absPath.replace(/[\\/]+$/, "");
-  return normalized === "/" || normalized === homedir();
+  return normalized === "" || normalized === homedir();
 }
 
 export function createPendingGrant(

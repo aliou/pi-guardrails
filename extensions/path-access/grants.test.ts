@@ -50,6 +50,12 @@ describe("path access grants", () => {
     expect(isGrantTooBroad(`${homedir()}/project`)).toBe(false);
   });
 
+  it("rejects filesystem root grants as too broad", () => {
+    expect(isGrantTooBroad("/")).toBe(true);
+    expect(isGrantTooBroad("//")).toBe(true);
+    expect(isGrantTooBroad("/etc")).toBe(false);
+  });
+
   it("creates pending grants with a storage grant", () => {
     expect(createPendingGrant("/tmp/logs", true, "local")).toEqual({
       kind: "directory",
