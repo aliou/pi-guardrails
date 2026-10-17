@@ -362,6 +362,11 @@ function walkSubstitutions(
     case "BinaryArithm":
     case "BinaryTest":
       return visit(node.x, node.y);
+    // Fail open for node types a future @aliou/sh adds — the opposite of
+    // partHasExpansion's deliberate fail-closed `default: true`. The stances
+    // differ because the costs differ: an unrecognised expansion part must
+    // never prove a file absent, while an unrecognised AST node here only
+    // loses detection coverage and must not crash traversal.
     default:
       return false;
   }
