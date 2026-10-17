@@ -287,4 +287,30 @@ describe("outside-workspace plausibility filter", () => {
       ]);
     });
   });
+
+  describe("single-quoted text is not an expansion (issue #123)", () => {
+    it.each([
+      ["sed -n '/Validation cannot currently/,$p' x.md", "sed `$` range"],
+      ["sed -n '/## High concerns/,$p' x.md", "sed heading range"],
+      // Resolves outside the workspace, so existence suppression applies.
+      ["cat '../$USER/config.json'", "single-quoted `$USER` path"],
+    ])("suppresses the quoted literal from %s (%s)", async (command) => {
+      expect(await extract(command)).toEqual([]);
+    });
+
+    it.each([
+      ['cat "$HOME/../../etc/$USER.conf"', "double-quoted parameter expansion"],
+      ["cat $HOME/../../etc/$USER.conf", "unquoted parameter expansion"],
+      ["cat `pwd`/../etc/shadow", "command substitution"],
+      ['cat "$(pwd)/../../etc/shadow"', "nested command substitution"],
+    ])("still reports the real expansion in %s (%s)", async (command) => {
+      expect(await extract(command)).not.toEqual([]);
+    });
+
+    it("still reports the real file argument of a sed range", async () => {
+      expect(await extract("sed -n '/pat/,$p' /etc/passwd")).toEqual([
+        "/etc/passwd",
+      ]);
+    });
+  });
 });

@@ -9,13 +9,13 @@ import {
 import {
   commandCreatesPaths,
   hasNonPathShape,
-  hasShellExpansion,
   isImplausibleLocalPath,
 } from "../../core/paths/plausibility";
 import {
   isFdDuplicationRedirect,
   isHeredocRedirect,
   walkCommands,
+  wordHasExpansion,
   wordToString,
 } from "../../core/shell/ast";
 import { classifyCommandArgs } from "../../core/shell/command-args";
@@ -69,6 +69,7 @@ export async function extractBashPathCandidates(
     commandName?: string,
     commandArgs: string[] = [],
     programText = false,
+    mayExpand = false,
   ): Promise<void> => {
     if (!token || token.startsWith("-")) return;
     if (!forcePath && !maybePathLike(token)) return;
@@ -78,7 +79,7 @@ export async function extractBashPathCandidates(
     // or when shell expansion means the filesystem cannot settle it yet.
     const skipImplausible =
       forcePath ||
-      hasShellExpansion(token) ||
+      mayExpand ||
       commandCreatesPaths(commandName, commandArgs) ||
       programText;
 
@@ -111,6 +112,15 @@ export async function extractBashPathCandidates(
     walkCommands(
       ast,
       (cmd, redirects) => {
+        // Expansion is decided per source word from its AST parts, not from
+        // the flattened token: `wordToString` flattens quoting away, so the
+        // `$p` in a single-quoted sed range (`'/pat/,$p'`) is literal text
+        // that a token-level check would misread as an unexpanded variable.
+        // Key the flattened form so classified arguments can be looked up.
+        const expandedTokens = new Set<string>();
+        for (const word of cmd?.words ?? []) {
+          if (wordHasExpansion(word)) expandedTokens.add(wordToString(word));
+        }
         for (const redir of redirects ?? []) {
           // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
           // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
@@ -146,6 +156,7 @@ export async function extractBashPathCandidates(
                   commandName,
                   words.slice(1),
                   arg.programText,
+                  expandedTokens.has(arg.token),
                 ),
               );
             }
@@ -160,7 +171,16 @@ export async function extractBashPathCandidates(
             if (word === "\\" || word === "(" || word === ")" || word === "!")
               continue;
             if (word.startsWith("-") && word !== "-" && word !== "--") continue;
-            pending.push(addCandidate(word));
+            pending.push(
+              addCandidate(
+                word,
+                false,
+                undefined,
+                [],
+                false,
+                expandedTokens.has(word),
+              ),
+            );
           }
         }
         return false;
