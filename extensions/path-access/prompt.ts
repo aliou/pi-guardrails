@@ -101,12 +101,12 @@ function expandedCommandRow(command: string): string {
   return `  Command: ${command}`;
 }
 
-interface PromptOption {
+export interface PromptOption {
   label: string;
   result: PromptResult;
 }
 
-const FILE_OPTIONS: PromptOption[] = [
+export const FILE_OPTIONS: PromptOption[] = [
   { label: "Allow once", result: "allow-file-once" },
   { label: "Allow file this session", result: "allow-file-session" },
   { label: "Allow file always", result: "allow-file-always" },
@@ -115,12 +115,21 @@ const FILE_OPTIONS: PromptOption[] = [
   { label: "Deny", result: "deny" },
 ];
 
-const DIR_OPTIONS: PromptOption[] = [
+export const DIR_OPTIONS: PromptOption[] = [
   { label: "Allow once", result: "allow-dir-once" },
   { label: "Allow directory this session", result: "allow-dir-session" },
   { label: "Allow directory always", result: "allow-dir-always" },
   { label: "Deny", result: "deny" },
 ];
+
+/**
+ * Options for the outside-path prompt for the given mode.
+ * File tools and bash get file + directory options;
+ * directory-oriented tools (ls, find) get directory-only options.
+ */
+export function promptOptions(showFileOptions: boolean): PromptOption[] {
+  return showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
+}
 
 const OPTION_INDENT = " ";
 const OPTION_COLUMN_GAP = 4;
@@ -225,7 +234,7 @@ export function createPathAccessPromptComponent(
     _kb: unknown,
     done: (result: PromptResult) => void,
   ) => {
-    const options = showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
+    const options = promptOptions(showFileOptions);
     let selectedIndex = 0;
     let optionLayout = createOptionLayout(options, tui.terminal.columns);
     let commandExpanded = false;

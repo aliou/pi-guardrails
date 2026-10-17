@@ -27,7 +27,11 @@ import {
   persistGrant,
   resolveAllowedPaths,
 } from "./grants";
-import { createPathAccessPromptComponent, type PromptResult } from "./prompt";
+import {
+  createPathAccessPromptComponent,
+  type PromptResult,
+  promptOptions,
+} from "./prompt";
 import { createPathAccessRule } from "./rules";
 import { targetsForTool } from "./targets";
 
@@ -126,9 +130,9 @@ export default async function pathAccess(pi: ExtensionAPI) {
       });
       pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
-      let result: PromptResult | undefined;
+      let result: PromptResult;
       try {
-        result = await ctx.ui.custom<PromptResult>(
+        const customResult = await ctx.ui.custom<PromptResult>(
           createPathAccessPromptComponent(
             event.toolName,
             safety.metadata.displayPath,
@@ -138,6 +142,24 @@ export default async function pathAccess(pi: ExtensionAPI) {
             bashCommand,
           ),
         );
+
+        if (customResult === undefined) {
+          // RPC mode has no custom component support; fall back to a plain
+          // select with the same options as the TUI prompt.
+          const options = promptOptions(showFileOptions);
+          const dirNote = showFileOptions
+            ? "\nDirectory grants apply to the parent directory."
+            : "";
+          const selection = await ctx.ui.select(
+            `Allow access to ${safety.metadata.displayPath}? (outside ${ctx.cwd})${dirNote}`,
+            options.map((option) => option.label),
+          );
+          result =
+            options.find((option) => option.label === selection)?.result ??
+            "deny";
+        } else {
+          result = customResult;
+        }
       } finally {
         pi.events.emit(
           GUARDRAILS_PROMPT_CLOSED_EVENT,
