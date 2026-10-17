@@ -256,6 +256,10 @@
         "mode": {
           "$ref": "#/definitions/PathAccessMode"
         },
+        "applyTo": {
+          "$ref": "#/definitions/PathAccessApplyTo",
+          "description": "Which operations the gate applies to. Default: \"all\"."
+        },
         "allowedPaths": {
           "type": "array",
           "items": {
@@ -277,6 +281,14 @@
         "ask",
         "block"
       ]
+    },
+    "PathAccessApplyTo": {
+      "type": "string",
+      "enum": [
+        "all",
+        "write"
+      ],
+      "description": "Which operations the outside-workspace gate applies to.\n- `all`: gate every tool call that touches a path outside cwd (default).\n- `write`: gate only writes. Read-only tools (`read`, `grep`, `find`, `ls`)   pass freely, so skill/config files outside the project stay readable.   Bash commands are still gated: a command can write."
     },
     "AllowedPath": {
       "anyOf": [

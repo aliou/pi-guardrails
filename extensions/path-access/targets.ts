@@ -1,6 +1,13 @@
 import { resolveFromCwd } from "../../src/core/paths";
 import { extractBashPathCandidates } from "../../src/shared/paths";
 
+/** Tools that only read. Bash is never read-only: a command can write. */
+const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
+
+export function isReadOnlyTool(toolName: string): boolean {
+  return READ_ONLY_TOOLS.has(toolName);
+}
+
 export async function targetsForTool(
   toolName: string,
   input: Record<string, unknown>,

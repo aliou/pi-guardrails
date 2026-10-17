@@ -12,6 +12,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   },
   pathAccess: {
     mode: "ask",
+    applyTo: "all",
     allowedPaths: [{ kind: "file", path: "/dev/null" }],
     alwaysScope: "local",
   },

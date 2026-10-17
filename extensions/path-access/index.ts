@@ -33,7 +33,7 @@ import {
   promptOptions,
 } from "./prompt";
 import { createPathAccessRule } from "./rules";
-import { targetsForTool } from "./targets";
+import { isReadOnlyTool, targetsForTool } from "./targets";
 
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
@@ -74,6 +74,12 @@ export default async function pathAccess(pi: ExtensionAPI) {
     }
 
     const input = event.input as Record<string, unknown>;
+    if (
+      config.pathAccess.applyTo === "write" &&
+      isReadOnlyTool(event.toolName)
+    ) {
+      return;
+    }
     const bashCommand =
       event.toolName === "bash" ? String(input.command ?? "") : undefined;
     const targets = [

@@ -65,6 +65,8 @@ The `path-access` extension checks tool calls that target paths outside the curr
 
 It can allow, block, or ask before Pi accesses files elsewhere on your machine. In ask mode, you can allow one file or a directory once, for the session, or always.
 
+Which operations are gated is controlled by `pathAccess.applyTo`: `"all"` (default) gates reads and writes outside the workspace, `"write"` gates writes only so read-only tools (`read`, `grep`, `find`, `ls`) can access skill and config files outside the project without a prompt. Bash commands are still gated: a command can write. Configurable through `/guardrails:settings` (Path Access → Applies to).
+
 Where "always" grants are saved is controlled by `pathAccess.alwaysScope`: `"local"` (default) writes them to the project config (`{project}/.pi/extensions/guardrails.json`), `"global"` writes them to the user-wide config (`~/.pi/agent/extensions/guardrails.json`) so they apply in every project. Session grants stay in memory and "once" grants are not persisted, regardless of this setting. Configurable through `/guardrails:settings` (Path Access → Always-grant scope).
 
 Granted paths are stored in `pathAccess.allowedPaths` as explicit `{ kind, path }` entries: `file` matches the exact path, `directory` matches the directory and its descendants. Edit them through `/guardrails:settings` (Path Access → Allowed paths, Tab toggles file/directory) or directly in the settings file. Paths support `~/` for home. Existing configs using the legacy string form (trailing `/` for directories) are migrated automatically.

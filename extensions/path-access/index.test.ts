@@ -19,6 +19,7 @@ import { DIR_OPTIONS, FILE_OPTIONS } from "./prompt";
 const mockState: {
   pathAccess: {
     mode: "allow" | "ask" | "block";
+    applyTo?: "all" | "write";
     allowedPaths: never[];
     alwaysScope: "local" | "global";
   };
@@ -49,6 +50,9 @@ vi.mock("./dynamic-resources", () => ({
 
 vi.mock("./targets", () => ({
   targetsForTool: vi.fn(async () => ["/outside/secret.txt"]),
+  isReadOnlyTool: vi.fn((toolName: string) =>
+    ["read", "grep", "find", "ls"].includes(toolName),
+  ),
 }));
 
 const toolCall = {
@@ -111,6 +115,7 @@ describe("pathAccess extension hook", () => {
   beforeEach(() => {
     mockState.pathAccess = {
       mode: "ask",
+      applyTo: "all",
       allowedPaths: [],
       alwaysScope: "local",
     };
@@ -320,10 +325,79 @@ describe("pathAccess extension hook", () => {
   });
 });
 
+describe("pathAccess extension hook write-only applyTo", () => {
+  beforeEach(() => {
+    mockState.pathAccess = {
+      mode: "ask",
+      applyTo: "write",
+      allowedPaths: [],
+      alwaysScope: "local",
+    };
+    mockState.saves = [];
+  });
+
+  function setup() {
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    return { pi, ctx };
+  }
+
+  it("lets read-only tools pass without a prompt", async () => {
+    const { pi, ctx } = setup();
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await expect(toolCallHandler(toolCall, ctx)).resolves.toBeUndefined();
+
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+    expect(pi.events.emit).not.toHaveBeenCalled();
+  });
+
+  it("still gates write tools", async () => {
+    const { pi, ctx } = setup();
+    ctx.ui.custom.mockResolvedValue("allow-file-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(bashToolCall, ctx);
+
+    expect(ctx.ui.custom).toHaveBeenCalledTimes(1);
+  });
+
+  it("gates read-only tools again once applyTo is 'all'", async () => {
+    mockState.pathAccess.applyTo = "all";
+    const { pi, ctx } = setup();
+    ctx.ui.custom.mockResolvedValue("allow-file-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(toolCall, ctx);
+
+    expect(ctx.ui.custom).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("pathAccess extension hook RPC fallback", () => {
   beforeEach(() => {
     mockState.pathAccess = {
       mode: "ask",
+      applyTo: "all",
       allowedPaths: [],
       alwaysScope: "local",
     };

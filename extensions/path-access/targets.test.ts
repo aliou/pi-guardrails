@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { vol } from "memfs";
 import { describe, expect, it } from "vitest";
-import { targetsForTool } from "./targets";
+import { isReadOnlyTool, targetsForTool } from "./targets";
 
 describe("targetsForTool", () => {
   it("resolves direct file tool targets from cwd", async () => {
@@ -64,5 +64,19 @@ describe("targetsForTool", () => {
     await expect(
       targetsForTool("custom", { path: "README.md" }, "/repo"),
     ).resolves.toEqual([]);
+  });
+});
+
+describe("isReadOnlyTool", () => {
+  it("classifies read-only tools", () => {
+    for (const tool of ["read", "grep", "find", "ls"]) {
+      expect(isReadOnlyTool(tool)).toBe(true);
+    }
+  });
+
+  it("never treats write-capable tools as read-only", () => {
+    for (const tool of ["write", "edit", "bash", "custom"]) {
+      expect(isReadOnlyTool(tool)).toBe(false);
+    }
   });
 });

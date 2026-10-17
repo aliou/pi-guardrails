@@ -80,8 +80,19 @@ export type PathAccessMode = "allow" | "ask" | "block";
  */
 export type PathAccessAlwaysScope = "local" | "global";
 
+/**
+ * Which operations the outside-workspace gate applies to.
+ * - `all`: gate every tool call that touches a path outside cwd (default).
+ * - `write`: gate only writes. Read-only tools (`read`, `grep`, `find`, `ls`)
+ *   pass freely, so skill/config files outside the project stay readable.
+ *   Bash commands are still gated: a command can write.
+ */
+export type PathAccessApplyTo = "all" | "write";
+
 export interface PathAccessConfig {
   mode?: PathAccessMode;
+  /** Which operations the gate applies to. Default: "all". */
+  applyTo?: PathAccessApplyTo;
   /**
    * Paths always allowed, regardless of cwd. Each entry carries an explicit
    * `kind`: `file` matches the exact path, `directory` matches the directory
@@ -156,6 +167,7 @@ export interface ResolvedConfig {
   };
   pathAccess: {
     mode: PathAccessMode;
+    applyTo: PathAccessApplyTo;
     allowedPaths: AllowedPath[];
     alwaysScope: PathAccessAlwaysScope;
   };
