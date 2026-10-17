@@ -83,7 +83,7 @@ It catches built-in risky patterns like recursive deletes, privileged commands, 
 
 Built-in dangerous-command checks, file policies, and path-access extraction inspect commands inside command substitutions (`$(...)` and backticks) and process substitutions (`<(...)` and `>(...)`), including nested substitutions and expanded redirect targets. For example, `echo "$(cat .env)"` exposes the inner file access, while `echo "$(echo .env)"` still treats `.env` as text.
 
-These checks inspect executable nodes provided by the shell parser; they do not evaluate expansions or reparse literal text. Single-quoted text and heredoc delimiters are not executable substitutions. The current parser leaves heredoc bodies and some expansion operands (such as `${value:-$(...)}`) as raw text, so substitutions in those locations remain outside this traversal.
+These checks inspect executable nodes provided by the shell parser; they do not evaluate expansions or reparse literal text. Single-quoted text and heredoc delimiters are not executable substitutions. The current parser leaves some constructs as raw text — heredoc bodies (note an *unquoted* heredoc body executes `$(...)` in bash), expansion operands such as `${value:-$(...)}`, and extglob patterns such as `@($(cmd))` — so substitutions in those locations remain outside this traversal.
 
 ## Extension events
 
