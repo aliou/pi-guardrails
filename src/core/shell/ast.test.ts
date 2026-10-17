@@ -83,6 +83,16 @@ describe("walkCommands substitution traversal", () => {
     ).toEqual([]);
   });
 
+  it("documents that unquoted heredoc bodies stay raw text", () => {
+    // Bash *does* perform command substitution in an unquoted heredoc body,
+    // but the parser keeps heredoc bodies as raw text, so traversal cannot
+    // see them. This pins the gap as an intentional parser limitation — the
+    // quoted-body and delimiter cases above are true exclusions; this one is
+    // a known blind spot, tracked alongside extglob patterns and
+    // `${var:-$(...)}` operands in the README.
+    expect(commands("cat <<EOF\n$(cat .env)\nEOF\n", true)).toEqual([["cat"]]);
+  });
+
   it("stops the entire walk when a nested callback returns true", () => {
     const found: string[] = [];
     walkCommands(
