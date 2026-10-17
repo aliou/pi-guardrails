@@ -104,21 +104,31 @@ function expandedCommandRow(command: string): string {
 export interface PromptOption {
   label: string;
   result: PromptResult;
+  /** Single-key shortcut that selects the option immediately. */
+  key?: string;
 }
 
 export const FILE_OPTIONS: PromptOption[] = [
-  { label: "Allow once", result: "allow-file-once" },
-  { label: "Allow file this session", result: "allow-file-session" },
-  { label: "Allow file always", result: "allow-file-always" },
-  { label: "Allow directory this session", result: "allow-dir-session" },
-  { label: "Allow directory always", result: "allow-dir-always" },
+  { label: "Allow once", result: "allow-file-once", key: "o" },
+  { label: "Allow file this session", result: "allow-file-session", key: "f" },
+  { label: "Allow file always", result: "allow-file-always", key: "F" },
+  {
+    label: "Allow directory this session",
+    result: "allow-dir-session",
+    key: "d",
+  },
+  { label: "Allow directory always", result: "allow-dir-always", key: "D" },
   { label: "Deny", result: "deny" },
 ];
 
 export const DIR_OPTIONS: PromptOption[] = [
-  { label: "Allow once", result: "allow-dir-once" },
-  { label: "Allow directory this session", result: "allow-dir-session" },
-  { label: "Allow directory always", result: "allow-dir-always" },
+  { label: "Allow once", result: "allow-dir-once", key: "o" },
+  {
+    label: "Allow directory this session",
+    result: "allow-dir-session",
+    key: "d",
+  },
+  { label: "Allow directory always", result: "allow-dir-always", key: "D" },
   { label: "Deny", result: "deny" },
 ];
 
@@ -126,95 +136,31 @@ export const DIR_OPTIONS: PromptOption[] = [
  * Options for the outside-path prompt for the given mode.
  * File tools and bash get file + directory options;
  * directory-oriented tools (ls, find) get directory-only options.
+ * When the directory is not grantable (too broad, e.g. the filesystem root
+ * or the home directory), directory grant options are omitted entirely.
  */
-export function promptOptions(showFileOptions: boolean): PromptOption[] {
-  return showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
+export function promptOptions(
+  showFileOptions: boolean,
+  dirGrantable = true,
+): PromptOption[] {
+  const options = showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
+  if (dirGrantable) return options;
+  return options.filter(
+    (option) =>
+      option.result !== "allow-dir-session" &&
+      option.result !== "allow-dir-always",
+  );
 }
 
 const OPTION_INDENT = " ";
-const OPTION_COLUMN_GAP = 4;
-
-interface OptionLayout {
-  rows: number[][];
-  columnWidths: number[];
-}
-
-function naturalOptionWidth(option: PromptOption): number {
-  return visibleWidth(option.label) + 2;
-}
-
-function oneColumnRows(options: PromptOption[]): number[][] {
-  return options.map((_, index) => [index]);
-}
-
-function compactRows(options: PromptOption[]): number[][] {
-  if (options.length === FILE_OPTIONS.length) return [[0], [1, 2], [3, 4], [5]];
-  if (options.length === DIR_OPTIONS.length) return [[0], [1, 2], [3]];
-  return oneColumnRows(options);
-}
-
-function optionColumnWidths(
-  options: PromptOption[],
-  rows: number[][],
-): number[] {
-  const widths: number[] = [];
-  for (const row of rows) {
-    for (let column = 0; column < row.length; column++) {
-      const option = options[row[column]];
-      if (!option) continue;
-      widths[column] = Math.max(
-        widths[column] ?? 0,
-        naturalOptionWidth(option),
-      );
-    }
-  }
-  return widths;
-}
-
-function layoutWidth(layout: OptionLayout): number {
-  const columnsWidth = layout.columnWidths.reduce(
-    (sum, width) => sum + width,
-    0,
-  );
-  const gapsWidth =
-    Math.max(0, layout.columnWidths.length - 1) * OPTION_COLUMN_GAP;
-  return visibleWidth(OPTION_INDENT) + columnsWidth + gapsWidth;
-}
-
-function createOptionLayout(
-  options: PromptOption[],
-  width: number,
-): OptionLayout {
-  const availableWidth = Math.max(1, width - visibleWidth(OPTION_INDENT));
-  const compact = {
-    rows: compactRows(options),
-    columnWidths: optionColumnWidths(options, compactRows(options)),
-  };
-
-  if (
-    compact.rows.some((row) => row.length > 1) &&
-    layoutWidth(compact) <= width
-  ) {
-    return compact;
-  }
-
-  return {
-    rows: oneColumnRows(options),
-    columnWidths: [
-      Math.min(
-        availableWidth,
-        Math.max(...options.map((option) => naturalOptionWidth(option))),
-      ),
-    ],
-  };
-}
 
 /**
  * Build the confirmation UI component.
  * For directory-oriented tools (ls, find): only directory grant options.
  * For file tools and bash: both file and directory options.
- * Options rendered as highlighted tabs (selected = accent bg, unselected = dim),
- * navigable linearly with arrows/Tab/Shift+Tab.
+ * Options render one per row (selected = accent bg, unselected = dim),
+ * navigable with arrows/Tab/Shift+Tab or selectable in one keypress via
+ * the shortcut shown on each row.
  */
 export function createPathAccessPromptComponent(
   toolName: string,
@@ -222,7 +168,7 @@ export function createPathAccessPromptComponent(
   displayDir: string,
   cwd: string,
   showFileOptions: boolean,
-  command?: string,
+  opts: { command?: string; dirGrantable?: boolean } = {},
 ) {
   return (
     tui: { terminal: { columns: number }; requestRender(): void },
@@ -234,16 +180,17 @@ export function createPathAccessPromptComponent(
     _kb: unknown,
     done: (result: PromptResult) => void,
   ) => {
-    const options = promptOptions(showFileOptions);
+    const options = promptOptions(showFileOptions, opts.dirGrantable ?? true);
     let selectedIndex = 0;
-    let optionLayout = createOptionLayout(options, tui.terminal.columns);
     let commandExpanded = false;
     let commandCanExpand = false;
 
     const container = new Container();
     const border = (s: string) => theme.fg("warning", s);
     const cwdDisplay = displayCwd(cwd);
-    const normalizedCommand = command ? normalizeCommand(command) : "";
+    const normalizedCommand = opts.command
+      ? normalizeCommand(opts.command)
+      : "";
 
     container.addChild(
       new Text(
@@ -281,31 +228,23 @@ export function createPathAccessPromptComponent(
     );
     container.addChild(new Spacer(1));
 
-    const optionGrid: Component = {
+    const optionList: Component = {
       render: (width: number) => {
-        optionLayout = createOptionLayout(options, width);
-        return optionLayout.rows.map((row) => {
-          const cells = row.map((optionIndex, column) => {
-            const option = options[optionIndex];
-            const cellWidth = optionLayout.columnWidths[column] ?? 1;
-            const labelWidth = Math.max(1, cellWidth - 2);
-            const label = truncateVisibleEnd(option.label, labelWidth);
-            const raw = ` ${label} `;
-            const pad = Math.max(0, cellWidth - visibleWidth(raw));
-            const styled =
-              optionIndex === selectedIndex
-                ? theme.bg("selectedBg", theme.fg("accent", raw))
-                : theme.fg("dim", raw);
-
-            return `${styled}${" ".repeat(pad)}`;
-          });
-
-          return `${OPTION_INDENT}${cells.join(" ".repeat(OPTION_COLUMN_GAP))}`;
+        const available = Math.max(1, width - visibleWidth(OPTION_INDENT));
+        return options.map((option, index) => {
+          const raw = ` ${option.key ?? " "} ${option.label} `;
+          const truncated = truncateVisibleEnd(raw, available);
+          const styled =
+            index === selectedIndex
+              ? theme.bg("selectedBg", theme.fg("accent", truncated))
+              : theme.fg("dim", truncated);
+          const pad = Math.max(0, available - visibleWidth(truncated));
+          return `${OPTION_INDENT}${styled}${" ".repeat(pad)}`;
         });
       },
       invalidate: () => {},
     };
-    container.addChild(optionGrid);
+    container.addChild(optionList);
 
     container.addChild(new Spacer(1));
     const footerLine = new Text("", 1, 0);
@@ -343,13 +282,18 @@ export function createPathAccessPromptComponent(
         }
         const commandToggleHint = commandCanExpand
           ? commandExpanded
-            ? " · x collapse command"
-            : " · x expand command"
+            ? "x collapse command"
+            : "x expand command"
           : "";
+        const shortcutHint = options
+          .filter((option) => option.key)
+          .map((option) => option.key)
+          .join("/");
+        const hints = `↑/↓/Tab · Enter · ${shortcutHint} · Esc deny`;
         footerLine.setText(
           theme.fg(
             "dim",
-            `←/→/↑/↓/Tab select · Enter select · Esc deny${commandToggleHint}`,
+            commandToggleHint ? `${hints}\n${commandToggleHint}` : hints,
           ),
         );
         const raw = container.render(contentWidth);
@@ -395,6 +339,11 @@ export function createPathAccessPromptComponent(
         if ((data === "x" || data === "X") && commandCanExpand) {
           commandExpanded = !commandExpanded;
           requestRender();
+          return;
+        }
+        const shortcut = options.find((option) => option.key === data);
+        if (shortcut) {
+          done(shortcut.result);
           return;
         }
         if (matchesKey(data, Key.enter)) {

@@ -14,7 +14,7 @@ function renderPrompt(command?: string, width = 100): string[] {
     "/outside",
     "/workspace",
     true,
-    command,
+    { command },
   );
 
   return component(
@@ -25,16 +25,20 @@ function renderPrompt(command?: string, width = 100): string[] {
   ).render(width);
 }
 
-function createPrompt(width = 100, command = "cat /outside/secret.txt") {
+function createPrompt(
+  width = 100,
+  command?: string,
+  opts: { showFileOptions?: boolean; dirGrantable?: boolean } = {},
+) {
   const done = vi.fn();
   const requestRender = vi.fn();
   const component = createPathAccessPromptComponent(
-    "bash",
+    opts.showFileOptions === false ? "ls" : "bash",
     "/outside/secret.txt",
     "/outside",
     "/workspace",
-    true,
-    command,
+    opts.showFileOptions !== false,
+    { command, dirGrantable: opts.dirGrantable },
   );
   const prompt = component(
     { terminal: { columns: width }, requestRender },
@@ -112,17 +116,20 @@ describe("createPathAccessPromptComponent", () => {
     expect(commandLine).not.toContain("\u0007");
   });
 
-  it("renders related options side by side when wide enough", () => {
+  it("renders one option per row with its shortcut", () => {
     const lines = renderPrompt("cat /outside/secret.txt", 100);
-    const fileRow = lines.find((line) =>
-      line.includes("Allow file this session"),
-    );
-    const dirRow = lines.find((line) =>
-      line.includes("Allow directory this session"),
+    const optionLines = lines.filter(
+      (line) => line.includes("Allow") || line.includes("Deny"),
     );
 
-    expect(fileRow).toContain("Allow file always");
-    expect(dirRow).toContain("Allow directory always");
+    expect(optionLines.map((line) => line.replace(/│/g, "").trim())).toEqual([
+      "o Allow once",
+      "f Allow file this session",
+      "F Allow file always",
+      "d Allow directory this session",
+      "D Allow directory always",
+      "Deny",
+    ]);
   });
 
   it("renders one option per row when narrow", () => {
@@ -134,7 +141,56 @@ describe("createPathAccessPromptComponent", () => {
     expect(fileRow).not.toContain("Allow file always");
   });
 
-  it("keeps tab navigation linear in the compact layout", () => {
+  it("omits directory grants when the directory is not grantable", () => {
+    const { prompt } = createPrompt(100, "cat /secret.txt", {
+      dirGrantable: false,
+    });
+    const lines = prompt.render(100).join("\n");
+
+    expect(lines).toContain("Allow once");
+    expect(lines).toContain("Allow file this session");
+    expect(lines).toContain("Deny");
+    expect(lines).not.toContain("Allow directory");
+  });
+
+  it("reduces to allow-once and deny for an ungrantable directory target", () => {
+    const { prompt } = createPrompt(100, undefined, {
+      showFileOptions: false,
+      dirGrantable: false,
+    });
+    const lines = prompt.render(100).join("\n");
+
+    expect(lines).toContain("Allow once");
+    expect(lines).toContain("Deny");
+    expect(lines).not.toContain("Allow directory");
+  });
+
+  it.each([
+    { key: "o", result: "allow-file-once" },
+    { key: "f", result: "allow-file-session" },
+    { key: "F", result: "allow-file-always" },
+    { key: "d", result: "allow-dir-session" },
+    { key: "D", result: "allow-dir-always" },
+  ])("selects $result with the $key shortcut", ({ key, result }) => {
+    const { done, prompt } = createPrompt();
+
+    prompt.handleInput?.(key);
+
+    expect(done).toHaveBeenCalledWith(result);
+  });
+
+  it("ignores shortcuts for omitted directory grants", () => {
+    const { done, prompt } = createPrompt(100, "ls /", {
+      dirGrantable: false,
+    });
+
+    prompt.handleInput?.("d");
+    prompt.handleInput?.("D");
+
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it("keeps tab navigation linear", () => {
     const { done, prompt } = createPrompt();
 
     prompt.handleInput?.("\t");

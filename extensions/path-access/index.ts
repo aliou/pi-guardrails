@@ -118,6 +118,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
       const parentDir = dirname(absolutePath);
       const showFileOptions =
         event.toolName !== "ls" && event.toolName !== "find";
+      const dirPath = showFileOptions ? parentDir : absolutePath;
+      const dirGrantable = !isGrantTooBroad(dirPath);
       const promptOpened = createPromptOpenedPayload({
         feature: "pathAccess",
         action: safety.action,
@@ -139,14 +141,14 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
-            bashCommand,
+            { command: bashCommand, dirGrantable },
           ),
         );
 
         if (customResult === undefined) {
           // RPC mode has no custom component support; fall back to a plain
           // select with the same options as the TUI prompt.
-          const options = promptOptions(showFileOptions);
+          const options = promptOptions(showFileOptions, dirGrantable);
           const dirNote = showFileOptions
             ? "\nDirectory grants apply to the parent directory."
             : "";
@@ -185,7 +187,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
       }
 
       if (result === "allow-dir-session" || result === "allow-dir-always") {
-        const dirPath = showFileOptions ? parentDir : absolutePath;
+        // Safety net: the prompt omits non-grantable directory options, but
+        // keep the guard in case a result arrives through another path.
         if (isGrantTooBroad(dirPath)) {
           ctx.ui.notify(
             `Cannot grant access to ${normalizeForDisplay(dirPath, ctx.cwd)}/ — too broad. Treating as allow once.`,

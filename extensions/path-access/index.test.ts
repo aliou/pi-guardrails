@@ -15,6 +15,7 @@ import {
 import pathAccess from "./index";
 import type { createPathAccessPromptComponent } from "./prompt";
 import { DIR_OPTIONS, FILE_OPTIONS } from "./prompt";
+import { targetsForTool } from "./targets";
 
 const mockState: {
   pathAccess: {
@@ -165,6 +166,34 @@ describe("pathAccess extension hook", () => {
       GUARDRAILS_PROMPT_CLOSED_EVENT,
       expect.objectContaining({ prompt: { id: opened.prompt.id } }),
     );
+  });
+
+  it("omits directory grant options when the target directory is not grantable", async () => {
+    vi.mocked(targetsForTool).mockResolvedValue(["/"]);
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-dir-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(lsToolCall, ctx);
+
+    const promptComponent = ctx.ui.custom.mock.calls[0]?.[0] as
+      | PathAccessPromptComponent
+      | undefined;
+    assert(promptComponent, "path access prompt should be shown");
+    const rendered = renderPromptComponent(promptComponent);
+    expect(rendered).toContain("Allow once");
+    expect(rendered).toContain("Deny");
+    expect(rendered).not.toContain("Allow directory");
   });
 
   it("shows the bash command in the outside-path prompt", async () => {
@@ -441,6 +470,18 @@ describe("pathAccess extension hook RPC fallback", () => {
     expect(saved.pathAccess.allowedPaths).toEqual([
       { kind: "file", path: "/outside/secret.txt" },
     ]);
+  });
+
+  it("omits directory grant options for an ungrantable directory target", async () => {
+    vi.mocked(targetsForTool).mockResolvedValue(["/"]);
+    const { pi, ctx } = setup();
+    ctx.ui.select.mockResolvedValue("Allow once");
+
+    await runHandler(pi, ctx, lsToolCall);
+
+    expect(ctx.ui.select).toHaveBeenCalledTimes(1);
+    const [, options] = ctx.ui.select.mock.calls[0] as [string, string[]];
+    expect(options).toEqual(["Allow once", "Deny"]);
   });
 
   it("still emits the prompt lifecycle around the fallback", async () => {
