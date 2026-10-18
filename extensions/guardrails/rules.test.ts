@@ -1,7 +1,13 @@
 import { join } from "node:path";
 import { vol } from "memfs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { compilePolicies, createPolicyRules, normalizeTarget } from "./rules";
+import {
+  candidateTargetForms,
+  compilePolicies,
+  createPolicyRules,
+  normalizeTarget,
+} from "./rules";
+import { extractTargets } from "./targets";
 
 function singleRule(
   cwd: string,
@@ -17,6 +23,38 @@ describe("normalizeTarget", () => {
     expect(normalizeTarget("/repo/config/locked.json", cwd)).toBe(
       "config/locked.json",
     );
+  });
+});
+
+describe("candidateTargetForms", () => {
+  const home = "/home/dev";
+  const cwd = join(home, "work", "app");
+
+  beforeEach(() => {
+    vi.stubEnv("HOME", home);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("lists cwd-relative, tilde, and absolute forms for an in-cwd under-$HOME target", () => {
+    expect(candidateTargetForms("foo.txt", cwd)).toEqual([
+      "foo.txt",
+      "~/work/app/foo.txt",
+      "/home/dev/work/app/foo.txt",
+    ]);
+  });
+
+  it("lists tilde and absolute forms for an outside-cwd under-$HOME target", () => {
+    expect(candidateTargetForms("~/work/other/foo.txt", cwd)).toEqual([
+      "~/work/other/foo.txt",
+      "/home/dev/work/other/foo.txt",
+    ]);
+  });
+
+  it("lists only the absolute form outside the cwd and $HOME", () => {
+    expect(candidateTargetForms("/etc/hosts", cwd)).toEqual(["/etc/hosts"]);
   });
 });
 
@@ -147,6 +185,89 @@ describe("createPolicyRules", () => {
           kind: "file",
           path: "~/work/app/foo.txt",
         }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("matches /-anchored patterns against tilde-spelled under-$HOME targets outside the cwd", async () => {
+      const rule = singleRule(cwd, {
+        id: "confidential",
+        patterns: [{ pattern: "/home/dev/confidential/**" }],
+        protection: "noAccess",
+        onlyIfExists: false,
+      });
+
+      await expect(
+        rule.check({ kind: "file", path: "~/confidential/key.pem" }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("passes when an allowed pattern matches an alternate spelling", async () => {
+      const rule = singleRule(cwd, {
+        id: "ro-tree-allowed",
+        patterns: [{ pattern: "/home/dev/work/**" }],
+        allowedPatterns: [{ pattern: "~/work/app/public.txt" }],
+        protection: "readOnly",
+        onlyIfExists: false,
+        respectCwd: false,
+      });
+
+      await expect(
+        rule.check({ kind: "file", path: "public.txt" }),
+      ).resolves.toEqual({ kind: "pass" });
+    });
+
+    it("extracts and blocks bash operands spelling an anchored target cwd-relatively", async () => {
+      const piHome = join(home, ".pi");
+      const policies = compilePolicies([
+        {
+          id: "auth",
+          patterns: [{ pattern: "~/.pi/agent/auth.json" }],
+          protection: "noAccess",
+          respectCwd: false,
+          onlyIfExists: false,
+        },
+      ]);
+
+      const targets = await extractTargets(
+        { toolName: "bash", input: { command: "cat agent/auth.json" } },
+        piHome,
+        policies,
+      );
+      expect(targets).toEqual([{ path: "agent/auth.json", unresolved: false }]);
+
+      const [rule] = createPolicyRules(policies, piHome);
+      await expect(
+        rule.check({
+          kind: "file",
+          path: "agent/auth.json",
+          unresolved: false,
+        }),
+      ).resolves.toMatchObject({ kind: "match", metadata: { ruleId: "auth" } });
+    });
+
+    it("enforces anchored patterns for cwd-relative spellings of in-cwd targets when respectCwd is false", async () => {
+      await expect(
+        treeRule(false).check({ kind: "file", path: "foo.txt" }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("enforces anchored patterns for absolute spellings of in-cwd targets when respectCwd is false", async () => {
+      await expect(
+        treeRule(false).check({ kind: "file", path: join(cwd, "foo.txt") }),
+      ).resolves.toMatchObject({ kind: "match" });
+    });
+
+    it("enforces anchored patterns when the session cwd is $HOME itself", async () => {
+      const rule = singleRule(home, {
+        id: "ro-tree",
+        patterns: [{ pattern: "~/work" }, { pattern: "~/work/**" }],
+        protection: "readOnly",
+        onlyIfExists: false,
+        respectCwd: false,
+      });
+
+      await expect(
+        rule.check({ kind: "file", path: "work/app/foo.txt" }),
       ).resolves.toMatchObject({ kind: "match" });
     });
 

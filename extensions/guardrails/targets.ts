@@ -10,7 +10,7 @@ import {
 } from "../../src/core/shell";
 import { expandGlob, hasGlobChars } from "../../src/shared/glob";
 import type { CompiledPolicy } from "./rules";
-import { normalizeTarget } from "./rules";
+import { candidateTargetForms, normalizeTarget } from "./rules";
 
 /** A path extracted from a tool invocation, ready for policy matching. */
 export interface ExtractedTarget {
@@ -49,10 +49,14 @@ export async function extractTargets(
   const maybeAdd = async (candidate: string, unresolved: boolean) => {
     if (!candidate || candidate.startsWith("-")) return;
     for (const file of await expandCandidate(candidate)) {
-      const normalized = normalizeTarget(file, cwd);
+      const forms = unresolved
+        ? [normalizeTarget(file, cwd)]
+        : candidateTargetForms(file, cwd);
       if (
         policies.some((policy) =>
-          policy.patterns.some((pattern) => pattern.test(normalized)),
+          policy.patterns.some((pattern) =>
+            forms.some((form) => pattern.test(form)),
+          ),
         )
       ) {
         // If the same path surfaces both resolved and unresolved, treat it as

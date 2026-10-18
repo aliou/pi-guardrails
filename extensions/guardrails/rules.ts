@@ -83,6 +83,26 @@ export function normalizeTarget(filePath: string, cwd: string): string {
   return normalizeFilePath(absolute);
 }
 
+export function candidateTargetForms(filePath: string, cwd: string): string[] {
+  const absolute = normalizeFilePath(resolve(cwd, expandHomePath(filePath)));
+  const forms = new Set<string>();
+
+  const rel = normalizeFilePath(relative(cwd, absolute));
+  if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) {
+    forms.add(rel || ".");
+  }
+
+  const home = normalizeFilePath(expandHomePath("~"));
+  if (absolute === home) {
+    forms.add("~");
+  } else if (absolute.startsWith(`${home}/`)) {
+    forms.add(`~/${absolute.slice(home.length + 1)}`);
+  }
+
+  forms.add(absolute);
+  return [...forms];
+}
+
 /** Glob patterns anchored to an absolute location (`~` or `/`). */
 function isLocationAnchored(pattern: CompiledPattern): boolean {
   if (pattern.source.regex) return false;
@@ -114,15 +134,24 @@ export function createPolicyRules(
     async check(action: Action) {
       if (action.kind !== "file") return { kind: "pass" };
       const path = normalizeTarget(action.path, cwd);
+      const anchoredInPlay =
+        !policy.respectCwd ||
+        action.unresolved ||
+        !isWithinCwd(action.path, cwd);
       // Unresolved shell expansions keep full enforcement.
-      const patterns =
-        policy.respectCwd && !action.unresolved && isWithinCwd(action.path, cwd)
-          ? policy.patterns.filter((pattern) => !isLocationAnchored(pattern))
-          : policy.patterns;
-      if (!patterns.some((pattern) => pattern.test(path))) {
+      const patterns = anchoredInPlay
+        ? policy.patterns
+        : policy.patterns.filter((pattern) => !isLocationAnchored(pattern));
+      const forms =
+        anchoredInPlay && !action.unresolved
+          ? candidateTargetForms(action.path, cwd)
+          : [path];
+      const anyMatch = (compiled: CompiledPattern[]) =>
+        compiled.some((pattern) => forms.some((form) => pattern.test(form)));
+      if (!anyMatch(patterns)) {
         return { kind: "pass" };
       }
-      if (policy.allowedPatterns.some((pattern) => pattern.test(path))) {
+      if (anyMatch(policy.allowedPatterns)) {
         return { kind: "pass" };
       }
       if (

@@ -43,6 +43,8 @@ Use it to protect files like `.env`, private keys, local credentials, generated 
 
 Policy rules respect the working directory by default (`respectCwd: true`): a location-anchored pattern (`~`- or `/`-prefixed glob such as `~/work/**`) that happens to contain the session's cwd does not neuter the workspace. Name-based patterns (`.env`), relative path globs, and regex patterns still apply inside the cwd, so secrets stay protected. Set `respectCwd: false` on a rule to enforce anchored patterns everywhere.
 
+Anchored patterns are matched against every equivalent spelling of a target (cwd-relative, `~/…`, and absolute), so a `~/…`-anchored rule holds no matter where the session starts or how the tool input spelled the path.
+
 [![Guardrails policies and settings walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/policies.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/policies.mp4)
 
 Useful commands:
