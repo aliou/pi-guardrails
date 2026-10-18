@@ -19,16 +19,16 @@ export const PI_CLI = join(
 
 export const SECRET_CANARY = "E2E-CANARY-SECRET-do-not-leak";
 export const README_CANARY = "E2E-CANARY-README-safe-to-read";
-export const BLOCK_MARKER = "E2E-BLOCKED-BY-POLICY";
+export const OUTSIDE_CANARY = "E2E-CANARY-OUTSIDE-workspace";
+export const WRITE_CANARY = "E2E-CANARY-WRITE-attempt";
+export const POLICY_BLOCK_MARKER = "E2E-BLOCKED-BY-POLICY";
+export const DENY_MESSAGE = "Command auto-denied: E2E dangerous command";
+export const PATH_DENY_MESSAGE = "outside working directory";
 
-export const POLICY_CONFIG = {
+export const POLICY_BLOCK_CONFIG = {
   enabled: true,
   applyBuiltinDefaults: false,
-  features: {
-    policies: true,
-    permissionGate: false,
-    pathAccess: false,
-  },
+  features: { policies: true, permissionGate: false, pathAccess: false },
   onboarding: { completed: true },
   policies: {
     rules: [
@@ -38,23 +38,85 @@ export const POLICY_CONFIG = {
         patterns: [{ pattern: "secrets.txt" }],
         protection: "noAccess",
         onlyIfExists: true,
-        blockMessage: `${BLOCK_MARKER}: {file}`,
+        blockMessage: `${POLICY_BLOCK_MARKER}: {file}`,
       },
     ],
   },
 };
 
+export const POLICY_READONLY_CONFIG = {
+  enabled: true,
+  applyBuiltinDefaults: false,
+  features: { policies: true, permissionGate: false, pathAccess: false },
+  onboarding: { completed: true },
+  policies: {
+    rules: [
+      {
+        id: "e2e-readonly",
+        description: "E2E fixture read-only file",
+        patterns: [{ pattern: "locked.txt" }],
+        protection: "readOnly",
+        onlyIfExists: true,
+        blockMessage: `${POLICY_BLOCK_MARKER}-write: {file}`,
+      },
+    ],
+  },
+};
+
+export const PERMISSION_GATE_CONFIG = {
+  enabled: true,
+  applyBuiltinDefaults: false,
+  features: { policies: false, permissionGate: true, pathAccess: false },
+  onboarding: { completed: true },
+  permissionGate: {
+    autoDenyPatterns: [
+      { pattern: "E2E_DANGEROUS_CMD", description: "E2E dangerous command" },
+    ],
+  },
+};
+
+export function pathAccessBlockConfig(): object {
+  return {
+    enabled: true,
+    applyBuiltinDefaults: false,
+    features: { policies: false, permissionGate: false, pathAccess: true },
+    onboarding: { completed: true },
+    pathAccess: { mode: "block", applyTo: "all", allowedPaths: [] },
+  };
+}
+
+export function pathAccessAllowedConfig(outsideDir: string): object {
+  return {
+    enabled: true,
+    applyBuiltinDefaults: false,
+    features: { policies: false, permissionGate: false, pathAccess: true },
+    onboarding: { completed: true },
+    pathAccess: {
+      mode: "block",
+      applyTo: "all",
+      allowedPaths: [{ kind: "directory", path: outsideDir }],
+    },
+  };
+}
+
 export interface FixtureProject {
   root: string;
+  outsideDir: string;
   cleanup: () => void;
 }
 
-export function createFixtureProject(): FixtureProject {
-  const root = mkdtempSync(join(tmpdir(), "pi-guardrails-e2e-"));
+export function createFixtureProject(
+  config: object | ((outsideDir: string) => object) = POLICY_BLOCK_CONFIG,
+): FixtureProject {
+  const base = mkdtempSync(join(tmpdir(), "pi-guardrails-e2e-"));
+  const root = join(base, "project");
+  const outsideDir = join(base, "outside");
   mkdirSync(join(root, ".pi", "extensions"), { recursive: true });
+  mkdirSync(outsideDir, { recursive: true });
 
   writeFileSync(join(root, "README.md"), `# E2E Fixture\n\n${README_CANARY}\n`);
   writeFileSync(join(root, "secrets.txt"), `token=${SECRET_CANARY}\n`);
+  writeFileSync(join(outsideDir, "outside-secret.txt"), `${OUTSIDE_CANARY}\n`);
 
   writeFileSync(
     join(root, ".pi", "settings.json"),
@@ -62,12 +124,17 @@ export function createFixtureProject(): FixtureProject {
   );
   writeFileSync(
     join(root, ".pi", "extensions", "guardrails.json"),
-    JSON.stringify(POLICY_CONFIG, null, 2),
+    JSON.stringify(
+      typeof config === "function" ? config(outsideDir) : config,
+      null,
+      2,
+    ),
   );
 
   return {
     root,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    outsideDir,
+    cleanup: () => rmSync(base, { recursive: true, force: true }),
   };
 }
 
@@ -121,4 +188,24 @@ export async function waitForPaneSettled(
     if (current === previous) return;
     previous = current;
   }
+}
+
+export async function startTuiSession(
+  session: string,
+  project: FixtureProject,
+): Promise<void> {
+  await tmux(
+    "new-session",
+    "-d",
+    "-s",
+    session,
+    "-x",
+    "120",
+    "-y",
+    "40",
+    "-c",
+    project.root,
+    `node ${PI_CLI}`,
+  );
+  await waitForPaneSettled(session);
 }
