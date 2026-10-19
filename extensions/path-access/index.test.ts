@@ -318,6 +318,24 @@ describe("pathAccess extension hook", () => {
 
     expect(mockState.saves).toHaveLength(0);
   });
+
+  it("accepts a before_agent_start event without systemPromptOptions", async () => {
+    // Oh My Pi's before_agent_start event has no systemPromptOptions.
+    const pi = createMock<ExtensionAPI>();
+    await pathAccess(pi);
+
+    const beforeAgentStart = registeredExtensionHandler(
+      pi,
+      "before_agent_start",
+    );
+    assert(
+      typeof beforeAgentStart === "function",
+      "before_agent_start handler should be registered",
+    );
+    expect(() =>
+      beforeAgentStart({ type: "before_agent_start", prompt: "hi" }, {}),
+    ).not.toThrow();
+  });
 });
 
 describe("pathAccess extension hook RPC fallback", () => {
