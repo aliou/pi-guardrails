@@ -1,5 +1,25 @@
 # @aliou/pi-guardrails
 
+## 0.20.0
+
+### Minor Changes
+
+- b9871b8: Add `pathAccess.alwaysScope` option (`"local"` | `"global"`, default `"local"`) controlling where "Allow … always" grants from the path-access prompt are persisted. The default keeps the current behavior of writing grants to the project config; set it to `"global"` to save grants to the user-wide config (`~/.pi/agent/extensions/guardrails.json`) so they apply in every project. Session grants still go to memory and "allow once" grants are never persisted. Also configurable via `/guardrails:settings` under Path Access → Always-grant scope.
+- eb1a8f6: Add `pathAccess.applyTo` (`"all"` or `"write"`, default `"all"`) to control which operations the outside-workspace gate covers. With `"write"`, read-only tools (`read`, `grep`, `find`, `ls`) can access paths outside the project — skill files, configs — without a grant, while writes and bash commands are still gated. Also configurable through `/guardrails:settings` (Path Access → Applies to).
+- 5b878c0: Rework the path-access outside-path prompt options. Options now render as a single-column list in the same order they navigate, instead of a two-column grid whose linear arrow navigation zig-zagged visually (↓ from "Allow once" landed on "Allow file this session", then → moved sideways on the same row). Each option now also has a single-key shortcut shown on its row (`o`/`f`/`F`/`d`/`D`).
+
+  Directory grant options ("Allow directory this session/always") are no longer offered when the directory is not grantable — the filesystem root or the home directory — instead of being shown and then rejected after selection. This applies to both the TUI prompt and the RPC select fallback.
+
+  Also fix `isGrantTooBroad` never matching the filesystem root: trailing-separator stripping reduced `/` to an empty string before comparison, so selecting "Allow directory always" for `/` silently persisted a useless empty-path grant with no "too broad" warning.
+
+### Patch Changes
+
+- 0abc1ff: Anchored policy patterns (`~/…`- or `/`-prefixed globs) are now matched against every equivalent spelling of a target — cwd-relative, `~/…`, and absolute — so a `~/…`-anchored rule holds regardless of where the session starts or how the tool input spelled the path. Previously, a target under `$HOME` that was also inside the session cwd was normalized to its cwd-relative form, and an anchored pattern never saw the home-anchored form.
+- 4d0ce8a: Inspect executable command and process substitutions in built-in dangerous-command checks, file policies, and path-access extraction. Inner commands such as `echo "$(rm -rf ./scratch)"` and `echo "$(cat .env)"` now reach the existing checks without treating literal text or text-only command arguments as file access. Traversal is limited to executable nodes exposed by the shell parser; raw heredoc bodies and raw expansion operands remain out of scope.
+- ef2d46d: Add RPC-mode fallback to the path-access outside-path prompt. In RPC mode, `ctx.ui.custom()` resolves to `undefined`, so the prompt now falls back to a plain `ctx.ui.select()` with the same options as the TUI prompt, letting RPC users grant or deny access to paths outside the working directory.
+- a71c1f7: Show the command in the permission-gate RPC fallback. RPC clients only receive the `select` title, which named the danger ("Dangerous command: recursive force delete") but not the command, so users had to approve a command they could not see. The title now ends with the command, indented four spaces per line so Markdown clients render it as a code block.
+- cdb6457: Stop treating single-quoted `$` as an unexpanded shell reference in path-access extraction. A command such as `sed -n '/pat/,$p' file` no longer produces an outside-workspace candidate from the sed range, which removes false "Outside Workspace Access" prompts in interactive sessions and hard blocks in sessions without a UI. Whether a word contains an expansion is now decided from the AST word parts instead of the flattened token text, so real expansions (`"$HOME/x"`, `$(cmd)`, backticks) are still reported.
+
 ## 0.19.0
 
 ### Minor Changes
