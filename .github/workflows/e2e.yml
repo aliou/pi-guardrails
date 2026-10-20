@@ -11,6 +11,11 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    permissions:
+      # id-token: Mints the GitHub OIDC token exchanged for a short-lived
+      # Tailscale API token by tailscale/github-action.
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v6
 
