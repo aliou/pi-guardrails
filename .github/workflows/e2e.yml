@@ -1,0 +1,64 @@
+name: E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Connect to tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:ci-guardrails-e2e
+          ping: aperture-qa
+
+      - name: Configure pi
+        run: |
+          mkdir -p ~/.pi/agent/extensions
+          cat > ~/.pi/agent/settings.json <<'EOF'
+          {
+            "packages": ["npm:@aliou/pi-ts-aperture"],
+            "defaultProvider": "aperture",
+            "defaultModel": "neuralwatt/glm-5.3-flash",
+            "defaultProjectTrust": "always"
+          }
+          EOF
+          cat > ~/.pi/agent/extensions/aperture.json <<'EOF'
+          {
+            "baseUrl": "http://aperture-qa",
+            "onboardingDone": true,
+            "proxy": { "enabled": false, "upstreamProviders": [] },
+            "dedicated": {
+              "enabled": true,
+              "providers": [
+                { "id": "neuralwatt", "name": "Neuralwatt", "enabled": true }
+              ]
+            }
+          }
+          EOF
+
+      - name: Warm model catalogs
+        run: pnpm exec pi update --models
+
+      - name: Run e2e tests
+        run: pnpm test:e2e
