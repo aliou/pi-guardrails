@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PatternConfig } from "../../src/shared/config";
 import {
   createPermissionGateRule,
   formatAutoDenyReason,
@@ -128,5 +129,27 @@ describe("formatAutoDenyReason", () => {
     expect(
       formatAutoDenyReason({ pattern: "python -m venv", description: "  " }),
     ).toBe("Command matched auto-deny pattern and was blocked automatically.");
+  });
+});
+
+describe("matchCommandPattern against quoted data", () => {
+  const grepRootRegex: PatternConfig = {
+    pattern: "\\bgrep\\b[^;&|]*\\s/(?=\\s|$)",
+    regex: true,
+    description: "grep against filesystem root",
+  };
+
+  it("does not auto-deny division inside a quoted grep pattern", () => {
+    expect(
+      matchCommandPattern("grep -c 'bandW \\* 2 / 3' content04.js", [
+        grepRootRegex,
+      ]),
+    ).toBeNull();
+  });
+
+  it("still auto-denies a grep against the filesystem root", () => {
+    expect(matchCommandPattern("grep -rn foo /", [grepRootRegex])).toEqual(
+      grepRootRegex,
+    );
   });
 });
