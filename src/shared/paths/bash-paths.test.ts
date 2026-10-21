@@ -6,9 +6,6 @@ import { extractBashPathCandidates } from "./bash-paths";
 const CWD = "/work/project";
 const HOME = homedir();
 
-// Outside-workspace candidates are now checked against the filesystem: a
-// token whose path and parent directory are both missing is treated as a
-// misparsed identifier rather than a path. Seed the tree these tests assume.
 beforeEach(() => {
   vol.fromJSON({
     "/etc/hosts": "",
@@ -24,11 +21,129 @@ beforeEach(() => {
     "/work/project/secrets.txt": "",
     "/work/project/scripts/call_api.js": "",
     "/work/project/scripts/read_file.js": "",
+    "/work/project/README.md": "",
+    "/work/project/.pi/.keep": "",
+    "/work/project/frontend/app.js": "",
+    "/work/project/packages/dashboard/pkg.json": "",
+    "/work/project/packages/api/pkg.json": "",
+    "/work/.keep": "",
     [`${HOME}/.keep`]: "",
   });
 });
 
 describe("extractBashPathCandidates", () => {
+  describe("cd resolution", () => {
+    it.each([
+      ["cd .pi && cat ../README.md", ["/work/project/README.md"]],
+      [
+        "cd frontend && pnpm build > ../.pi/build.log 2>&1",
+        ["/work/project/.pi/build.log"],
+      ],
+      [
+        "cd packages/dashboard && bun test && cd ../api && uv run pytest",
+        ["/work/project/packages/dashboard", "/work/project/packages/api"],
+      ],
+      ["cd frontend && cat ../app.js", ["/work/project/app.js"]],
+    ])("resolves relative paths after cd: %j", async (command, expected) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        expected,
+      );
+    });
+
+    it("resolves nested bash -c programs against the cd target", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && bash -c 'cat ../app.js'",
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/app.js"]);
+    });
+
+    it("inherits the cd target inside command substitutions", async () => {
+      await expect(
+        extractBashPathCandidates(
+          'cd frontend && echo "$(cat ../app.js)"',
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/app.js"]);
+    });
+
+    it("does not leak cd out of a subshell", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && (cd .. && cat frontend/app.js) && cat ../app.js",
+          CWD,
+        ),
+      ).resolves.toEqual([
+        "/work/project/frontend/app.js",
+        "/work/project/app.js",
+      ]);
+    });
+
+    it("resolves pipeline elements against the pre-pipeline directory", async () => {
+      await expect(
+        extractBashPathCandidates("cd frontend | cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/README.md"]);
+    });
+
+    it("resolves a bare cd against HOME", async () => {
+      await expect(
+        extractBashPathCandidates("cd && cat ./.keep", CWD),
+      ).resolves.toEqual([`${HOME}/.keep`]);
+    });
+
+    it.each([
+      ["background statements", "cd frontend & cat ../README.md"],
+      ["coproc bodies", "coproc cd frontend; cat ../README.md"],
+      ["coproc blocks", "coproc { cd frontend; }; cat ../README.md"],
+    ])("does not leak cd out of %s", async (_label, command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+        "/work/README.md",
+      ]);
+    });
+
+    it("tracks cd inside a background statement", async () => {
+      await expect(
+        extractBashPathCandidates("cd frontend && cat ../README.md &", CWD),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("resolves an operand after -- as a path", async () => {
+      vol.mkdirSync("/work/project/-name");
+      await expect(
+        extractBashPathCandidates("cd -- -name && cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("leaves the directory unchanged when cd has more than one operand", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && cd a b && cat ../README.md",
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("resolves against the session cwd after a cd to a missing directory", async () => {
+      await expect(
+        extractBashPathCandidates("cd missing; cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/README.md"]);
+    });
+
+    it.each([
+      ["cd $d && cat ../README.md"],
+      ["cd frontend && cd - && cat ../README.md"],
+      ["cd *.js && cat ../README.md"],
+      ["cd frontend && cd missing && cat ../README.md"],
+      ["cd frontend && cd -x && cat ../README.md"],
+      ["cd frontend && cd -- - && cat ../README.md"],
+    ])("falls back to the session cwd when the cd target is untracked: %j", async (command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+        "/work/README.md",
+      ]);
+    });
+  });
+
   describe("executable substitutions", () => {
     it.each([
       'echo "$(cat /etc/passwd)"',
@@ -48,7 +163,6 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("extracts paths inside output process substitutions", async () => {
-      // The existing extractor also returns the unresolved redirect target.
       const paths = await extractBashPathCandidates(
         "echo ok > >(cat /etc/passwd)",
         CWD,
@@ -87,16 +201,12 @@ describe("extractBashPathCandidates", () => {
   });
 
   it("no longer force-extracts bare go run operands", async () => {
-    // `main.go` has no separator, so it is not path-like — the same rule that
-    // already applies to `cat README.md`. It resolves inside the workspace
-    // either way, so path-access allows it.
     const result = await extractBashPathCandidates("go run main.go", CWD);
 
     expect(result).toEqual([]);
   });
 
   it("surfaces the directory go -C changes into", async () => {
-    // `go -C /tmp` really does operate outside the workspace.
     const result = await extractBashPathCandidates(
       "go -C /tmp test ./...",
       CWD,
@@ -107,8 +217,6 @@ describe("extractBashPathCandidates", () => {
 
   describe("when a command has regular expression arguments", () => {
     it("keeps sed expressions in-workspace and extracts file operands", async () => {
-      // The script token is noise, but it resolves inside the workspace where
-      // checkPathAccess always allows, so it cannot produce a prompt.
       const result = await extractBashPathCandidates(
         "sed 's/abc/{2,3}/g' ./file",
         CWD,
@@ -168,10 +276,6 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("bounds nested shell recursion depth", async () => {
-      // Build 5 levels of sh -c wrapping a cat. This exceeds MAX_SHELL_DEPTH,
-      // so recursion stops before the innermost cat is parsed: /etc/passwd is
-      // not extracted and no fake cwd-relative candidate leaks. Uses the
-      // '"'"' single-quote escape trick that @aliou/sh parses cleanly.
       let cmd = "cat /etc/passwd";
       for (let i = 0; i < 5; i++) {
         cmd = `sh -c '${cmd.replace(/'/g, "'\"'\"'")}'`;
@@ -251,30 +355,20 @@ describe("extractBashPathCandidates", () => {
     });
   });
 
-  // Regression: github issue #32 — awk regex patterns should not be
-  // treated as file paths.
   it("does not extract awk regex patterns as paths", async () => {
     const result = await extractBashPathCandidates(
       "awk '/aaa/{flag=1} flag{print}' test.txt",
       CWD,
     );
-    // The awk program should NOT be treated as a path
     expect(result).toEqual([]);
   });
 
-  // Regression: github issue #79 — `find <dir> \( ... \) | xargs grep -l
-  // "a\|b"` produces `\` words and an escaped-pipe grep pattern that were
-  // treated as paths. On Windows, resolve(cwd, "\\") collapses to the drive
-  // root (D:\), triggering a bogus outside-workspace prompt.
   it("ignores find expression tokens and xargs grep patterns", async () => {
     const result = await extractBashPathCandidates(
       'find ./src -type f \\( -name "*.cs" -o -name "*.gd" \\) | xargs grep -l "Hitbox\\|hitbox" 2>/dev/null',
       CWD,
     );
 
-    // The `\` words are gone (that was the drive-root bug). The grep pattern
-    // now survives classification as in-workspace noise, which cannot prompt;
-    // what matters is that nothing outside the workspace is invented.
     expect(result.filter((path) => !path.startsWith(`${CWD}/`))).toEqual([
       "/dev/null",
     ]);
@@ -339,7 +433,6 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("detects Windows-style paths", async () => {
-      // Quoted backslashes survive bash escape processing.
       const quoted = await extractBashPathCandidates(
         'type "C:\\foo\\bar"',
         CWD,
@@ -347,7 +440,6 @@ describe("extractBashPathCandidates", () => {
       expect(quoted).toHaveLength(1);
       expect(quoted[0]).toContain("C:\\foo\\bar");
 
-      // Forward-slash drive paths need no quoting.
       const fwd = await extractBashPathCandidates("ls D:/Code/app", CWD);
       expect(fwd).toHaveLength(1);
       expect(fwd[0]).toContain("D:/Code/app");
@@ -380,8 +472,6 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("extracts trailing redirects attached to compound commands", async () => {
-      // @aliou/sh ≤0.2.2 surfaced compound trailing redirects as an
-      // anonymous SimpleCommand; 0.3.x attaches them to the compound node.
       for (const command of [
         "{ echo hi; } > /tmp/out",
         "( echo hi ) > /tmp/out",
@@ -394,11 +484,9 @@ describe("extractBashPathCandidates", () => {
     });
 
     it("ignores file-descriptor duplication redirects", async () => {
-      // `2>&1` and friends target fds, not files — must not extract `1`.
       expect(await extractBashPathCandidates("echo hi 2>&1", CWD)).toEqual([]);
       expect(await extractBashPathCandidates("cat file 3<&0", CWD)).toEqual([]);
       expect(await extractBashPathCandidates("exec 3>&-", CWD)).toEqual([]);
-      // `&>` redirects stdout AND stderr to a real file — keep it.
       expect(
         await extractBashPathCandidates("echo hi &> /tmp/log", CWD),
       ).toEqual(["/tmp/log"]);
@@ -429,10 +517,6 @@ describe("extractBashPathCandidates", () => {
   });
 
   describe("when a command uses comments", () => {
-    // Valid bash: a `#` comment after |, && or || continues the pipeline on
-    // the next line. Extraction must ignore the comment's text and keep the
-    // command that continues after it. Relies on @aliou/sh 0.3.3 accepting
-    // operator continuations (aliou/sh#24).
     it("ignores comment text after an operator, keeping the continuation", async () => {
       expect(
         await extractBashPathCandidates(
@@ -473,8 +557,6 @@ describe("extractBashPathCandidates", () => {
         "kubectl exec -it pod/one -- ls -l /app",
         CWD,
       );
-      // The in-pod path is dropped; the resource name stays as an
-      // in-workspace candidate, which path-access allows silently.
       expect(result).not.toContain("/app");
     });
   });
@@ -505,7 +587,6 @@ describe("extractBashPathCandidates", () => {
 
   describe("when command is malformed", () => {
     it("falls back to regex tokenization on parse failure", async () => {
-      // Unbalanced quote triggers parse error; regex fallback still finds paths
       const result = await extractBashPathCandidates(
         "cat /tmp/foo 'unterminated",
         CWD,

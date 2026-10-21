@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { parse as parsePath, resolve } from "node:path";
-import { parse } from "@aliou/sh";
+import { parse, type Word } from "@aliou/sh";
 import {
   expandHomePath,
   isWithinBoundary,
@@ -13,6 +13,7 @@ import {
 } from "../../core/paths/plausibility";
 import { toClassifiedArgs } from "../../core/shell/argv-roles";
 import {
+  type CommandScope,
   isFdDuplicationRedirect,
   isHeredocRedirect,
   walkCommands,
@@ -30,30 +31,50 @@ async function expandCandidate(
   return matches.length > 0 ? matches : [candidate];
 }
 
-/** Maximum nesting depth for recursive shell -c parsing. */
+const CD_FLAGS = new Set(["-L", "-P", "-e", "-@"]);
+
+function cdOperands(args: Word[]): Word[] | undefined {
+  const first = args.findIndex((word) => !CD_FLAGS.has(wordToString(word)));
+  if (first === -1) return [];
+  const text = wordToString(args[first]);
+  if (text === "--") return args.slice(first + 1);
+  if (/^-./.test(text)) return undefined;
+  return args.slice(first);
+}
+
+function cdTarget(
+  word: Word,
+  dir: string,
+  pathExists: (path: string) => boolean,
+): string | undefined {
+  const text = wordToString(word);
+  if (text === "-" || wordHasExpansion(word) || hasGlobChars(text)) {
+    return undefined;
+  }
+  const target = resolve(dir, expandHomePath(text));
+  return pathExists(target) ? target : undefined;
+}
+
+function nextCdDir(
+  args: Word[],
+  dir: string,
+  sessionCwd: string,
+  pathExists: (path: string) => boolean,
+): string | undefined {
+  const operands = cdOperands(args);
+  if (operands === undefined) return sessionCwd;
+  if (operands.length === 0) return expandHomePath("~");
+  if (operands.length > 1) return undefined;
+  return cdTarget(operands[0], dir, pathExists) ?? sessionCwd;
+}
+
 const MAX_SHELL_DEPTH = 3;
 
 export type ExtractOptions = {
-  /** Nesting level for recursive shell `-c` parsing. Internal. */
   depth?: number;
-  /** Filesystem existence probe. Injectable for tests. */
   pathExists?: (path: string) => boolean;
 };
 
-/**
- * Extract path-like candidates from a bash command string.
- * Returns absolute paths. Best-effort: uses AST parsing with regex fallback.
- * Does NOT filter by any policy — returns all path-like arguments.
- *
- * Outside-workspace candidates are filtered by shape and filesystem
- * plausibility (see `core/paths/plausibility`) so that identifier arguments
- * such as `ctx7 docs /websites/apisix` do not read as filesystem access.
- * In-workspace candidates are returned unfiltered: `checkPathAccess` allows
- * them regardless, so noise there is cheaper than another heuristic.
- *
- * `depth` bounds recursion into nested shell `-c` programs to prevent
- * stack exhaustion on deeply nested agent-controlled commands.
- */
 export async function extractBashPathCandidates(
   command: string,
   cwd: string,
@@ -62,9 +83,18 @@ export async function extractBashPathCandidates(
   const { depth = 0, pathExists = existsSync } = options;
   const seen = new Set<string>();
   const results: string[] = [];
+  const scopeDirs = new Map<CommandScope, string>();
+  const dirFor = (scope: CommandScope): string => {
+    const known = scopeDirs.get(scope);
+    if (known !== undefined) return known;
+    const inherited = scope.parent ? dirFor(scope.parent) : cwd;
+    scopeDirs.set(scope, inherited);
+    return inherited;
+  };
 
   const addCandidate = async (
     token: string,
+    dir: string,
     forcePath = false,
     commandName?: string,
     commandArgs: string[] = [],
@@ -75,22 +105,16 @@ export async function extractBashPathCandidates(
     if (!forcePath && !maybePathLike(token)) return;
     if (!forcePath && hasNonPathShape(token)) return;
 
-    // Suppression is skipped when the token may create its missing parent,
-    // or when shell expansion means the filesystem cannot settle it yet.
     const skipImplausible =
       forcePath ||
       mayExpand ||
       commandCreatesPaths(commandName, commandArgs) ||
       programText;
 
-    const expanded = await expandCandidate(token, cwd);
+    const expanded = await expandCandidate(token, dir);
     for (const file of expanded) {
-      const abs = resolve(cwd, expandHomePath(file));
-      // Tokens with repeated separators (`//`, `cat .//`) collapse to the
-      // filesystem root, which is never a meaningful prompt target.
+      const abs = resolve(dir, expandHomePath(file));
       if (parsePath(abs).root === abs) continue;
-      // Only outside-workspace candidates are filtered: in-workspace paths are
-      // always allowed downstream, so noise there cannot cause a prompt.
       if (
         !skipImplausible &&
         !isWithinBoundary(abs, cwd) &&
@@ -111,24 +135,17 @@ export async function extractBashPathCandidates(
 
     walkCommands(
       ast,
-      (cmd, redirects) => {
-        // Expansion is decided per source word from its AST parts, not from
-        // the flattened token: `wordToString` flattens quoting away, so the
-        // `$p` in a single-quoted sed range (`'/pat/,$p'`) is literal text
-        // that a token-level check would misread as an unexpanded variable.
-        // Key the flattened form so classified arguments can be looked up.
+      (cmd, redirects, scope) => {
+        const dir = dirFor(scope);
         const wordList = cmd?.words ?? [];
         const expandedTokens = new Set<string>();
         for (const word of wordList) {
           if (wordHasExpansion(word)) expandedTokens.add(wordToString(word));
         }
         for (const redir of redirects ?? []) {
-          // Fd duplications (`2>&1`, `<&-`) have no filesystem target.
-          // `&>`/`&>>` redirect stdout AND stderr to a real path — keep those.
           if (isFdDuplicationRedirect(redir)) continue;
-          // Heredoc delimiters and here-strings are text, not file targets.
           if (isHeredocRedirect(redir)) continue;
-          pending.push(addCandidate(wordToString(redir.target), true));
+          pending.push(addCandidate(wordToString(redir.target), dir, true));
         }
         const commandName = wordList[0] ? wordToString(wordList[0]) : "";
         if (commandName) {
@@ -136,7 +153,7 @@ export async function extractBashPathCandidates(
             if (arg.recurseShell) {
               if (depth >= MAX_SHELL_DEPTH) continue;
               pending.push(
-                extractBashPathCandidates(arg.token, cwd, {
+                extractBashPathCandidates(arg.token, dir, {
                   depth: depth + 1,
                   pathExists,
                 }).then((nested) => {
@@ -152,6 +169,7 @@ export async function extractBashPathCandidates(
               pending.push(
                 addCandidate(
                   arg.token,
+                  dir,
                   arg.forcePath,
                   commandName,
                   wordList.slice(1).map(wordToString),
@@ -162,11 +180,6 @@ export async function extractBashPathCandidates(
             }
           }
         } else {
-          // Subshell fragments (e.g. the `\( ... \)` group of a find
-          // expression) arrive as commands with no name: the "words" are
-          // flags, patterns, and shell punctuation, not paths. Only keep
-          // tokens that look like real paths; skip lone `\` from escaped
-          // parens, which resolves to the drive root on Windows (issue #79).
           for (const word of wordList) {
             const text = wordToString(word);
             if (text === "\\" || text === "(" || text === ")" || text === "!")
@@ -175,6 +188,7 @@ export async function extractBashPathCandidates(
             pending.push(
               addCandidate(
                 text,
+                dir,
                 false,
                 undefined,
                 [],
@@ -184,6 +198,10 @@ export async function extractBashPathCandidates(
             );
           }
         }
+        if (commandName === "cd") {
+          const next = nextCdDir(wordList.slice(1), dir, cwd, pathExists);
+          if (next !== undefined) scopeDirs.set(scope, next);
+        }
         return false;
       },
       { includeSubstitutions: true },
@@ -192,9 +210,6 @@ export async function extractBashPathCandidates(
     await Promise.all(pending);
     return results;
   } catch {
-    // Fallback: regex tokenization. The command name is unreliable here, so
-    // only shape rejection applies; existence suppression stays off to keep
-    // the fallback fail-safe (extra candidates, never fewer).
     const tokenRegex = /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&]+)/g;
     for (const match of command.matchAll(tokenRegex)) {
       const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
