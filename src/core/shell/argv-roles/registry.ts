@@ -30,6 +30,10 @@ export function commandFamily(command: string): FamilyName {
   return "generic";
 }
 
+export function takesNoFileOperands(command: string): boolean {
+  return commandFamily(command) === "no-file-operand";
+}
+
 function classifyRoles(cmd: string, args: Word[]): ArgRole[] {
   const name = normalizeCommandName(cmd);
   for (const family of FAMILIES) {
