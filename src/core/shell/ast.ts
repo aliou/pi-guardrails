@@ -127,7 +127,20 @@ function partHasExpansion(part: WordPart): boolean {
 export type CommandCallback = (
   cmd: SimpleCommand | undefined,
   redirects?: Redirect[],
+  scope?: CommandScope,
 ) => boolean | undefined;
+
+/**
+ * Where a command sits in the shell's subshell structure. A new scope is
+ * created at every boundary that runs commands in a separate shell (pipeline
+ * arm, subshell, command substitution, function body); everything else shares
+ * its parent's scope. Consumers that resolve state sequentially — such as
+ * `cd` tracking — key their per-scope state on this object instead of one
+ * global, so a `cd` inside an isolated scope cannot leak past its boundary.
+ */
+export type CommandScope = {
+  parent: CommandScope | undefined;
+};
 
 export type WalkCommandsOptions = {
   /** Visit executable substitutions in words; literal text is never reparsed. */
@@ -146,7 +159,7 @@ export function walkCommands(
   callback: CommandCallback,
   options: WalkCommandsOptions = {},
 ): void {
-  walkStatements(node.body, callback, options);
+  walkStatements(node.body, callback, options, { parent: undefined });
 }
 
 function hasRedirect(redirects: Redirect[] | undefined): boolean {
@@ -157,17 +170,19 @@ function walkStatement(
   stmt: Statement,
   callback: CommandCallback,
   options: WalkCommandsOptions,
+  scope: CommandScope,
 ): boolean {
-  return walkCommand(stmt.command, callback, options);
+  return walkCommand(stmt.command, callback, options, scope);
 }
 
 function walkStatements(
   stmts: Statement[],
   callback: CommandCallback,
   options: WalkCommandsOptions,
+  scope: CommandScope,
 ): boolean {
   for (const stmt of stmts) {
-    if (walkStatement(stmt, callback, options)) return true;
+    if (walkStatement(stmt, callback, options, scope)) return true;
   }
   return false;
 }
@@ -176,11 +191,12 @@ function walkCommand(
   cmd: Command,
   callback: CommandCallback,
   options: WalkCommandsOptions,
+  scope: CommandScope,
 ): boolean {
   return (
-    walkCommandBody(cmd, callback, options) ||
+    walkCommandBody(cmd, callback, options, scope) ||
     (options.includeSubstitutions === true &&
-      walkSubstitutions(cmd, callback, options))
+      walkSubstitutions(cmd, callback, options, scope))
   );
 }
 
@@ -188,6 +204,7 @@ function walkCommandBody(
   cmd: Command,
   callback: CommandCallback,
   options: WalkCommandsOptions,
+  scope: CommandScope,
 ): boolean {
   // Compound nodes may attach trailing redirects (`{ …; } > out`). Collect
   // them before descending so the caller sees the redirect even when the
@@ -196,79 +213,119 @@ function walkCommandBody(
 
   switch (cmd.type) {
     case "SimpleCommand":
-      return callback(cmd, redirects) === true;
+      return callback(cmd, redirects, scope) === true;
 
     case "Pipeline":
-      return walkStatements(cmd.commands, callback, options);
+      // Each element runs in its own subshell, so each gets its own scope.
+      for (const stmt of cmd.commands) {
+        if (walkStatement(stmt, callback, options, { parent: scope })) {
+          return true;
+        }
+      }
+      return false;
 
     case "Logical":
       return (
-        walkStatement(cmd.left, callback, options) ||
-        walkStatement(cmd.right, callback, options)
+        walkStatement(cmd.left, callback, options, scope) ||
+        walkStatement(cmd.right, callback, options, scope)
       );
 
     case "Subshell":
-    case "Block":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
-      return walkStatements(cmd.body, callback, options);
+      return walkStatements(cmd.body, callback, options, { parent: scope });
+
+    case "Block":
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
+        return true;
+      }
+      return walkStatements(cmd.body, callback, options, scope);
 
     case "IfClause":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
       return (
-        walkStatements(cmd.cond, callback, options) ||
-        walkStatements(cmd.then, callback, options) ||
-        (cmd.else ? walkStatements(cmd.else, callback, options) : false)
+        walkStatements(cmd.cond, callback, options, scope) ||
+        walkStatements(cmd.then, callback, options, scope) ||
+        (cmd.else ? walkStatements(cmd.else, callback, options, scope) : false)
       );
 
     case "ForClause":
     case "SelectClause":
     case "WhileClause": {
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
       const cond = "cond" in cmd ? cmd.cond : undefined;
       return (
-        (cond ? walkStatements(cond, callback, options) : false) ||
-        walkStatements(cmd.body, callback, options)
+        (cond ? walkStatements(cond, callback, options, scope) : false) ||
+        walkStatements(cmd.body, callback, options, scope)
       );
     }
 
     case "CaseClause":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
       for (const item of cmd.items) {
-        if (walkStatements(item.body, callback, options)) return true;
+        if (walkStatements(item.body, callback, options, scope)) return true;
       }
       return false;
 
     case "FunctionDecl":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
-      return walkStatements(cmd.body, callback, options);
+      // The body executes in whatever shell calls the function, but the
+      // definition site cannot know that shell's state, so it is isolated.
+      return walkStatements(cmd.body, callback, options, { parent: scope });
 
     case "TimeClause":
-      return walkStatement(cmd.command, callback, options);
+      return walkStatement(cmd.command, callback, options, scope);
 
     case "CoprocClause":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
-      return walkStatement(cmd.body, callback, options);
+      return walkStatement(cmd.body, callback, options, scope);
 
     case "CStyleLoop":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
-      return walkStatements(cmd.body, callback, options);
+      return walkStatements(cmd.body, callback, options, scope);
 
     case "TestClause":
-      if (hasRedirect(redirects) && callback(undefined, redirects) === true) {
+      if (
+        hasRedirect(redirects) &&
+        callback(undefined, redirects, scope) === true
+      ) {
         return true;
       }
       return false;
@@ -301,11 +358,13 @@ function walkSubstitutions(
   node: SubstitutionNode,
   callback: CommandCallback,
   options: WalkCommandsOptions,
+  scope: CommandScope,
 ): boolean {
   const visit = (...children: (SubstitutionNode | undefined)[]): boolean =>
     children.some(
       (child) =>
-        child !== undefined && walkSubstitutions(child, callback, options),
+        child !== undefined &&
+        walkSubstitutions(child, callback, options, scope),
     );
 
   if ("redirects" in node && visit(...(node.redirects ?? []))) return true;
@@ -313,7 +372,7 @@ function walkSubstitutions(
   switch (node.type) {
     case "CmdSubst":
     case "ProcSubst":
-      return walkStatements(node.stmts, callback, options);
+      return walkStatements(node.stmts, callback, options, { parent: scope });
     case "Word":
     case "DblQuoted":
       return visit(...node.parts);
