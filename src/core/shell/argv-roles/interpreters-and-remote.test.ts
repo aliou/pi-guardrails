@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyInvocation } from "./index";
-import { wordsOf } from "./test-helpers";
+import { roleCandidates, wordsOf } from "./test-helpers";
 
 function roles(source: string): string[] {
   const { name, args } = wordsOf(source);
@@ -22,6 +22,45 @@ describe("interpreter family", () => {
 
   it("classifies powershell flags case-insensitively", () => {
     expect(roles("pwsh -File script.ps1")).toEqual(["none", "script"]);
+  });
+});
+
+describe("interpreter program literals", () => {
+  it.each([
+    ["node -e 'const x=(c+0.055)/1.055; console.log(x)'", []],
+    ["node -e 'console.log(require(p + \"/package.json\").version)'", []],
+    ["node -e 'const p = \"/etc\" + name'", []],
+    ['python3 -c \'print(spec["paths"]["/api/items"])\'', []],
+    ["node -e 'console.log(routes()[\"/api/items\"])'", []],
+    ['node -e \'open("/etc" + "/" + name)\'', []],
+  ])("skips code fragments that are not path operands: %j", (command, expected) => {
+    expect(roleCandidates(command)).toEqual(expected);
+  });
+
+  it.each([
+    ["node -e 'fs.readFile(\"/etc/passwd\", cb)'", ["/etc/passwd"]],
+    ['python3 -c \'open("/tmp/new.txt", "w")\'', ["/tmp/new.txt"]],
+    ["node -e 'require(\"/srv/index.js\")'", ["/srv/index.js"]],
+  ])("keeps quoted literals in call position: %j", (command, expected) => {
+    expect(roleCandidates(command)).toEqual(expected);
+  });
+
+  it.each([
+    ["node -e 'Promise.all([\"/etc/passwd\"].map(read))'", ["/etc/passwd"]],
+    [
+      'node -e \'read(["/etc/hosts", "/etc/passwd"])\'',
+      ["/etc/hosts", "/etc/passwd"],
+    ],
+    ["python3 -c 'for p in [\"/etc/passwd\"]: open(p)'", ["/etc/passwd"]],
+  ])("keeps path-like array elements: %j", (command, expected) => {
+    expect(roleCandidates(command)).toEqual(expected);
+  });
+
+  it.each([
+    ['python3 -c \'open("/etc" + "/passwd")\'', ["/etc/passwd"]],
+    ['node -e \'read("/etc" + "/" + "passwd")\'', ["/etc/passwd"]],
+  ])("joins constant concatenations: %j", (command, expected) => {
+    expect(roleCandidates(command)).toEqual(expected);
   });
 });
 

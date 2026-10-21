@@ -26,16 +26,77 @@ export function classifyInvocation(
   }));
 }
 
-const CODE_TOKEN_REGEX =
-  /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&(){}[\]]+)/g;
+const PROGRAM_LITERAL_REGEX = /"([^"]*)"|'([^']*)'|`([^`]*)`/g;
+const CONCAT_GAP_REGEX = /^\s*\+\s*$/;
+const SUBSCRIPT_TARGET_REGEX = /[\w$)\]]/;
+
+interface ProgramLiteral {
+  value: string;
+  start: number;
+  end: number;
+}
+
+function programLiterals(code: string): ProgramLiteral[] {
+  return Array.from(code.matchAll(PROGRAM_LITERAL_REGEX), (match) => {
+    const start = match.index ?? 0;
+    return {
+      value: match[1] ?? match[2] ?? match[3] ?? "",
+      start,
+      end: start + match[0].length,
+    };
+  });
+}
+
+function concatenationChains(
+  code: string,
+  literals: ProgramLiteral[],
+): ProgramLiteral[][] {
+  const chains: ProgramLiteral[][] = [];
+  let previous: ProgramLiteral | undefined;
+  for (const literal of literals) {
+    const gap = previous ? code.slice(previous.end, literal.start) : "";
+    const chain = chains.at(-1);
+    if (chain && CONCAT_GAP_REGEX.test(gap)) chain.push(literal);
+    else chains.push([literal]);
+    previous = literal;
+  }
+  return chains;
+}
+
+function previousNonSpace(code: string, from: number): number {
+  let i = from;
+  while (i >= 0 && /\s/.test(code[i])) i--;
+  return i;
+}
+
+function nextNonSpace(code: string, from: number): number {
+  let i = from;
+  while (i < code.length && /\s/.test(code[i])) i++;
+  return i;
+}
+
+function isSubscriptKey(code: string, start: number): boolean {
+  const bracket = previousNonSpace(code, start - 1);
+  if (code[bracket] !== "[") return false;
+  return SUBSCRIPT_TARGET_REGEX.test(code[bracket - 1] ?? "");
+}
+
+function chainValue(code: string, chain: ProgramLiteral[]): string {
+  const first = chain[0];
+  const last = chain[chain.length - 1];
+  if (code[previousNonSpace(code, first.start - 1)] === "+") return "";
+  if (code[nextNonSpace(code, last.end)] === "+") return "";
+  if (isSubscriptKey(code, first.start)) return "";
+  return chain.map((literal) => literal.value).join("");
+}
 
 export function extractProgramTextPaths(code: string): string[] {
   const out: string[] = [];
-  for (const match of code.matchAll(CODE_TOKEN_REGEX)) {
-    const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
-    if (!token || token.startsWith("-")) continue;
-    if (!maybePathLike(token)) continue;
-    out.push(token);
+  for (const chain of concatenationChains(code, programLiterals(code))) {
+    const value = chainValue(code, chain);
+    if (!value || value.startsWith("-")) continue;
+    if (!maybePathLike(value)) continue;
+    out.push(value);
   }
   return out;
 }
