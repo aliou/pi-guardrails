@@ -7,9 +7,12 @@ import {
   maybePathLike,
 } from "../../core/paths/path";
 import {
+  cannotBeCreated,
   commandCreatesPaths,
   hasNonPathShape,
   isImplausibleLocalPath,
+  isWritableDirectory,
+  runsElevated,
 } from "../../core/paths/plausibility";
 import {
   isFdDuplicationRedirect,
@@ -18,6 +21,7 @@ import {
   wordHasExpansion,
   wordToString,
 } from "../../core/shell/ast";
+import { trackCdChains } from "../../core/shell/cd";
 import { classifyCommandArgs } from "../../core/shell/command-args";
 import { expandGlob, hasGlobChars } from "../glob";
 
@@ -38,6 +42,24 @@ export type ExtractOptions = {
   depth?: number;
   /** Filesystem existence probe. Injectable for tests. */
   pathExists?: (path: string) => boolean;
+  /** Directory writability probe. Injectable for tests. */
+  isWritable?: (dir: string) => boolean;
+  /**
+   * Workspace root for the outside-workspace filter. Defaults to `cwd`.
+   * Internal: nested shell programs run in the directory a preceding `cd`
+   * selected, which is not necessarily the workspace root.
+   */
+  workspace?: string;
+};
+
+type CandidateOptions = {
+  /** Directory relative tokens resolve against. */
+  dir: string;
+  forcePath?: boolean;
+  commandName?: string;
+  commandArgs?: string[];
+  programText?: boolean;
+  mayExpand?: boolean;
 };
 
 /**
@@ -51,6 +73,10 @@ export type ExtractOptions = {
  * In-workspace candidates are returned unfiltered: `checkPathAccess` allows
  * them regardless, so noise there is cheaper than another heuristic.
  *
+ * Relative tokens resolve against the directory selected by a preceding
+ * `cd` in the same `&&` chain (see `trackCdChains`), and against `cwd`
+ * everywhere else.
+ *
  * `depth` bounds recursion into nested shell `-c` programs to prevent
  * stack exhaustion on deeply nested agent-controlled commands.
  */
@@ -59,17 +85,25 @@ export async function extractBashPathCandidates(
   cwd: string,
   options: ExtractOptions = {},
 ): Promise<string[]> {
-  const { depth = 0, pathExists = existsSync } = options;
+  const {
+    depth = 0,
+    pathExists = existsSync,
+    isWritable = isWritableDirectory,
+    workspace = cwd,
+  } = options;
   const seen = new Set<string>();
   const results: string[] = [];
 
   const addCandidate = async (
     token: string,
-    forcePath = false,
-    commandName?: string,
-    commandArgs: string[] = [],
-    programText = false,
-    mayExpand = false,
+    {
+      dir,
+      forcePath = false,
+      commandName,
+      commandArgs = [],
+      programText = false,
+      mayExpand = false,
+    }: CandidateOptions,
   ): Promise<void> => {
     if (!token || token.startsWith("-")) return;
     if (!forcePath && !maybePathLike(token)) return;
@@ -78,23 +112,28 @@ export async function extractBashPathCandidates(
     // Suppression is skipped when the token may create its missing parent,
     // or when shell expansion means the filesystem cannot settle it yet.
     const skipImplausible =
-      forcePath ||
-      mayExpand ||
-      commandCreatesPaths(commandName, commandArgs) ||
-      programText;
+      forcePath || mayExpand || commandCreatesPaths(commandName, commandArgs);
+    // An elevated command can write where this process cannot.
+    const canWrite = runsElevated(commandName, commandArgs)
+      ? () => true
+      : isWritable;
 
-    const expanded = await expandCandidate(token, cwd);
+    const expanded = await expandCandidate(token, dir);
     for (const file of expanded) {
-      const abs = resolve(cwd, expandHomePath(file));
+      const abs = resolve(dir, expandHomePath(file));
       // Tokens with repeated separators (`//`, `cat .//`) collapse to the
       // filesystem root, which is never a meaningful prompt target.
       if (parsePath(abs).root === abs) continue;
       // Only outside-workspace candidates are filtered: in-workspace paths are
       // always allowed downstream, so noise there cannot cause a prompt.
+      // Interpreter programs can create any missing parents themselves, so
+      // only a path no writable ancestor can hold is ruled out for them.
       if (
         !skipImplausible &&
-        !isWithinBoundary(abs, cwd) &&
-        isImplausibleLocalPath(abs, pathExists)
+        !isWithinBoundary(abs, workspace) &&
+        (programText
+          ? cannotBeCreated(abs, pathExists, canWrite)
+          : isImplausibleLocalPath(abs, pathExists, canWrite))
       ) {
         continue;
       }
@@ -108,10 +147,12 @@ export async function extractBashPathCandidates(
   try {
     const { ast } = parse(command);
     const pending: Promise<void>[] = [];
+    const commandDirs = trackCdChains(ast, cwd, command);
 
     walkCommands(
       ast,
       (cmd, redirects) => {
+        const dir = (cmd && commandDirs.get(cmd)) ?? cwd;
         // Expansion is decided per source word from its AST parts, not from
         // the flattened token: `wordToString` flattens quoting away, so the
         // `$p` in a single-quoted sed range (`'/pat/,$p'`) is literal text
@@ -127,7 +168,9 @@ export async function extractBashPathCandidates(
           if (isFdDuplicationRedirect(redir)) continue;
           // Heredoc delimiters and here-strings are text, not file targets.
           if (isHeredocRedirect(redir)) continue;
-          pending.push(addCandidate(wordToString(redir.target), true));
+          pending.push(
+            addCandidate(wordToString(redir.target), { dir, forcePath: true }),
+          );
         }
         const words = (cmd?.words ?? []).map(wordToString);
         const commandName = words[0];
@@ -136,9 +179,11 @@ export async function extractBashPathCandidates(
             if (arg.recurseShell) {
               if (depth >= MAX_SHELL_DEPTH) continue;
               pending.push(
-                extractBashPathCandidates(arg.token, cwd, {
+                extractBashPathCandidates(arg.token, dir, {
                   depth: depth + 1,
                   pathExists,
+                  isWritable,
+                  workspace,
                 }).then((nested) => {
                   for (const abs of nested) {
                     if (!seen.has(abs)) {
@@ -150,14 +195,14 @@ export async function extractBashPathCandidates(
               );
             } else {
               pending.push(
-                addCandidate(
-                  arg.token,
-                  arg.forcePath,
+                addCandidate(arg.token, {
+                  dir,
+                  forcePath: arg.forcePath,
                   commandName,
-                  words.slice(1),
-                  arg.programText,
-                  expandedTokens.has(arg.token),
-                ),
+                  commandArgs: words.slice(1),
+                  programText: arg.programText,
+                  mayExpand: expandedTokens.has(arg.token),
+                }),
               );
             }
           }
@@ -172,14 +217,10 @@ export async function extractBashPathCandidates(
               continue;
             if (word.startsWith("-") && word !== "-" && word !== "--") continue;
             pending.push(
-              addCandidate(
-                word,
-                false,
-                undefined,
-                [],
-                false,
-                expandedTokens.has(word),
-              ),
+              addCandidate(word, {
+                dir,
+                mayExpand: expandedTokens.has(word),
+              }),
             );
           }
         }

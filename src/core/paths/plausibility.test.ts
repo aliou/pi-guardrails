@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  cannotBeCreated,
   commandCreatesPaths,
   createsPaths,
   effectiveCommandName,
   hasNonPathShape,
   isImplausibleLocalPath,
+  runsElevated,
 } from "./plausibility";
 
 describe("hasNonPathShape", () => {
@@ -109,34 +111,113 @@ describe("commandCreatesPaths", () => {
   });
 });
 
-describe("isImplausibleLocalPath", () => {
-  const exists = (set: string[]) => (path: string) => set.includes(path);
+const exists = (set: string[]) => (path: string) => set.includes(path);
+const writable = (set: string[]) => (dir: string) => set.includes(dir);
 
+describe("isImplausibleLocalPath", () => {
   it("accepts a path that exists", () => {
-    expect(isImplausibleLocalPath("/etc/passwd", exists(["/etc/passwd"]))).toBe(
-      false,
-    );
+    expect(
+      isImplausibleLocalPath(
+        "/etc/passwd",
+        exists(["/etc/passwd"]),
+        writable([]),
+      ),
+    ).toBe(false);
   });
 
-  it("accepts a missing file whose parent exists", () => {
-    expect(isImplausibleLocalPath("/tmp/new.txt", exists(["/tmp"]))).toBe(
-      false,
-    );
+  it("accepts a missing file whose parent exists and is writable", () => {
+    expect(
+      isImplausibleLocalPath(
+        "/tmp/new.txt",
+        exists(["/tmp"]),
+        writable(["/tmp"]),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a missing file whose parent is not writable", () => {
+    // It can be neither read nor created: `cat /usr/nope`.
+    expect(
+      isImplausibleLocalPath("/usr/nope", exists(["/usr"]), writable([])),
+    ).toBe(true);
   });
 
   it("rejects a missing path whose parent is also missing", () => {
-    expect(isImplausibleLocalPath("/websites/apisix", exists(["/"]))).toBe(
+    expect(
+      isImplausibleLocalPath(
+        "/websites/apisix",
+        exists(["/"]),
+        writable(["/"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts a missing top-level entry when the root is writable", () => {
+    // Root, or a Windows drive root: `/exfil` can really be created, so
+    // `rm -rf /nope` and `sort -o /exfil` stay surfaced.
+    expect(isImplausibleLocalPath("/exfil", exists([]), writable(["/"]))).toBe(
+      false,
+    );
+  });
+
+  it("rejects a missing top-level entry when the root is not writable (issue #134)", () => {
+    expect(
+      isImplausibleLocalPath("/transition", exists([]), writable([])),
+    ).toBe(true);
+  });
+
+  it("never rejects the filesystem root", () => {
+    expect(isImplausibleLocalPath("/", exists([]), writable([]))).toBe(false);
+  });
+});
+
+describe("cannotBeCreated", () => {
+  it("accepts a path that exists", () => {
+    expect(
+      cannotBeCreated("/etc/passwd", exists(["/etc/passwd"]), writable([])),
+    ).toBe(false);
+  });
+
+  it("accepts a deep missing path under a writable ancestor", () => {
+    // A program can `os.makedirs` the missing levels itself.
+    expect(
+      cannotBeCreated("/tmp/a/b/c", exists(["/tmp"]), writable(["/tmp"])),
+    ).toBe(false);
+  });
+
+  it("rejects a missing path whose nearest existing ancestor is not writable", () => {
+    expect(cannotBeCreated("/api/items", exists([]), writable([]))).toBe(true);
+    expect(cannotBeCreated("/usr/a/b", exists(["/usr"]), writable(["/"]))).toBe(
       true,
     );
   });
 
-  it("accepts a missing top-level entry, since the root always exists", () => {
-    // `/exfil` itself is reported; only `/exfil/data` is suppressed. Keeping
-    // top-level targets means `rm -rf /nope` is still surfaced.
-    expect(isImplausibleLocalPath("/exfil", exists([]))).toBe(false);
+  it("accepts anything under a writable root", () => {
+    expect(
+      cannotBeCreated("/exfil/sub/data", exists([]), writable(["/"])),
+    ).toBe(false);
   });
 
   it("never rejects the filesystem root", () => {
-    expect(isImplausibleLocalPath("/", exists([]))).toBe(false);
+    expect(cannotBeCreated("/", exists([]), writable([]))).toBe(false);
+  });
+});
+
+describe("runsElevated", () => {
+  it.each([
+    ["sudo", ["cat", "/x"]],
+    ["/usr/bin/sudo", ["cat", "/x"]],
+    ["doas", ["cat", "/x"]],
+    ["env", ["sudo", "cat", "/x"]],
+    ["xargs", ["-I", "{}", "sudo", "cat"]],
+  ])("detects %s %j", (command, args) => {
+    expect(runsElevated(command, args)).toBe(true);
+  });
+
+  it.each([
+    ["cat", ["/x"]],
+    ["ls", ["/usr/bin/sudo"]],
+  ])("does not fire for %s %j", (command, args) => {
+    expect(runsElevated(command, args)).toBe(false);
   });
 });

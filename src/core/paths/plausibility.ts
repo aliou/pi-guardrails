@@ -1,3 +1,4 @@
+import { accessSync, constants } from "node:fs";
 import { basename, dirname } from "node:path";
 
 /**
@@ -198,13 +199,54 @@ export function commandCreatesPaths(
   );
 }
 
+/** Default writability probe: can this process create entries in `dir`? */
+export function isWritableDirectory(dir: string): boolean {
+  try {
+    accessSync(dir, constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * True when an absolute path is unlikely to be a real filesystem target
- * because neither it nor its parent directory exists.
+ * Prefixes that run the rest of the command with elevated privileges. A
+ * writability probe made as the current user says nothing about what such a
+ * command can create, so callers must treat every directory as writable.
+ */
+const ELEVATING_COMMANDS = new Set(["doas", "pkexec", "run0", "su", "sudo"]);
+
+/**
+ * True when the command, or a word that could be a wrapped command, elevates
+ * privileges. Scans every separator-free word, like `commandCreatesPaths`, so
+ * a false hit only costs an extra candidate.
+ */
+export function runsElevated(
+  commandName: string | undefined,
+  args: string[] = [],
+): boolean {
+  if (!commandName) return false;
+  if (ELEVATING_COMMANDS.has(normalize(commandName))) return true;
+  return args.some(
+    (arg) =>
+      !arg.includes("/") &&
+      !arg.includes("\\") &&
+      ELEVATING_COMMANDS.has(arg.toLowerCase()),
+  );
+}
+
+/**
+ * True when an absolute path is unlikely to be a real filesystem target:
+ * it does not exist, and its parent either does not exist or is not
+ * writable, so the command can neither read it nor create it.
  *
  * Reads that matter target files that already exist (`/etc/passwd`,
  * `~/.ssh/id_rsa`), so this never suppresses them. Writes to a missing
  * directory fail unless the command creates parents — see `createsPaths`.
+ * Writes into an existing directory the process cannot write to fail too,
+ * which is what rules out search text such as `grep "/transition"`: `/` is
+ * not writable for a normal user (issue #134). When it is (root, Windows
+ * drive roots), the top-level entry stays plausible.
  *
  * It is also evasion-resistant in the obvious direction: creating the root
  * first (`mkdir -p /exfil`, itself never suppressed) makes the parent exist,
@@ -213,16 +255,37 @@ export function commandCreatesPaths(
 export function isImplausibleLocalPath(
   absPath: string,
   pathExists: (path: string) => boolean,
+  isWritable: (dir: string) => boolean = isWritableDirectory,
 ): boolean {
   if (pathExists(absPath)) return false;
 
   const parent = dirname(absPath);
   if (parent === absPath) return false; // the filesystem root itself
 
-  // A top-level entry (`/exfil`, `C:\exfil`) is always plausible: its parent
-  // is the root, which always exists. This keeps `rm -rf /nope` and
-  // `mkdir /exfil` visible regardless of the create-capable command list.
-  if (dirname(parent) === parent) return false;
+  // The root always exists, whatever the probe says.
+  const isRoot = dirname(parent) === parent;
+  if (isRoot || pathExists(parent)) return !isWritable(parent);
+  return true;
+}
 
-  return !pathExists(parent);
+/**
+ * True when a missing path cannot be created by anything the command does:
+ * its nearest existing ancestor is not writable.
+ *
+ * Used for interpreter program text, where the program may create any
+ * number of missing parents itself (`os.makedirs`), so a missing parent
+ * proves nothing on its own. A non-writable ancestor still does: fragments
+ * such as `/1.055` or `"/package.json"` sit under `/` (issue #136).
+ */
+export function cannotBeCreated(
+  absPath: string,
+  pathExists: (path: string) => boolean,
+  isWritable: (dir: string) => boolean = isWritableDirectory,
+): boolean {
+  if (pathExists(absPath)) return false;
+  let dir = dirname(absPath);
+  if (dir === absPath) return false; // the filesystem root itself
+  // Stop at the root, which always exists, whatever the probe says.
+  while (dirname(dir) !== dir && !pathExists(dir)) dir = dirname(dir);
+  return !isWritable(dir);
 }
