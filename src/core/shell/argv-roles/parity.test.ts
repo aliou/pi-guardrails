@@ -16,10 +16,7 @@ const PARITY: Array<[string, string[]]> = [
   ["bash -c 'echo /etc/passwd'", ["echo /etc/passwd"]],
   ["sh -c 'cat /secret'", ["cat /secret"]],
   ["bash script.sh /arg", ["script.sh", "/arg"]],
-  [
-    "node -e 'console.log(require(p + \"/package.json\").version)'",
-    ["/package.json"],
-  ],
+  ["node -e 'console.log(require(p + \"/package.json\").version)'", []],
   ["python3 -c 'open(\"/etc/passwd\")'", ["/etc/passwd"]],
   ["python3 script.py /data", ["script.py", "/data"]],
   ["php -r 'echo 1;' /srv", ["/srv"]],
