@@ -1,5 +1,6 @@
 import type { Action, Rule } from "../../src/core";
 import { checkDangerousCommand } from "../../src/core/commands";
+import { commandSurfaces } from "../../src/core/shell/surface";
 import type { DangerousPattern, PatternConfig } from "../../src/shared/config";
 import { compileCommandPatterns } from "../../src/shared/matching";
 
@@ -51,8 +52,11 @@ export function matchCommandPattern(
   patterns: PatternConfig[],
 ): PatternConfig | null {
   const compiled = compileCommandPatterns(patterns);
+  const surfaces = commandSurfaces(command) ?? [command];
   for (let i = 0; i < compiled.length; i++) {
-    if (compiled[i].test(command)) return patterns[i];
+    if (surfaces.some((surface) => compiled[i].test(surface))) {
+      return patterns[i];
+    }
   }
   return null;
 }
