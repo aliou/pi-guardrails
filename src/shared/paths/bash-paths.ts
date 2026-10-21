@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { parse as parsePath, resolve } from "node:path";
-import { parse } from "@aliou/sh";
+import { parse, type SimpleCommand, type Word } from "@aliou/sh";
 import {
   expandHomePath,
   isWithinBoundary,
@@ -13,6 +13,7 @@ import {
 } from "../../core/paths/plausibility";
 import { toClassifiedArgs } from "../../core/shell/argv-roles";
 import {
+  type CommandScope,
   isFdDuplicationRedirect,
   isHeredocRedirect,
   walkCommands,
@@ -28,6 +29,33 @@ async function expandCandidate(
   if (!hasGlobChars(candidate)) return [candidate];
   const matches = await expandGlob(candidate, { cwd });
   return matches.length > 0 ? matches : [candidate];
+}
+
+/**
+ * Directory a `cd` moves to, resolved against `dir`. Returns `undefined` when
+ * the command leaves the directory unchanged (bad arity), and the session cwd
+ * when the target cannot be tracked (`cd -`, expansions, globs, option-like
+ * operands) so that later relative paths fall back to legacy resolution
+ * instead of a fabricated base.
+ */
+function nextCdDir(
+  cmd: SimpleCommand,
+  dir: string,
+  sessionCwd: string,
+): string | undefined {
+  const words = cmd.words ?? [];
+  if (!words[0] || wordToString(words[0]) !== "cd") return undefined;
+  const operands = words.slice(1).filter((word: Word) => {
+    const text = wordToString(word);
+    return text !== "-L" && text !== "-P" && text !== "--";
+  });
+  if (operands.length === 0) return expandHomePath("~");
+  if (operands.length > 1) return undefined;
+  const word = operands[0];
+  const text = wordToString(word);
+  if (text === "-" || text.startsWith("-")) return sessionCwd;
+  if (wordHasExpansion(word) || hasGlobChars(text)) return sessionCwd;
+  return resolve(dir, expandHomePath(text));
 }
 
 /** Maximum nesting depth for recursive shell -c parsing. */
@@ -62,9 +90,18 @@ export async function extractBashPathCandidates(
   const { depth = 0, pathExists = existsSync } = options;
   const seen = new Set<string>();
   const results: string[] = [];
+  const scopeDirs = new Map<CommandScope, string>();
+  const dirFor = (scope: CommandScope): string => {
+    const known = scopeDirs.get(scope);
+    if (known !== undefined) return known;
+    const inherited = scope.parent ? dirFor(scope.parent) : cwd;
+    scopeDirs.set(scope, inherited);
+    return inherited;
+  };
 
   const addCandidate = async (
     token: string,
+    dir: string,
     forcePath = false,
     commandName?: string,
     commandArgs: string[] = [],
@@ -83,9 +120,9 @@ export async function extractBashPathCandidates(
       commandCreatesPaths(commandName, commandArgs) ||
       programText;
 
-    const expanded = await expandCandidate(token, cwd);
+    const expanded = await expandCandidate(token, dir);
     for (const file of expanded) {
-      const abs = resolve(cwd, expandHomePath(file));
+      const abs = resolve(dir, expandHomePath(file));
       // Tokens with repeated separators (`//`, `cat .//`) collapse to the
       // filesystem root, which is never a meaningful prompt target.
       if (parsePath(abs).root === abs) continue;
@@ -111,7 +148,9 @@ export async function extractBashPathCandidates(
 
     walkCommands(
       ast,
-      (cmd, redirects) => {
+      (cmd, redirects, scope) => {
+        const activeScope: CommandScope = scope ?? { parent: undefined };
+        let dir = dirFor(activeScope);
         // Expansion is decided per source word from its AST parts, not from
         // the flattened token: `wordToString` flattens quoting away, so the
         // `$p` in a single-quoted sed range (`'/pat/,$p'`) is literal text
@@ -128,7 +167,7 @@ export async function extractBashPathCandidates(
           if (isFdDuplicationRedirect(redir)) continue;
           // Heredoc delimiters and here-strings are text, not file targets.
           if (isHeredocRedirect(redir)) continue;
-          pending.push(addCandidate(wordToString(redir.target), true));
+          pending.push(addCandidate(wordToString(redir.target), dir, true));
         }
         const commandName = wordList[0] ? wordToString(wordList[0]) : "";
         if (commandName) {
@@ -136,7 +175,7 @@ export async function extractBashPathCandidates(
             if (arg.recurseShell) {
               if (depth >= MAX_SHELL_DEPTH) continue;
               pending.push(
-                extractBashPathCandidates(arg.token, cwd, {
+                extractBashPathCandidates(arg.token, dir, {
                   depth: depth + 1,
                   pathExists,
                 }).then((nested) => {
@@ -152,6 +191,7 @@ export async function extractBashPathCandidates(
               pending.push(
                 addCandidate(
                   arg.token,
+                  dir,
                   arg.forcePath,
                   commandName,
                   wordList.slice(1).map(wordToString),
@@ -175,6 +215,7 @@ export async function extractBashPathCandidates(
             pending.push(
               addCandidate(
                 text,
+                dir,
                 false,
                 undefined,
                 [],
@@ -182,6 +223,13 @@ export async function extractBashPathCandidates(
                 expandedTokens.has(text),
               ),
             );
+          }
+        }
+        if (cmd && wordToString(cmd.words?.[0] ?? wordList[0] ?? "") === "cd") {
+          const next = nextCdDir(cmd, dir, cwd);
+          if (next !== undefined) {
+            scopeDirs.set(activeScope, next);
+            dir = next;
           }
         }
         return false;
