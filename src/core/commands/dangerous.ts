@@ -1,5 +1,6 @@
 import { parse } from "@aliou/sh";
 import { walkCommands, wordToString } from "../shell/ast";
+import { commandSurfaces } from "../shell/surface";
 
 /**
  * Dangerous command matchers for the permission gate.
@@ -447,6 +448,9 @@ export function checkDangerousCommand({
     }
   }
 
+  const surfaces = commandSurfaces(command);
+  const patternInputs = surfaces ?? [command];
+
   for (const compiled of patterns) {
     const source = compiled.source;
     if (
@@ -458,7 +462,7 @@ export function checkDangerousCommand({
       continue;
     }
 
-    if (compiled.test(command)) {
+    if (patternInputs.some((input) => compiled.test(input))) {
       return {
         description: source.description ?? source.pattern,
         pattern: source.pattern,
