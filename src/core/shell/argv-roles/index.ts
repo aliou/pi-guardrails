@@ -1,15 +1,16 @@
 import type { Word } from "@aliou/sh";
 import { maybePathLike } from "../../paths/path";
 import { wordHasExpansion, wordToString } from "../ast";
-import type { ClassifiedArg } from "../command-args";
-import { classifyRoles, commandFamily } from "./registry";
+import { classifyRoles, commandFamily, takesNoFileOperands } from "./registry";
 import {
+  type ClassifiedArg,
   type ClassifiedWord,
   normalizeCommandName,
   wordIsFullyQuoted,
 } from "./roles";
 
-export { commandFamily };
+export type { ClassifiedArg };
+export { commandFamily, takesNoFileOperands };
 
 export function classifyInvocation(
   command: string,

@@ -1,7 +1,6 @@
 import type { SimpleCommand, Word } from "@aliou/sh";
 import { parse } from "@aliou/sh";
 import { walkCommands, wordToString } from "../ast";
-import { classifyCommandArgs } from "../command-args";
 import { toClassifiedArgs } from "./index";
 
 export function firstCommand(source: string): SimpleCommand {
@@ -22,14 +21,6 @@ export function wordsOf(source: string): { name: string; args: Word[] } {
   const cmd = firstCommand(source);
   const words = cmd.words ?? [];
   return { name: wordToString(words[0] as Word), args: words.slice(1) };
-}
-
-export function legacyCandidates(source: string): string[] {
-  const { name, args } = wordsOf(source);
-  return classifyCommandArgs(
-    name,
-    args.map((w) => wordToString(w)),
-  ).map((c) => c.token);
 }
 
 export function roleCandidates(source: string): string[] {

@@ -9,6 +9,7 @@ export type ArgRole =
   | "script"
   | "option-value"
   | "remote"
+  | "text-operand"
   | "none"
   | "operand";
 
@@ -33,3 +34,10 @@ export function normalizeCommandName(command: string): string {
 export function isOptionText(text: string): boolean {
   return text.startsWith("-") && text !== "-" && text !== "--";
 }
+
+export type ClassifiedArg = {
+  token: string;
+  forcePath?: boolean;
+  programText?: boolean;
+  recurseShell?: boolean;
+};

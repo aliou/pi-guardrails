@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyInvocation } from "./index";
-import { legacyCandidates, roleCandidates, wordsOf } from "./test-helpers";
+import { roleCandidates, wordsOf } from "./test-helpers";
 
 function roles(source: string): string[] {
   const { name, args } = wordsOf(source);
@@ -17,9 +17,6 @@ describe("find family", () => {
   });
 
   it("matches legacy: only pre-expression roots are candidates", () => {
-    expect(roleCandidates("find . -name '*.js' -type f")).toEqual(
-      legacyCandidates("find . -name '*.js' -type f"),
-    );
     expect(roleCandidates("find . -name '*.js' -type f")).toEqual(["."]);
   });
 });
