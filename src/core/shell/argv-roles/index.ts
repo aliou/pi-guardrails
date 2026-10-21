@@ -27,16 +27,40 @@ export function classifyInvocation(
 }
 
 // mirrors legacy extractPathsFromCode exactly; the #136 refinement is deferred
-const CODE_TOKEN_REGEX =
-  /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&(){}[\]]+)/g;
+const PROGRAM_LITERAL_REGEX = /"([^"]*)"|'([^']*)'|`([^`]*)`/g;
 
+function adjacentOperatorChar(
+  code: string,
+  from: number,
+  step: 1 | -1,
+): string {
+  for (let i = from; i >= 0 && i < code.length; i += step) {
+    if (!/\s/.test(code[i])) return code[i];
+  }
+  return "";
+}
+
+/**
+ * Path candidates from interpreter code (`node -e`, `python -c`, …). Only
+ * quoted string literals count: bare code tokens like the `/1.055` of a
+ * division are identifiers and operators, not paths. A literal glued to a
+ * `+` is a concatenation fragment (`p + "/package.json"`) whose target is
+ * unknowable, and a literal against `[`/`]` is a dictionary key or index
+ * (`spec["paths"]["/api/items"]`), so both are skipped. Literals in call
+ * position (`open("/etc/passwd")`) are kept.
+ */
 export function extractProgramTextPaths(code: string): string[] {
   const out: string[] = [];
-  for (const match of code.matchAll(CODE_TOKEN_REGEX)) {
-    const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
-    if (!token || token.startsWith("-")) continue;
-    if (!maybePathLike(token)) continue;
-    out.push(token);
+  for (const match of code.matchAll(PROGRAM_LITERAL_REGEX)) {
+    const value = match[1] ?? match[2] ?? match[3] ?? "";
+    if (!value || value.startsWith("-")) continue;
+    if (!maybePathLike(value)) continue;
+    const start = match.index ?? 0;
+    const before = adjacentOperatorChar(code, start - 1, -1);
+    const after = adjacentOperatorChar(code, start + match[0].length, 1);
+    if (before === "+" || after === "+") continue;
+    if (before === "[" || after === "]") continue;
+    out.push(value);
   }
   return out;
 }
