@@ -2,37 +2,61 @@ import { describe, expect, it } from "vitest";
 import type { GuardrailsConfig } from "../types";
 import { run, shouldRun } from "./009-allow-dev-null";
 
-function withPathAccess(pathAccess: Record<string, unknown>): GuardrailsConfig {
-  return {
+function withConfig(
+  overrides: Record<string, unknown> = {},
+  // `null` builds a config with no pathAccess key at all.
+  pathAccess: Record<string, unknown> | null = {
+    mode: "ask",
+    allowedPaths: [],
+  },
+): GuardrailsConfig {
+  const config: Record<string, unknown> = {
     onboarding: { completed: true },
     features: { pathAccess: true },
-    pathAccess,
-  } as unknown as GuardrailsConfig;
+    ...overrides,
+  };
+  if (pathAccess !== null) config.pathAccess = pathAccess;
+  return config as unknown as GuardrailsConfig;
 }
 
 describe("009-allow-dev-null", () => {
   describe("shouldRun", () => {
-    it("runs for ask-mode configs without /dev/null", () => {
-      expect(shouldRun(withPathAccess({ mode: "ask", allowedPaths: [] }))).toBe(
-        true,
-      );
-    });
-
-    it("runs for block-mode configs without /dev/null", () => {
-      expect(
-        shouldRun(withPathAccess({ mode: "block", allowedPaths: [] })),
-      ).toBe(true);
+    it.each([
+      "ask",
+      "block",
+    ] as const)("runs for %s-mode configs without /dev/null", (mode) => {
+      expect(shouldRun(withConfig({}, { mode, allowedPaths: [] }))).toBe(true);
     });
 
     it("does not run when /dev/null is already allowed", () => {
       expect(
         shouldRun(
-          withPathAccess({
-            mode: "block",
-            allowedPaths: [{ kind: "file", path: "/dev/null" }],
-          }),
+          withConfig(
+            {},
+            {
+              mode: "block",
+              allowedPaths: [{ kind: "file", path: "/dev/null" }],
+            },
+          ),
         ),
       ).toBe(false);
+    });
+
+    it("does not run when applyBuiltinDefaults is false", () => {
+      expect(shouldRun(withConfig({ applyBuiltinDefaults: false }))).toBe(
+        false,
+      );
+    });
+
+    it("does not run when pathAccess is not configured at all", () => {
+      expect(shouldRun(withConfig({}, null))).toBe(false);
+    });
+
+    it.each([
+      undefined,
+      "allow",
+    ])("does not run when mode is %s (no gating to fix)", (mode) => {
+      expect(shouldRun(withConfig({}, { mode, allowedPaths: [] }))).toBe(false);
     });
 
     it("does not run before onboarding or without the feature enabled", () => {
@@ -54,10 +78,13 @@ describe("009-allow-dev-null", () => {
   describe("run", () => {
     it("appends /dev/null without touching existing entries", () => {
       const result = run(
-        withPathAccess({
-          mode: "block",
-          allowedPaths: [{ kind: "directory", path: "/tmp/outside" }],
-        }),
+        withConfig(
+          {},
+          {
+            mode: "block",
+            allowedPaths: [{ kind: "directory", path: "/tmp/outside" }],
+          },
+        ) as GuardrailsConfig,
       );
 
       expect(result.pathAccess?.allowedPaths).toEqual([

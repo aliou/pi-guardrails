@@ -317,6 +317,53 @@ describe("pathAccess.allowedPaths builtin default resolution", () => {
     });
     expect(decision.kind).toBe("allow");
   });
+
+  it("neither resolves nor writes /dev/null when a migrated config opts out of builtin defaults", async () => {
+    // onboarding + features.pathAccess make migration 009 eligible; the
+    // opt-out must keep it from writing the entry into the on-disk file
+    // (the predicate re-runs on every load, not just once per version).
+    const config = await loadWithLocal({
+      onboarding: { completed: true },
+      features: { pathAccess: true },
+      applyBuiltinDefaults: false,
+      pathAccess: { mode: "block", allowedPaths: [] },
+    });
+
+    expect(config.pathAccess.allowedPaths).toEqual([]);
+
+    const saved = JSON.parse(
+      await readFile(join(process.cwd(), ".pi/extensions/guardrails.json"), {
+        encoding: "utf-8",
+      }),
+    );
+    expect(saved.pathAccess.allowedPaths).toEqual([]);
+  });
+
+  it("writes the /dev/null default into an on-disk config that has not opted out", async () => {
+    // Positive control for the opt-out test above: the same config minus
+    // the opt-out must gain the entry in the file, proving the migration
+    // path is actually exercised (not vacuously green).
+    const config = await loadWithLocal({
+      onboarding: { completed: true },
+      features: { pathAccess: true },
+      pathAccess: { mode: "block", allowedPaths: [] },
+    });
+
+    expect(config.pathAccess.allowedPaths).toContainEqual({
+      kind: "file",
+      path: "/dev/null",
+    });
+
+    const saved = JSON.parse(
+      await readFile(join(process.cwd(), ".pi/extensions/guardrails.json"), {
+        encoding: "utf-8",
+      }),
+    );
+    expect(saved.pathAccess.allowedPaths).toContainEqual({
+      kind: "file",
+      path: "/dev/null",
+    });
+  });
 });
 
 describe("permission gate pattern merging across scopes", () => {
