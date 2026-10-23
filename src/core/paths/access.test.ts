@@ -1,5 +1,10 @@
 import { assert, describe, expect, it } from "vitest";
-import { checkPathAccess, isPathAllowed, type PathAccessState } from "./access";
+import {
+  checkPathAccess,
+  isPathAllowed,
+  isProcessDevicePath,
+  type PathAccessState,
+} from "./access";
 
 describe("isPathAllowed", () => {
   describe("when allowedPaths is empty", () => {
@@ -82,6 +87,39 @@ describe("isPathAllowed", () => {
   });
 });
 
+describe("isProcessDevicePath", () => {
+  it.each([
+    "/dev/stdin",
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/tty",
+    "/dev/fd/0",
+    "/dev/fd/3",
+    "/dev/fd/007",
+  ])("classifies %s as bash-child process plumbing", (p) => {
+    expect(isProcessDevicePath(p)).toBe(true);
+  });
+
+  it.each([
+    "/dev/random",
+    "/dev/urandom",
+    "/dev/zero",
+    "/dev/disk0",
+    "/dev/tty0",
+    "/dev/pts/0",
+    "/dev/fd/",
+    "/dev/fd/abc",
+    "/dev/fd/-1",
+    "/dev/fd/3/",
+    "/dev/fd/3/extra",
+    "/dev/stdinx",
+    "/dev/stdout/x",
+    "/etc/stdin",
+  ])("does not classify %s as process plumbing", (p) => {
+    expect(isProcessDevicePath(p)).toBe(false);
+  });
+});
+
 describe("checkPathAccess", () => {
   const cwd = "/work/project";
   const base = (overrides: Partial<PathAccessState> = {}): PathAccessState => ({
@@ -119,6 +157,29 @@ describe("checkPathAccess", () => {
       expect(checkPathAccess(cwd, ".", base({ mode: "ask" })).kind).toBe(
         "allow",
       );
+    });
+  });
+
+  describe("when the path is a device file", () => {
+    it("treats device paths like any other outside-workspace path", () => {
+      expect(
+        checkPathAccess("/dev/tty", "/dev/tty", base({ mode: "ask" })).kind,
+      ).toBe("ask");
+      expect(
+        checkPathAccess("/dev/fd/3", "/dev/fd/3", base({ mode: "block" })).kind,
+      ).toBe("deny");
+      expect(
+        checkPathAccess("/dev/stdin", "/dev/stdin", base({ mode: "block" }))
+          .kind,
+      ).toBe("deny");
+    });
+
+    it("returns allow when a device path is explicitly in allowedPaths", () => {
+      const state = base({
+        mode: "block",
+        allowedPaths: [{ kind: "file", path: "/dev/tty" }],
+      });
+      expect(checkPathAccess("/dev/tty", "/dev/tty", state).kind).toBe("allow");
     });
   });
 

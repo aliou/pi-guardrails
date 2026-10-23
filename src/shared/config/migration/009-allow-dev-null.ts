@@ -24,7 +24,9 @@ export function shouldRun(config: GuardrailsConfig): boolean {
   return (
     config.onboarding?.completed === true &&
     config.features?.pathAccess === true &&
-    config.pathAccess?.mode === "ask" &&
+    config.applyBuiltinDefaults !== false &&
+    (config.pathAccess?.mode === "ask" ||
+      config.pathAccess?.mode === "block") &&
     !includesDevNull(config.pathAccess?.allowedPaths)
   );
 }

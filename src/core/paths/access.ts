@@ -12,6 +12,19 @@ export interface PathAccessState {
   hasUI: boolean;
 }
 
+const PROCESS_DEVICE_PATHS = new Set([
+  "/dev/stdin",
+  "/dev/stdout",
+  "/dev/stderr",
+  "/dev/tty",
+]);
+
+const DEV_FD_PATTERN = /^\/dev\/fd\/\d+$/;
+
+export function isProcessDevicePath(absPath: string): boolean {
+  return PROCESS_DEVICE_PATHS.has(absPath) || DEV_FD_PATTERN.test(absPath);
+}
+
 /**
  * Check if an absolute path is covered by the allowedPaths list.
  *
