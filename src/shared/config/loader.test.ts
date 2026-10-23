@@ -306,9 +306,6 @@ describe("pathAccess.allowedPaths builtin default resolution", () => {
       pathAccess: { mode: "block" },
     });
 
-    // Same state assembly the path-access hook performs: the resolved
-    // entries are absolute, so grants' resolveAllowedPaths is the identity
-    // here and checkPathAccess is the decision point the hook defers to.
     const decision = checkPathAccess("/dev/null", "/dev/null", {
       cwd: "/work/project",
       mode: config.pathAccess.mode,
@@ -319,9 +316,6 @@ describe("pathAccess.allowedPaths builtin default resolution", () => {
   });
 
   it("neither resolves nor writes /dev/null when a migrated config opts out of builtin defaults", async () => {
-    // onboarding + features.pathAccess make migration 009 eligible; the
-    // opt-out must keep it from writing the entry into the on-disk file
-    // (the predicate re-runs on every load, not just once per version).
     const config = await loadWithLocal({
       onboarding: { completed: true },
       features: { pathAccess: true },
@@ -340,9 +334,6 @@ describe("pathAccess.allowedPaths builtin default resolution", () => {
   });
 
   it("writes the /dev/null default into an on-disk config that has not opted out", async () => {
-    // Positive control for the opt-out test above: the same config minus
-    // the opt-out must gain the entry in the file, proving the migration
-    // path is actually exercised (not vacuously green).
     const config = await loadWithLocal({
       onboarding: { completed: true },
       features: { pathAccess: true },

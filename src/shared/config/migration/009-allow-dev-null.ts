@@ -20,24 +20,6 @@ function includesDevNull(allowedPaths: unknown[] | undefined): boolean {
   });
 }
 
-/**
- * Adds the built-in /dev/null allowance to user configs that predate it.
- *
- * This migration is predicate-gated (composeMigrations re-evaluates it on
- * every load of every on-disk config), so its predicate must be as strict
- * as the write it performs:
- *
- * - No mode gate: block-mode users need the safe default just as much as
- *   ask-mode users (in block mode there is no prompt, so a missing
- *   /dev/null entry means every 2>/dev/null fails).
- * - `applyBuiltinDefaults: false` opts out of builtin defaults, and the
- *   loader seeding respects it, so the migration must not write the entry
- *   back into an opted-out file.
- * - Only configs that actually configure path access in a gating mode:
- *   a missing `pathAccess` key (or mode "allow") means the user never
- *   relied on the entry, and the loader seeding already covers them at
- *   runtime without touching their file.
- */
 export function shouldRun(config: GuardrailsConfig): boolean {
   return (
     config.onboarding?.completed === true &&

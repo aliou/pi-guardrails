@@ -161,9 +161,6 @@ describe("checkPathAccess", () => {
   });
 
   describe("when the path is a device file", () => {
-    // The bash-origin device allowance lives in the path-access rule, not
-    // in the core check: the same path reached through an in-process tool
-    // is pi's own fd or terminal and must still be checked (rules.test.ts).
     it("treats device paths like any other outside-workspace path", () => {
       expect(
         checkPathAccess("/dev/tty", "/dev/tty", base({ mode: "ask" })).kind,

@@ -612,9 +612,8 @@ describe("pathAccess extension hook process devices", () => {
     vi.mocked(targetsForTool).mockResolvedValue(["/dev/fd/3", "/dev/tty"]);
     const { pi, ctx } = setup();
 
-    const result = await runHandler(pi, ctx, toolCall); // read tool
+    const result = await runHandler(pi, ctx, toolCall);
 
-    // Not silently allowed: in block mode the hook denies without a prompt.
     expect(result).toMatchObject({
       block: true,
       reason: expect.stringContaining("/dev/fd/3"),

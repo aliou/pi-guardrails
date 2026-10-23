@@ -58,9 +58,7 @@ describe("createPathAccessRule", () => {
     });
 
     it("still checks device paths reached through in-process tools", () => {
-      // For read/write/edit/grep/find/ls, /dev/fd/N is pi's own fd and
-      // /dev/tty is the terminal — they must not pass silently.
-      const rule = createPathAccessRule(state()); // block mode
+      const rule = createPathAccessRule(state());
       for (const origin of ["read", "write", "edit", "grep", "find", "ls"]) {
         for (const path of ["/dev/fd/3", "/dev/tty"]) {
           expect(rule.check({ kind: "file", path, origin })).toMatchObject({

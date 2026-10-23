@@ -4,7 +4,6 @@ import { run, shouldRun } from "./009-allow-dev-null";
 
 function withConfig(
   overrides: Record<string, unknown> = {},
-  // `null` builds a config with no pathAccess key at all.
   pathAccess: Record<string, unknown> | null = {
     mode: "ask",
     allowedPaths: [],
