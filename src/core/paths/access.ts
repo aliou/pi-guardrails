@@ -13,15 +13,24 @@ export interface PathAccessState {
 }
 
 /**
- * Device files that are process plumbing, not filesystem state. Redirecting
- * or reading these never touches user data, so prompting for them protects
- * nothing and only trains users to click through (issue #90).
+ * Device files that are process plumbing for a *bash child*: its stdin,
+ * stdout, stderr, controlling terminal, and open file descriptors. A bash
+ * command cannot use them to reach user data the harness did not already
+ * gate, so path-access skips them (issue #90).
  *
- * This is the single source of truth for the built-in device allowance; it
- * applies regardless of `allowedPaths` and `applyBuiltinDefaults`. `/dev/null`
- * is deliberately NOT here: it is a config default (`DEFAULT_CONFIG`
- * `pathAccess.allowedPaths`) so users can inspect and opt out of it via
- * `applyBuiltinDefaults: false` (issue #89).
+ * CAUTION: this is only safe for bash-origin targets. The same paths in the
+ * pi process itself — reached through in-process tools like `read`, `write`,
+ * or `edit` — are pi's own file descriptors and terminal: a write to
+ * `/dev/fd/N` can truncate a file pi holds open, and `/dev/stdout` or
+ * `/dev/tty` can inject into the TUI. Callers must gate on the target's
+ * origin (see `extensions/path-access/rules.ts`); `checkPathAccess`
+ * deliberately does NOT consult this set.
+ *
+ * This is the single source of truth for the built-in device allowance. It
+ * applies regardless of `allowedPaths` and `applyBuiltinDefaults`.
+ * `/dev/null` is deliberately NOT here: it is a config default
+ * (`DEFAULT_CONFIG` `pathAccess.allowedPaths`) so users can inspect and opt
+ * out of it via `applyBuiltinDefaults: false` (issue #89).
  */
 const PROCESS_DEVICE_PATHS = new Set([
   "/dev/stdin",
@@ -34,8 +43,8 @@ const PROCESS_DEVICE_PATHS = new Set([
 const DEV_FD_PATTERN = /^\/dev\/fd\/\d+$/;
 
 /**
- * Whether an absolute path is built-in process plumbing (see
- * `PROCESS_DEVICE_PATHS`): always allowed by `checkPathAccess`.
+ * Whether an absolute path is bash-child process plumbing (see
+ * `PROCESS_DEVICE_PATHS`). Only meaningful for bash-origin targets.
  */
 export function isProcessDevicePath(absPath: string): boolean {
   return PROCESS_DEVICE_PATHS.has(absPath) || DEV_FD_PATTERN.test(absPath);
@@ -69,10 +78,6 @@ export function checkPathAccess(
   if (state.mode === "allow") return { kind: "allow" };
 
   if (isWithinBoundary(absolutePath, state.cwd)) return { kind: "allow" };
-
-  // Process plumbing (/dev/stdin, /dev/tty, /dev/fd/N, ...) never names
-  // user data: allow it before consulting mode or allowedPaths.
-  if (isProcessDevicePath(absolutePath)) return { kind: "allow" };
 
   if (isPathAllowed(absolutePath, state.allowedPaths)) return { kind: "allow" };
 

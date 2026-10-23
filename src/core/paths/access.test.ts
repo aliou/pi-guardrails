@@ -1,5 +1,10 @@
 import { assert, describe, expect, it } from "vitest";
-import { checkPathAccess, isPathAllowed, type PathAccessState } from "./access";
+import {
+  checkPathAccess,
+  isPathAllowed,
+  isProcessDevicePath,
+  type PathAccessState,
+} from "./access";
 
 describe("isPathAllowed", () => {
   describe("when allowedPaths is empty", () => {
@@ -82,6 +87,39 @@ describe("isPathAllowed", () => {
   });
 });
 
+describe("isProcessDevicePath", () => {
+  it.each([
+    "/dev/stdin",
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/tty",
+    "/dev/fd/0",
+    "/dev/fd/3",
+    "/dev/fd/007",
+  ])("classifies %s as bash-child process plumbing", (p) => {
+    expect(isProcessDevicePath(p)).toBe(true);
+  });
+
+  it.each([
+    "/dev/random",
+    "/dev/urandom",
+    "/dev/zero",
+    "/dev/disk0",
+    "/dev/tty0",
+    "/dev/pts/0",
+    "/dev/fd/",
+    "/dev/fd/abc",
+    "/dev/fd/-1",
+    "/dev/fd/3/",
+    "/dev/fd/3/extra",
+    "/dev/stdinx",
+    "/dev/stdout/x",
+    "/etc/stdin",
+  ])("does not classify %s as process plumbing", (p) => {
+    expect(isProcessDevicePath(p)).toBe(false);
+  });
+});
+
 describe("checkPathAccess", () => {
   const cwd = "/work/project";
   const base = (overrides: Partial<PathAccessState> = {}): PathAccessState => ({
@@ -122,31 +160,29 @@ describe("checkPathAccess", () => {
     });
   });
 
-  describe("when the path is a built-in process device", () => {
-    it.each([
-      "/dev/stdin",
-      "/dev/stdout",
-      "/dev/stderr",
-      "/dev/tty",
-      "/dev/fd/0",
-      "/dev/fd/3",
-    ])("allows %s without consulting allowedPaths, in ask and block modes", (p) => {
-      expect(checkPathAccess(p, p, base({ mode: "ask" })).kind).toBe("allow");
-      expect(checkPathAccess(p, p, base({ mode: "block" })).kind).toBe("allow");
+  describe("when the path is a device file", () => {
+    // The bash-origin device allowance lives in the path-access rule, not
+    // in the core check: the same path reached through an in-process tool
+    // is pi's own fd or terminal and must still be checked (rules.test.ts).
+    it("treats device paths like any other outside-workspace path", () => {
+      expect(
+        checkPathAccess("/dev/tty", "/dev/tty", base({ mode: "ask" })).kind,
+      ).toBe("ask");
+      expect(
+        checkPathAccess("/dev/fd/3", "/dev/fd/3", base({ mode: "block" })).kind,
+      ).toBe("deny");
+      expect(
+        checkPathAccess("/dev/stdin", "/dev/stdin", base({ mode: "block" }))
+          .kind,
+      ).toBe("deny");
     });
 
-    it.each([
-      "/dev/random",
-      "/dev/urandom",
-      "/dev/zero",
-      "/dev/disk0",
-      "/dev/fd/abc",
-      "/dev/fd/3/extra",
-      "/dev/stdinx",
-      "/etc/stdin",
-    ])("does not extend the allowance to %s", (p) => {
-      expect(checkPathAccess(p, p, base({ mode: "ask" })).kind).toBe("ask");
-      expect(checkPathAccess(p, p, base({ mode: "block" })).kind).toBe("deny");
+    it("returns allow when a device path is explicitly in allowedPaths", () => {
+      const state = base({
+        mode: "block",
+        allowedPaths: [{ kind: "file", path: "/dev/tty" }],
+      });
+      expect(checkPathAccess("/dev/tty", "/dev/tty", state).kind).toBe("allow");
     });
   });
 

@@ -46,4 +46,42 @@ describe("createPathAccessRule", () => {
       kind: "pass",
     });
   });
+
+  describe("process device paths", () => {
+    it("passes bash-origin device paths without consulting the state", () => {
+      const rule = createPathAccessRule(state()); // block mode
+      for (const path of ["/dev/stdin", "/dev/tty", "/dev/fd/3"]) {
+        expect(rule.check({ kind: "file", path, origin: "bash" })).toEqual({
+          kind: "pass",
+        });
+      }
+    });
+
+    it("still checks device paths reached through in-process tools", () => {
+      // For read/write/edit/grep/find/ls, /dev/fd/N is pi's own fd and
+      // /dev/tty is the terminal — they must not pass silently.
+      const rule = createPathAccessRule(state()); // block mode
+      for (const origin of ["read", "write", "edit", "grep", "find", "ls"]) {
+        for (const path of ["/dev/fd/3", "/dev/tty"]) {
+          expect(rule.check({ kind: "file", path, origin })).toMatchObject({
+            kind: "match",
+          });
+        }
+      }
+    });
+
+    it("checks device paths when no origin is known", () => {
+      const rule = createPathAccessRule(state()); // block mode
+      expect(rule.check({ kind: "file", path: "/dev/tty" })).toMatchObject({
+        kind: "match",
+      });
+    });
+
+    it("does not pass bash-origin paths outside the device set", () => {
+      const rule = createPathAccessRule(state()); // block mode
+      expect(
+        rule.check({ kind: "file", path: "/dev/urandom", origin: "bash" }),
+      ).toMatchObject({ kind: "match" });
+    });
+  });
 });

@@ -572,3 +572,64 @@ describe("pathAccess extension hook RPC fallback", () => {
     );
   });
 });
+
+describe("pathAccess extension hook process devices", () => {
+  beforeEach(() => {
+    mockState.pathAccess = {
+      mode: "block",
+      applyTo: "all",
+      allowedPaths: [],
+      alwaysScope: "local",
+    };
+    mockState.saves = [];
+  });
+
+  function setup() {
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    return { pi, ctx };
+  }
+
+  async function runHandler(
+    pi: DeepMocked<ExtensionAPI>,
+    ctx: DeepMocked<ExtensionContext>,
+    event: unknown,
+  ) {
+    await pathAccess(pi);
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    return toolCallHandler(event as never, ctx);
+  }
+
+  it("blocks a read tool targeting pi's own fds and terminal", async () => {
+    vi.mocked(targetsForTool).mockResolvedValue(["/dev/fd/3", "/dev/tty"]);
+    const { pi, ctx } = setup();
+
+    const result = await runHandler(pi, ctx, toolCall); // read tool
+
+    // Not silently allowed: in block mode the hook denies without a prompt.
+    expect(result).toMatchObject({
+      block: true,
+      reason: expect.stringContaining("/dev/fd/3"),
+    });
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+  });
+
+  it("lets a bash command target process plumbing", async () => {
+    vi.mocked(targetsForTool).mockResolvedValue(["/dev/fd/3", "/dev/tty"]);
+    const { pi, ctx } = setup();
+
+    const result = await runHandler(pi, ctx, bashToolCall);
+
+    expect(result).toBeUndefined();
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+    expect(emittedPromptOpened(pi)).toBeUndefined();
+  });
+});
