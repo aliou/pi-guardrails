@@ -17,6 +17,7 @@ Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extens
 
 ```bash
 pnpm test             # Run tests
+pnpm test:e2e         # Run e2e tests (interactive + RPC sessions, ambient config)
 pnpm test:watch       # Run tests in watch mode
 pnpm typecheck        # Type check
 pnpm gen:schema       # Regenerate schema.json from config types

@@ -10,6 +10,13 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "extensions/**/*", "tests/**/*", "vitest.config.ts"],
+  "include": [
+    "src/**/*",
+    "extensions/**/*",
+    "tests/**/*",
+    "e2e/**/*",
+    "vitest.config.ts",
+    "vitest.e2e.config.ts"
+  ],
   "exclude": ["node_modules", "tmp"]
 }
