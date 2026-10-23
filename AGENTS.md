@@ -7,7 +7,7 @@ Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extens
 ## Stack
 
 - TypeScript (strict mode)
-- pnpm 10.26.1
+- pnpm 11.27.0
 - Vitest for testing
 - Biome for linting/formatting
 - Changesets for versioning
