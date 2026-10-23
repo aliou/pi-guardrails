@@ -1,4 +1,11 @@
 export {
+  type ClassifiedArg,
+  classifyInvocation,
+  commandFamily,
+  takesNoFileOperands,
+  toClassifiedArgs,
+} from "./argv-roles";
+export {
   type CommandCallback,
   isFdDuplicationRedirect,
   isHeredocRedirect,
@@ -7,8 +14,3 @@ export {
   wordHasExpansion,
   wordToString,
 } from "./ast";
-export {
-  type ClassifiedArg,
-  classifyCommandArgs,
-  takesNoFileOperands,
-} from "./command-args";

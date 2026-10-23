@@ -11,6 +11,7 @@ import {
   hasNonPathShape,
   isImplausibleLocalPath,
 } from "../../core/paths/plausibility";
+import { toClassifiedArgs } from "../../core/shell/argv-roles";
 import {
   isFdDuplicationRedirect,
   isHeredocRedirect,
@@ -18,7 +19,6 @@ import {
   wordHasExpansion,
   wordToString,
 } from "../../core/shell/ast";
-import { classifyCommandArgs } from "../../core/shell/command-args";
 import { expandGlob, hasGlobChars } from "../glob";
 
 async function expandCandidate(
@@ -117,8 +117,9 @@ export async function extractBashPathCandidates(
         // `$p` in a single-quoted sed range (`'/pat/,$p'`) is literal text
         // that a token-level check would misread as an unexpanded variable.
         // Key the flattened form so classified arguments can be looked up.
+        const wordList = cmd?.words ?? [];
         const expandedTokens = new Set<string>();
-        for (const word of cmd?.words ?? []) {
+        for (const word of wordList) {
           if (wordHasExpansion(word)) expandedTokens.add(wordToString(word));
         }
         for (const redir of redirects ?? []) {
@@ -129,10 +130,9 @@ export async function extractBashPathCandidates(
           if (isHeredocRedirect(redir)) continue;
           pending.push(addCandidate(wordToString(redir.target), true));
         }
-        const words = (cmd?.words ?? []).map(wordToString);
-        const commandName = words[0];
+        const commandName = wordList[0] ? wordToString(wordList[0]) : "";
         if (commandName) {
-          for (const arg of classifyCommandArgs(commandName, words.slice(1))) {
+          for (const arg of toClassifiedArgs(commandName, wordList.slice(1))) {
             if (arg.recurseShell) {
               if (depth >= MAX_SHELL_DEPTH) continue;
               pending.push(
@@ -154,7 +154,7 @@ export async function extractBashPathCandidates(
                   arg.token,
                   arg.forcePath,
                   commandName,
-                  words.slice(1),
+                  wordList.slice(1).map(wordToString),
                   arg.programText,
                   expandedTokens.has(arg.token),
                 ),
@@ -167,18 +167,19 @@ export async function extractBashPathCandidates(
           // flags, patterns, and shell punctuation, not paths. Only keep
           // tokens that look like real paths; skip lone `\` from escaped
           // parens, which resolves to the drive root on Windows (issue #79).
-          for (const word of words) {
-            if (word === "\\" || word === "(" || word === ")" || word === "!")
+          for (const word of wordList) {
+            const text = wordToString(word);
+            if (text === "\\" || text === "(" || text === ")" || text === "!")
               continue;
-            if (word.startsWith("-") && word !== "-" && word !== "--") continue;
+            if (text.startsWith("-") && text !== "-" && text !== "--") continue;
             pending.push(
               addCandidate(
-                word,
+                text,
                 false,
                 undefined,
                 [],
                 false,
-                expandedTokens.has(word),
+                expandedTokens.has(text),
               ),
             );
           }

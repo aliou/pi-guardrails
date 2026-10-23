@@ -545,3 +545,71 @@ describe("matchDangerousCommand", () => {
     expect(result?.pattern).toBe("sudo");
   });
 });
+
+describe("checkDangerousCommand user patterns", () => {
+  // The regex class from real-world configs: "grep whose remaining text
+  // contains a standalone /" — intended to catch greps against /, but raw
+  // matching also hits division inside a quoted grep pattern.
+  const grepRootRegex = {
+    pattern: "\\bgrep\\b[^;&|]*\\s/(?=\\s|$)",
+    regex: true,
+    description: "grep against filesystem root",
+  };
+
+  const run = (command: string) =>
+    checkDangerousCommand({
+      command,
+      patterns: compileCommandPatterns([grepRootRegex]),
+      useBuiltinMatchers: true,
+      fallbackPatterns: [grepRootRegex],
+    });
+
+  it("does not match division inside a quoted grep pattern", () => {
+    expect(
+      run(
+        "sed -i 's/a * 2 / 3/b/' content04.js && grep -c '2 / 3' content04.js",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("does not match a quoted grep pattern operand (#134)", () => {
+    expect(run('grep -rn "/transition" tests')).toBeUndefined();
+  });
+
+  it("still matches a grep against the filesystem root", () => {
+    expect(run("grep -rn foo /")).toEqual({
+      description: "grep against filesystem root",
+      pattern: "\\bgrep\\b[^;&|]*\\s/(?=\\s|$)",
+    });
+  });
+
+  it("still matches quoted interpreter code content", () => {
+    expect(
+      checkDangerousCommand({
+        command: "node -e 'fs.readFile(\"/etc/passwd\")'",
+        patterns: compileCommandPatterns([
+          { pattern: "readFile", description: "file read via node" },
+        ]),
+        useBuiltinMatchers: true,
+        fallbackPatterns: [],
+      }),
+    ).toEqual({
+      description: "file read via node",
+      pattern: "readFile",
+    });
+  });
+
+  it("falls back to the raw command when it does not parse", () => {
+    expect(
+      checkDangerousCommand({
+        command: "grep 'unclosed / pattern",
+        patterns: compileCommandPatterns([grepRootRegex]),
+        useBuiltinMatchers: true,
+        fallbackPatterns: [grepRootRegex],
+      }),
+    ).toEqual({
+      description: "grep against filesystem root",
+      pattern: "\\bgrep\\b[^;&|]*\\s/(?=\\s|$)",
+    });
+  });
+});
