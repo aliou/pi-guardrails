@@ -32,6 +32,7 @@ pnpm-debug.log*
 .direnv/
 result
 result-*
+.pre-commit-config.yaml
 
 # Husky
 .husky/_
