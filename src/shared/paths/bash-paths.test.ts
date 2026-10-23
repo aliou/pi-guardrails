@@ -398,6 +398,11 @@ describe("extractBashPathCandidates", () => {
       expect(await extractBashPathCandidates("echo hi 2>&1", CWD)).toEqual([]);
       expect(await extractBashPathCandidates("cat file 3<&0", CWD)).toEqual([]);
       expect(await extractBashPathCandidates("exec 3>&-", CWD)).toEqual([]);
+      // Dup without an explicit fd number (`>&2`) and inside pipelines.
+      expect(await extractBashPathCandidates("ls foo >&2", CWD)).toEqual([]);
+      expect(
+        await extractBashPathCandidates("grep -n x file 2>&1 | head", CWD),
+      ).toEqual([]);
       // `&>` redirects stdout AND stderr to a real file — keep it.
       expect(
         await extractBashPathCandidates("echo hi &> /tmp/log", CWD),

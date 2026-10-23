@@ -122,6 +122,34 @@ describe("checkPathAccess", () => {
     });
   });
 
+  describe("when the path is a built-in process device", () => {
+    it.each([
+      "/dev/stdin",
+      "/dev/stdout",
+      "/dev/stderr",
+      "/dev/tty",
+      "/dev/fd/0",
+      "/dev/fd/3",
+    ])("allows %s without consulting allowedPaths, in ask and block modes", (p) => {
+      expect(checkPathAccess(p, p, base({ mode: "ask" })).kind).toBe("allow");
+      expect(checkPathAccess(p, p, base({ mode: "block" })).kind).toBe("allow");
+    });
+
+    it.each([
+      "/dev/random",
+      "/dev/urandom",
+      "/dev/zero",
+      "/dev/disk0",
+      "/dev/fd/abc",
+      "/dev/fd/3/extra",
+      "/dev/stdinx",
+      "/etc/stdin",
+    ])("does not extend the allowance to %s", (p) => {
+      expect(checkPathAccess(p, p, base({ mode: "ask" })).kind).toBe("ask");
+      expect(checkPathAccess(p, p, base({ mode: "block" })).kind).toBe("deny");
+    });
+  });
+
   describe("when path is outside cwd and mode is block", () => {
     it("returns deny with the displayPath in the reason", () => {
       const state = base({ mode: "block" });

@@ -73,6 +73,8 @@ Where "always" grants are saved is controlled by `pathAccess.alwaysScope`: `"loc
 
 Granted paths are stored in `pathAccess.allowedPaths` as explicit `{ kind, path }` entries: `file` matches the exact path, `directory` matches the directory and its descendants. Edit them through `/guardrails:settings` (Path Access → Allowed paths, Tab toggles file/directory) or directly in the settings file. Paths support `~/` for home. Existing configs using the legacy string form (trailing `/` for directories) are migrated automatically.
 
+A few paths are allowed without any configuration: `/dev/null` is part of the built-in defaults (disable them with `applyBuiltinDefaults: false`), and process plumbing — `/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/tty`, and `/dev/fd/N` — is always allowed in every mode because redirecting to or reading from it never touches user data. All other device files (e.g. `/dev/urandom`) follow the normal outside-workspace rules.
+
 [![Guardrails path access prompt walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/path-access.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/path-access.mp4)
 
 ### permission-gate
