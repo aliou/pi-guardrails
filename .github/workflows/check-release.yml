@@ -1,0 +1,13 @@
+name: Check release
+
+on:
+  schedule:
+    - cron: "0 8,20 * * *" # 8am and 8pm UTC
+  workflow_dispatch:
+
+jobs:
+  check-release:
+    permissions:
+      contents: read
+      issues: write
+    uses: aliou/actions/.github/workflows/check-release.yml@main
