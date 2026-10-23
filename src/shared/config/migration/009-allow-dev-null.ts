@@ -20,11 +20,19 @@ function includesDevNull(allowedPaths: unknown[] | undefined): boolean {
   });
 }
 
+/**
+ * Adds the built-in /dev/null allowance to user configs that predate it.
+ *
+ * The mode gate is deliberately absent: this writes a safe default, which
+ * block-mode users need just as much as ask-mode users (in block mode there
+ * is no prompt, so a missing /dev/null entry means every 2>/dev/null fails).
+ * The loader also seeds the default at merge time (issue #89), so this
+ * migration only matters for configs saved before that fix shipped.
+ */
 export function shouldRun(config: GuardrailsConfig): boolean {
   return (
     config.onboarding?.completed === true &&
     config.features?.pathAccess === true &&
-    config.pathAccess?.mode === "ask" &&
     !includesDevNull(config.pathAccess?.allowedPaths)
   );
 }

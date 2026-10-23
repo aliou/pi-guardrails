@@ -97,7 +97,15 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
         memory?.permissionGate?.autoDenyPatterns,
       );
 
+      // Mirrors the policies.rules seeding above: the built-in defaults are
+      // the base layer, and user scopes layer on top by `kind:path` key so
+      // an identical user entry replaces rather than duplicates the default.
       const mergedPaths = new Map<string, AllowedPath>();
+      if (resolved.applyBuiltinDefaults) {
+        for (const entry of DEFAULT_CONFIG.pathAccess.allowedPaths) {
+          mergedPaths.set(`${entry.kind}:${entry.path}`, entry);
+        }
+      }
       for (const paths of [
         global?.pathAccess?.allowedPaths,
         local?.pathAccess?.allowedPaths,

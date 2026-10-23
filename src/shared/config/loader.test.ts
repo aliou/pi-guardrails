@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { vol } from "memfs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import pkg from "../../../package.json" with { type: "json" };
+import { checkPathAccess } from "../../core/paths";
 import { createGuardrailsConfigLoader } from "./loader";
 
 describe("guardrails config persistence", () => {
@@ -222,6 +223,99 @@ describe("pathAccess.alwaysScope resolution", () => {
     await configLoader.load();
 
     expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("global");
+  });
+});
+
+describe("pathAccess.allowedPaths builtin default resolution", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  const loadWithLocal = async (local: Record<string, unknown> = {}) => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-allowed-paths");
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-allowed-paths/.keep": "",
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        ...local,
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    return configLoader.getConfig();
+  };
+
+  it("applies the /dev/null default with no user config", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-allowed-paths-empty");
+    vol.fromJSON({ "/tmp/pi-agent-allowed-paths-empty/.keep": "" });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.allowedPaths).toContainEqual({
+      kind: "file",
+      path: "/dev/null",
+    });
+  });
+
+  it("resolves user entries alongside the /dev/null default", async () => {
+    const config = await loadWithLocal({
+      pathAccess: {
+        allowedPaths: [{ kind: "directory", path: "/tmp/outside" }],
+      },
+    });
+
+    expect(config.pathAccess.allowedPaths).toEqual(
+      expect.arrayContaining([
+        { kind: "file", path: "/dev/null" },
+        { kind: "directory", path: "/tmp/outside" },
+      ]),
+    );
+  });
+
+  it("omits the /dev/null default when applyBuiltinDefaults is false", async () => {
+    const config = await loadWithLocal({
+      applyBuiltinDefaults: false,
+      pathAccess: {
+        allowedPaths: [{ kind: "directory", path: "/tmp/outside" }],
+      },
+    });
+
+    expect(config.pathAccess.allowedPaths).toEqual([
+      { kind: "directory", path: "/tmp/outside" },
+    ]);
+  });
+
+  it("does not duplicate a user /dev/null entry", async () => {
+    const config = await loadWithLocal({
+      pathAccess: {
+        allowedPaths: [{ kind: "file", path: "/dev/null" }],
+      },
+    });
+
+    expect(config.pathAccess.allowedPaths).toEqual([
+      { kind: "file", path: "/dev/null" },
+    ]);
+  });
+
+  it("does not deny 2>/dev/null in block mode with defaults applied", async () => {
+    const config = await loadWithLocal({
+      pathAccess: { mode: "block" },
+    });
+
+    // Same state assembly the path-access hook performs: the resolved
+    // entries are absolute, so grants' resolveAllowedPaths is the identity
+    // here and checkPathAccess is the decision point the hook defers to.
+    const decision = checkPathAccess("/dev/null", "/dev/null", {
+      cwd: "/work/project",
+      mode: config.pathAccess.mode,
+      allowedPaths: config.pathAccess.allowedPaths,
+      hasUI: true,
+    });
+    expect(decision.kind).toBe("allow");
   });
 });
 
