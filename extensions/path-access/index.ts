@@ -45,7 +45,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
   let currentSkillAllowedPaths: AllowedPath[] = [];
 
   pi.on("before_agent_start", (event) => {
-    const skills = event.systemPromptOptions.skills;
+    // Oh My Pi sends before_agent_start without systemPromptOptions.
+    const skills = event.systemPromptOptions?.skills;
 
     if (!skills || skills.length === 0) return;
 
