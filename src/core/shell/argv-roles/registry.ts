@@ -1,4 +1,5 @@
 import type { Word } from "@aliou/sh";
+import { agentCliFamily } from "./agent-cli";
 import { awkFamily } from "./awk";
 import type { Family, FamilyName } from "./family";
 import { findFamily } from "./find";
@@ -17,6 +18,7 @@ const FAMILIES: Family[] = [
   findFamily,
   interpreterFamily,
   remoteFamily,
+  agentCliFamily,
   noFileOperandFamily,
   delimiterValueFamily,
   xargsFamily,

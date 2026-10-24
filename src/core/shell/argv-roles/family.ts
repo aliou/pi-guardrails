@@ -8,6 +8,7 @@ export type FamilyName =
   | "find"
   | "interpreter"
   | "remote"
+  | "agent-cli"
   | "no-file-operand"
   | "delimiter-value"
   | "nested-command"
