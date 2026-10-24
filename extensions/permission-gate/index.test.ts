@@ -13,6 +13,7 @@ import {
   type PartialFuncReturn,
 } from "@golevelup/ts-vitest";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { configLoader, type ResolvedConfig } from "../../src/shared/config";
 import {
   GUARDRAILS_ACTION_BLOCKED_EVENT,
   GUARDRAILS_FEATURE_REGISTER_EVENT,
@@ -23,23 +24,24 @@ import {
 } from "../../src/shared/events";
 import permissionGate from "./index";
 
+function makeConfig(overrides: Record<string, unknown> = {}): ResolvedConfig {
+  // Partial on purpose: the hook under test only reads the fields below.
+  return {
+    enabled: true,
+    features: { permissionGate: true, policies: true, pathAccess: true },
+    permissionGate: {
+      patterns: [{ pattern: "dangerous-cmd", description: "test danger" }],
+      useBuiltinMatchers: false,
+      requireConfirmation: true,
+      allowedPatterns: [],
+      autoDenyPatterns: [],
+      ...overrides,
+    },
+  } as unknown as ResolvedConfig;
+}
+
 // Control the config the hook sees without touching the real config loader.
 vi.mock("../../src/shared/config", () => {
-  function makeConfig(overrides: Record<string, unknown> = {}) {
-    return {
-      enabled: true,
-      features: { permissionGate: true, policies: true, pathAccess: true },
-      permissionGate: {
-        patterns: [{ pattern: "dangerous-cmd", description: "test danger" }],
-        useBuiltinMatchers: false,
-        requireConfirmation: true,
-        allowedPatterns: [],
-        autoDenyPatterns: [],
-        ...overrides,
-      },
-    };
-  }
-
   return {
     configLoader: {
       load: vi.fn().mockResolvedValue(undefined),
@@ -83,6 +85,7 @@ describe("permissionGate extension hook", () => {
   let toolCallHandler: ToolCallHandler | undefined;
 
   beforeEach(async () => {
+    vi.mocked(configLoader.getConfig).mockImplementation(() => makeConfig());
     pi = createMock<ExtensionAPI>();
     await permissionGate(pi);
     toolCallHandler = registeredToolCallHandler(pi);
@@ -131,6 +134,62 @@ describe("permissionGate extension hook", () => {
       createCtx(),
     );
     expect(result).toBeUndefined();
+  });
+
+  it("auto-deny returns terminate: true when the pattern opts in", async () => {
+    vi.mocked(configLoader.getConfig).mockReturnValue(
+      makeConfig({
+        autoDenyPatterns: [
+          {
+            pattern: "sleep-wait",
+            description: "do not sleep-wait",
+            terminate: true,
+          },
+        ],
+      }),
+    );
+
+    assert(toolCallHandler, "tool_call handler should be registered");
+    const result = await toolCallHandler(
+      {
+        type: "tool_call",
+        toolCallId: "sleep-call",
+        toolName: "bash",
+        input: { command: "echo sleep-wait" },
+      } satisfies BashToolCallEvent,
+      createCtx(),
+    );
+
+    expect(result).toEqual({
+      block: true,
+      reason: "Command auto-denied: do not sleep-wait",
+      terminate: true,
+    });
+  });
+
+  it("auto-deny without terminate keeps today's result shape", async () => {
+    vi.mocked(configLoader.getConfig).mockReturnValue(
+      makeConfig({
+        autoDenyPatterns: [{ pattern: "sleep-wait", description: "no" }],
+      }),
+    );
+
+    assert(toolCallHandler, "tool_call handler should be registered");
+    const result = await toolCallHandler(
+      {
+        type: "tool_call",
+        toolCallId: "sleep-call",
+        toolName: "bash",
+        input: { command: "echo sleep-wait" },
+      } satisfies BashToolCallEvent,
+      createCtx(),
+    );
+
+    expect(result).toEqual({
+      block: true,
+      reason: "Command auto-denied: no",
+    });
+    expect(result).not.toHaveProperty("terminate");
   });
 
   it("deny returns { block: true } without aborting the turn", async () => {

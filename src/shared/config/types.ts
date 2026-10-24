@@ -24,6 +24,8 @@ export interface PatternConfig {
   /** Optional description surfaced to the agent when the pattern triggers (e.g. auto-deny reason). */
   description?: string;
   regex?: boolean;
+  /** When a blocked call matches this pattern, hint the agent to end its turn instead of retrying (pi >= 0.84.1). Only used by consumers that block on match. */
+  terminate?: boolean;
 }
 
 /**

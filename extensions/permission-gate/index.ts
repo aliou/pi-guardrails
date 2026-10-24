@@ -60,7 +60,11 @@ export default async function permissionGate(pi: ExtensionAPI) {
         context: { toolName: "bash", input: event.input },
       });
 
-      return { block: true, reason };
+      return {
+        block: true,
+        reason,
+        ...(autoDenyMatch.terminate ? { terminate: true } : {}),
+      };
     }
 
     const safety = await checkAction(action, [

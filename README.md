@@ -81,6 +81,22 @@ The `permission-gate` extension detects dangerous bash commands before they run.
 
 It catches built-in risky patterns like recursive deletes, privileged commands, disk formatting, broad permission changes, and configured custom patterns. You can allow once, allow for the session, deny, decline and stop (which also aborts the current turn), or configure auto-deny rules.
 
+Auto-deny patterns support an optional `terminate: true` flag (pi >= 0.84.1): after blocking, the agent's turn ends instead of yielding back to the model, so it does not retry the blocked command. The turn only ends when every blocked call in the batch sets `terminate`. Example:
+
+```json
+{
+  "permissionGate": {
+    "autoDenyPatterns": [
+      {
+        "pattern": "sleep ",
+        "description": "do not sleep-wait; the process tool notifies you on exit",
+        "terminate": true
+      }
+    ]
+  }
+}
+```
+
 [![Guardrails permission gate walkthrough](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.12.0/permission-gate.mp4)
 
 ### Shell substitution checks
