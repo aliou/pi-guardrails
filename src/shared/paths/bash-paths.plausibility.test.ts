@@ -156,6 +156,31 @@ describe("outside-workspace plausibility filter", () => {
     });
   });
 
+  describe("interpreter code fragments (issue #136)", () => {
+    it.each([
+      [
+        "node -e 'const x=(c+0.055)/1.055; console.log(x)'",
+        "bare math division",
+      ],
+      [
+        "node -e 'console.log(require(p + \"/package.json\").version)'",
+        "concatenated fragment",
+      ],
+      [
+        "node -e 'process.env.HOME + \"/.pi/agent/npm/node_modules/\"'",
+        "home concatenation",
+      ],
+    ])("ignores the fragment in %s (%s)", async (command) => {
+      expect(await extract(command)).toEqual([]);
+    });
+
+    it("still surfaces a quoted read in inline code", async () => {
+      expect(await extract(`node -e 'require("/etc/passwd")'`)).toEqual([
+        "/etc/passwd",
+      ]);
+    });
+  });
+
   describe("real outside-workspace access is still surfaced", () => {
     it.each([
       ["cat /etc/passwd", ["/etc/passwd"]],

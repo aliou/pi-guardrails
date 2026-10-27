@@ -221,6 +221,50 @@ describe("classifyCommandArgs", () => {
         classifyCommandArgs("python3", ["-c", 'open("/etc/passwd")']),
       ).toEqual([{ token: "/etc/passwd", programText: true }]);
     });
+
+    it("ignores bare code tokens from inline code (issue #136)", () => {
+      expect(
+        tokens("node", ["-e", "const x=(c+0.055)/1.055; console.log(x)"]),
+      ).toEqual([]);
+    });
+
+    it("ignores literals glued to + concatenations", () => {
+      expect(
+        tokens("node", [
+          "-e",
+          'console.log(require(p + "/package.json").version)',
+        ]),
+      ).toEqual([]);
+      expect(
+        tokens("node", ["-e", 'process.env.HOME + "/.pi/agent/npm"']),
+      ).toEqual([]);
+      expect(tokens("node", ["-e", '"/etc" + "/passwd"'])).toEqual([]);
+    });
+
+    it("ignores literals used as subscript keys", () => {
+      expect(
+        tokens("python3", ["-c", 'print(spec["paths"]["/api/items"])']),
+      ).toEqual([]);
+    });
+
+    it("keeps literals in call position", () => {
+      expect(tokens("node", ["-e", 'open("/etc/passwd")'])).toEqual([
+        "/etc/passwd",
+      ]);
+      expect(tokens("node", ["-e", 'require("/srv/x.js")'])).toEqual([
+        "/srv/x.js",
+      ]);
+      expect(tokens("node", ["-e", 'fs.readFile("/x", cb)'])).toEqual(["/x"]);
+    });
+
+    it("keeps array element literals", () => {
+      expect(tokens("node", ["-e", '["/etc/passwd"].map(read)'])).toEqual([
+        "/etc/passwd",
+      ]);
+      expect(
+        tokens("node", ["-e", 'const list = ["a", "/etc/passwd"]']),
+      ).toEqual(["/etc/passwd"]);
+    });
   });
 
   describe("delimiter arguments", () => {

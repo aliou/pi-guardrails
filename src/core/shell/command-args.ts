@@ -261,6 +261,7 @@ type InterpreterFlags = {
   shellFamily: boolean;
   /** Match flags case-insensitively (PowerShell parameters). */
   caseInsensitive: boolean;
+  bareCodeTokens: boolean;
 };
 
 /** Shell-family interpreters whose -c value is itself a shell program. */
@@ -319,6 +320,7 @@ function interpreterFlags(cmd: string): InterpreterFlags {
       skipFlags: new Set(["-encodedcommand", "-e", "-ec"]),
       shellFamily: false,
       caseInsensitive: true,
+      bareCodeTokens: true,
     };
   }
   if (SHELL_INTERPRETERS.has(cmd)) {
@@ -328,6 +330,7 @@ function interpreterFlags(cmd: string): InterpreterFlags {
       skipFlags: new Set(),
       shellFamily: true,
       caseInsensitive: false,
+      bareCodeTokens: false,
     };
   }
   const codeFlags =
@@ -342,6 +345,7 @@ function interpreterFlags(cmd: string): InterpreterFlags {
     skipFlags: new Set(),
     shellFamily: false,
     caseInsensitive: false,
+    bareCodeTokens: false,
   };
 }
 
@@ -350,26 +354,50 @@ function interpreterFlags(cmd: string): InterpreterFlags {
  *
  * Interpreters (python -c, powershell -Command, node -e) hide filesystem
  * access inside a program string that the outer shell parser treats as a
- * single argument. Scanning the program for quoted/whitespace-delimited
- * path-like tokens lets path-access policies gate the embedded access.
+ * single argument. Scanning the program for quoted string literals (and, for
+ * PowerShell, unquoted tokens) lets path-access policies gate the embedded
+ * access.
  */
 const CODE_TOKEN_REGEX =
   /"([^"]+)"|'([^']+)'|`([^`]+)`|([^\s"'`<>|;&(){}[\]]+)/g;
 
-function extractPathsFromCode(code: string): ClassifiedArg[] {
+function extractPathsFromCode(
+  code: string,
+  bareTokens: boolean,
+): ClassifiedArg[] {
   const out: ClassifiedArg[] = [];
   for (const match of code.matchAll(CODE_TOKEN_REGEX)) {
-    const token = match[1] ?? match[2] ?? match[3] ?? match[4] ?? "";
+    const quoted = match[1] ?? match[2] ?? match[3];
+    const token = quoted ?? (bareTokens ? match[4] : undefined) ?? "";
     if (!token || token.startsWith("-")) continue;
     if (!maybePathLike(token)) continue;
+    if (!quoted) {
+      out.push({ token, programText: true });
+      continue;
+    }
+    const before = code.slice(0, match.index);
+    const after = code.slice(match.index + match[0].length);
+    if (before.trimEnd().endsWith("+") || after.trimStart().startsWith("+")) {
+      continue;
+    }
+    if (before.endsWith("[")) {
+      const prev = before.at(-2);
+      if (prev && /[A-Za-z0-9_$)\]]/.test(prev)) continue;
+    }
     out.push({ token, programText: true });
   }
   return out;
 }
 
 function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
-  const { codeFlags, fileFlags, skipFlags, shellFamily, caseInsensitive } =
-    interpreterFlags(cmd);
+  const {
+    codeFlags,
+    fileFlags,
+    skipFlags,
+    shellFamily,
+    caseInsensitive,
+    bareCodeTokens,
+  } = interpreterFlags(cmd);
   const out: ClassifiedArg[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] as string;
@@ -378,7 +406,7 @@ function classifyInterpreterArgs(cmd: string, args: string[]): ClassifiedArg[] {
       const code = args[++i];
       if (code) {
         if (shellFamily) out.push({ token: code, recurseShell: true });
-        else out.push(...extractPathsFromCode(code));
+        else out.push(...extractPathsFromCode(code, bareCodeTokens));
       }
       continue;
     }
