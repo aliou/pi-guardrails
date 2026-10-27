@@ -24,11 +24,132 @@ beforeEach(() => {
     "/work/project/secrets.txt": "",
     "/work/project/scripts/call_api.js": "",
     "/work/project/scripts/read_file.js": "",
+    "/work/project/README.md": "",
+    "/work/project/.pi/.keep": "",
+    "/work/project/frontend/app.js": "",
+    "/work/project/packages/dashboard/pkg.json": "",
+    "/work/project/packages/api/pkg.json": "",
+    "/work/outside-note.txt": "",
+    "/work/.keep": "",
     [`${HOME}/.keep`]: "",
   });
 });
 
 describe("extractBashPathCandidates", () => {
+  describe("cd resolution", () => {
+    it.each([
+      ["cd .pi && cat ../README.md", ["/work/project/README.md"]],
+      [
+        "cd frontend && pnpm build > ../.pi/build.log 2>&1",
+        ["/work/project/.pi/build.log"],
+      ],
+      [
+        "cd packages/dashboard && bun test && cd ../api && uv run pytest",
+        ["/work/project/packages/dashboard", "/work/project/packages/api"],
+      ],
+      ["cd frontend && cat ../app.js", ["/work/project/app.js"]],
+    ])("resolves relative paths after cd: %j", async (command, expected) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        expected,
+      );
+    });
+
+    it("resolves nested bash -c programs against the cd target", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && bash -c 'cat ../app.js'",
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/app.js"]);
+    });
+
+    it("inherits the cd target inside command substitutions", async () => {
+      await expect(
+        extractBashPathCandidates(
+          'cd frontend && echo "$(cat ../app.js)"',
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/app.js"]);
+    });
+
+    it("does not leak cd out of a subshell", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && (cd .. && cat ./app.js)",
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/frontend/app.js"]);
+    });
+
+    it("resolves pipeline elements against the pre-pipeline directory", async () => {
+      await expect(
+        extractBashPathCandidates("cd frontend | cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/README.md"]);
+    });
+
+    it("resolves paths after a cd out of the workspace", async () => {
+      await expect(
+        extractBashPathCandidates("cd .. && cat ./outside-note.txt", CWD),
+      ).resolves.toEqual(["/work/outside-note.txt"]);
+    });
+
+    it("resolves a bare cd against HOME", async () => {
+      await expect(
+        extractBashPathCandidates("cd && cat ./.keep", CWD),
+      ).resolves.toEqual([`${HOME}/.keep`]);
+    });
+
+    it.each([
+      ["background statements", "cd frontend & cat ../README.md"],
+      ["coproc bodies", "coproc cd frontend; cat ../README.md"],
+      ["coproc blocks", "coproc { cd frontend; }; cat ../README.md"],
+    ])("does not leak cd out of %s", async (_label, command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+        "/work/README.md",
+      ]);
+    });
+
+    it("tracks cd inside a background statement", async () => {
+      await expect(
+        extractBashPathCandidates("cd frontend && cat ../README.md &", CWD),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("resolves an operand after -- as a path", async () => {
+      vol.mkdirSync("/work/project/-name");
+      await expect(
+        extractBashPathCandidates("cd -- -name && cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("leaves the directory unchanged when cd has more than one operand", async () => {
+      await expect(
+        extractBashPathCandidates(
+          "cd frontend && cd a b && cat ../README.md",
+          CWD,
+        ),
+      ).resolves.toEqual(["/work/project/README.md"]);
+    });
+
+    it("resolves against the session cwd after a cd to a missing directory", async () => {
+      await expect(
+        extractBashPathCandidates("cd missing; cat ../README.md", CWD),
+      ).resolves.toEqual(["/work/README.md"]);
+    });
+
+    it.each([
+      ["cd $d && cat ../README.md"],
+      ["cd frontend && cd - && cat ../README.md"],
+      ["cd *.js && cat ../README.md"],
+      ["cd frontend && cd missing && cat ../README.md"],
+      ["cd frontend && cd -x && cat ../README.md"],
+      ["cd frontend && cd -- - && cat ../README.md"],
+    ])("falls back to the session cwd when the cd target is untracked: %j", async (command) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+        "/work/README.md",
+      ]);
+    });
+  });
   describe("executable substitutions", () => {
     it.each([
       'echo "$(cat /etc/passwd)"',
