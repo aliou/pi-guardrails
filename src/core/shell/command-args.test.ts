@@ -69,10 +69,7 @@ describe("classifyCommandArgs", () => {
   });
 
   it("keeps xargs-wrapped file operands", () => {
-    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual([
-      "pattern",
-      "./src",
-    ]);
+    expect(tokens("xargs", ["grep", "pattern", "./src"])).toEqual(["./src"]);
   });
 
   // Pattern-shaped arguments are no longer special-cased per command. They are
@@ -81,14 +78,84 @@ describe("classifyCommandArgs", () => {
   it.each([
     ["awk", ["/aaa/{print}", "./input"]],
     ["sed", ["s#/old#/new#g", "./file"]],
-    ["grep", ["/api/v1", "./src"]],
-    ["grep", ["-l", "Hitbox\\|hitbox\\|IsChisel", "./src"]],
-    ["rg", ["/api/v1", "./src"]],
     ["jq", ['.path | test("^/tmp/")', "./data.json"]],
     ["go", ["test", "./..."]],
     ["ctx7", ["docs", "/websites/apisix"]],
   ])("delegates %s arguments to downstream filtering", (command, args) => {
     expect(tokens(command, args)).toEqual(args);
+  });
+
+  describe("search commands", () => {
+    it.each([
+      ["grep", ["-rn", "/transition", "tests"], ["tests"]],
+      ["grep", ["-rn", "src/", "."], ["."]],
+      ["egrep", ["/api/v1", "./src"], ["./src"]],
+      ["fgrep", ["/api/v1", "./src"], ["./src"]],
+      ["rg", ["-n", "/upload|\\.detail|413", "backend"], ["backend"]],
+      ["/usr/bin/grep", ["/api/v1", "./src"], ["./src"]],
+    ] as const)("treats the pattern of %s as text, not a path", (command, args, expected) => {
+      expect(tokens(command, [...args])).toEqual(expected);
+    });
+
+    it("keeps every positional after the pattern", () => {
+      expect(tokens("grep", ["-rn", "foo", "/"])).toEqual(["/"]);
+      expect(tokens("grep", ["/pat", "./a", "./b"])).toEqual(["./a", "./b"]);
+    });
+
+    it("treats positionals as files once -e/-f gave the pattern", () => {
+      expect(tokens("grep", ["-e", "/pat", "./a", "./b"])).toEqual([
+        "./a",
+        "./b",
+      ]);
+      expect(tokens("grep", ["-e/pat", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["--regexp=/pat", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["-f", "./patterns", "./a"])).toEqual([
+        "./patterns",
+        "./a",
+      ]);
+      expect(tokens("grep", ["-fpatterns", "./a"])).toEqual([
+        "patterns",
+        "./a",
+      ]);
+      expect(tokens("grep", ["--file=./patterns", "./a"])).toEqual([
+        "./patterns",
+        "./a",
+      ]);
+    });
+
+    it("consumes values of value-taking options", () => {
+      expect(
+        tokens("grep", ["-A", "2", "-B2", "-m", "5", "/pat", "./a"]),
+      ).toEqual(["./a"]);
+      expect(
+        tokens("rg", [
+          "--after-context=2",
+          "-g",
+          "*.ts",
+          "-t",
+          "ts",
+          "-Tmd",
+          "--type-not=md",
+          "/pat",
+          "./a",
+        ]),
+      ).toEqual(["./a"]);
+    });
+
+    it("parses grouped short options getopt-style", () => {
+      expect(tokens("grep", ["-nA", "3", "/x", "/etc/hosts"])).toEqual([
+        "/etc/hosts",
+      ]);
+      expect(tokens("grep", ["-rnB2", "/pat", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["-inC", "5", "/pat", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["-rne", "PAT", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["-rlf", "pats", "./a"])).toEqual(["pats", "./a"]);
+    });
+
+    it("ends option parsing at --", () => {
+      expect(tokens("grep", ["--", "-weird", "./a"])).toEqual(["./a"]);
+      expect(tokens("grep", ["-e", "pat", "--", "./a"])).toEqual(["./a"]);
+    });
   });
 
   describe("find expressions", () => {

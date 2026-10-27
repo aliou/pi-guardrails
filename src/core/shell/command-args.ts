@@ -44,10 +44,12 @@ function isOption(arg: string): boolean {
  *     remotely and option values stay unparsed (identity files named by `-i`
  *     are read locally but shelve with the destination by design); for
  *     `kubectl`, argv after `--` belongs to the pod's command.
+ *  6. Search tools (`grep`, `egrep`, `fgrep`, `rg`) — the first non-option
+ *     positional is the search pattern, never a path.
  *
  * Everything else returns every token and is filtered downstream by shape and
  * plausibility checks in `extractBashPathCandidates`. Commands that merely
- * take identifier-shaped or pattern-shaped arguments (awk, sed, grep, jq, go,
+ * take identifier-shaped or pattern-shaped arguments (awk, sed, jq, go,
  * ctx7, gh, docker, kubectl, …) deliberately have no entry here: enumerating
  * them does not terminate.
  */
@@ -66,6 +68,7 @@ export function classifyCommandArgs(
   if (isInterpreter(cmd)) {
     return classifyInterpreterArgs(cmd, args);
   }
+  if (SEARCH_COMMANDS.has(cmd)) return classifySearchArgs(args);
   if (cmd === "cut")
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
@@ -102,6 +105,88 @@ const NO_FILE_OPERAND_COMMANDS = new Set(["echo", "printf", "tr"]);
 /** Whether a command's argv can never contain a file operand. */
 export function takesNoFileOperands(command: string): boolean {
   return NO_FILE_OPERAND_COMMANDS.has(normalizeCommandName(command));
+}
+
+const SEARCH_COMMANDS = new Set(["grep", "egrep", "fgrep", "rg"]);
+
+const SEARCH_PATTERN_OPTIONS = new Set(["--regexp", "--file"]);
+
+const SEARCH_VALUE_OPTIONS = new Set([
+  "--after-context",
+  "--before-context",
+  "--context",
+  "--max-count",
+  "--glob",
+  "--type",
+  "--type-not",
+]);
+
+const SEARCH_VALUE_LETTERS = new Set([
+  "e",
+  "f",
+  "A",
+  "B",
+  "C",
+  "m",
+  "g",
+  "t",
+  "T",
+]);
+
+function classifySearchArgs(args: string[]): ClassifiedArg[] {
+  const out: ClassifiedArg[] = [];
+  let patternGiven = false;
+  let optionsEnded = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (!optionsEnded && arg === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && isOption(arg)) {
+      if (arg.startsWith("--")) {
+        const eq = arg.indexOf("=");
+        const name = eq === -1 ? arg : arg.slice(0, eq);
+        if (SEARCH_PATTERN_OPTIONS.has(name)) {
+          patternGiven = true;
+          if (name === "--file") {
+            const file = eq === -1 ? args[++i] : arg.slice(eq + 1);
+            if (file) out.push({ token: file });
+          } else if (eq === -1) {
+            i++;
+          }
+        } else if (SEARCH_VALUE_OPTIONS.has(name) && eq === -1) {
+          i++;
+        }
+        continue;
+      }
+      const letters = arg.slice(1);
+      for (let j = 0; j < letters.length; j++) {
+        const letter = letters[j];
+        if (!SEARCH_VALUE_LETTERS.has(letter)) continue;
+        const value = letters.slice(j + 1);
+        if (letter === "e" || letter === "f") {
+          patternGiven = true;
+          if (letter === "f") {
+            const file = value || args[++i];
+            if (file) out.push({ token: file });
+          } else if (!value) {
+            i++;
+          }
+        } else if (!value) {
+          i++;
+        }
+        break;
+      }
+      continue;
+    }
+    if (!patternGiven) {
+      patternGiven = true;
+      continue;
+    }
+    out.push({ token: arg });
+  }
+  return out;
 }
 
 function classifyFindArgs(args: string[]): ClassifiedArg[] {
