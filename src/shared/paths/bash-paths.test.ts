@@ -72,12 +72,43 @@ describe("extractBashPathCandidates", () => {
       ).resolves.toEqual(["/work/project/app.js"]);
     });
 
-    it("does not leak cd out of a subshell", async () => {
+    it.each([
+      ["(cd frontend && cat ../.pi/x.log)", ["/work/project/.pi/x.log"]],
+      [
+        "(cd packages/dashboard && bun dev > ../../.pi/tmp/dev.log 2>&1 &)",
+        ["/work/project/packages/dashboard", "/work/project/.pi/tmp/dev.log"],
+      ],
+      [
+        "(cd packages/dashboard && for i in 1 2; do bun test > ../../.pi/run-$i.log; done)",
+        ["/work/project/packages/dashboard", "/work/project/.pi/run-$i.log"],
+      ],
+      ["cd frontend && (cd .. && cat ./app.js)", ["/work/project/app.js"]],
+      ["{ cd frontend; cat ../README.md; }", ["/work/project/README.md"]],
+    ])("tracks cd inside a group: %j", async (command, expected) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        expected,
+      );
+    });
+
+    it.each([
+      [
+        "(cd frontend && cat ./app.js) && cat ./README.md",
+        ["/work/project/frontend/app.js", "/work/project/README.md"],
+      ],
+      [
+        "(cd frontend) > ./out.log; cat ./README.md",
+        ["/work/project/out.log", "/work/project/README.md"],
+      ],
+      ["{ cd frontend; } & cat ./README.md", ["/work/project/README.md"]],
+    ])("does not leak cd out of a subshell: %j", async (command, expected) => {
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        expected,
+      );
+    });
+
+    it("keeps cd from a brace group for later statements", async () => {
       await expect(
-        extractBashPathCandidates(
-          "cd frontend && (cd .. && cat ./app.js)",
-          CWD,
-        ),
+        extractBashPathCandidates("{ cd frontend; } && cat ./app.js", CWD),
       ).resolves.toEqual(["/work/project/frontend/app.js"]);
     });
 
