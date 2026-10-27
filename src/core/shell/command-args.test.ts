@@ -158,6 +158,66 @@ describe("classifyCommandArgs", () => {
     });
   });
 
+  describe("git", () => {
+    it.each([
+      [
+        ["grep", "-n", "-E", "/transition|transitionContract\\(", "HEAD"],
+        ["grep", "HEAD"],
+      ],
+      [
+        ["grep", "-n", "/transition", "--", "src"],
+        ["grep", "src"],
+      ],
+      [
+        ["grep", "-e", "/transition", "--", "src"],
+        ["grep", "src"],
+      ],
+      [
+        ["grep", "--max-depth", "1", "/transition", "src"],
+        ["grep", "src"],
+      ],
+      [
+        ["-C", "./repo", "--no-pager", "grep", "/transition"],
+        ["-C", "./repo", "--no-pager", "grep"],
+      ],
+    ] as const)("treats the git grep pattern as text: %j", (args, expected) => {
+      expect(tokens("git", [...args])).toEqual(expected);
+    });
+
+    it.each([
+      [
+        ["log", "-p", "-L", "/def foo/,/^def bar/:backend/x.py"],
+        ["log", "-p", "backend/x.py"],
+      ],
+      [
+        ["log", "-L/def foo/,+5:backend/x.py"],
+        ["log", "backend/x.py"],
+      ],
+      [
+        ["log", "-L", ":foo:src/a.c", "--", "src/b.c"],
+        ["log", "src/a.c", "src/b.c"],
+      ],
+      [
+        ["blame", "-L", "/def foo/,+10", "backend/x.py"],
+        ["blame", "backend/x.py"],
+      ],
+      [
+        ["blame", "-L:foo", "backend/x.py"],
+        ["blame", "backend/x.py"],
+      ],
+    ] as const)("keeps only the file of a -L line range: %j", (args, expected) => {
+      expect(tokens("git", [...args])).toEqual(expected);
+    });
+
+    it("keeps arguments of other git subcommands", () => {
+      expect(tokens("git", ["diff", "/tmp/a", "./b"])).toEqual([
+        "diff",
+        "/tmp/a",
+        "./b",
+      ]);
+    });
+  });
+
   describe("find expressions", () => {
     it("keeps find roots and ignores expression patterns", () => {
       expect(tokens("find", ["./src", "-regex", ".*/test/.*"])).toEqual([
