@@ -313,3 +313,74 @@ describe("permission gate pattern merging across scopes", () => {
     ).toEqual(["allowed-a", "allowed-b"]);
   });
 });
+
+describe("pathAccess.allowedPaths builtin default", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  it("includes /dev/null when no user allowedPaths are configured", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-allowed-paths-default");
+    vol.fromJSON({ "/tmp/pi-agent-allowed-paths-default/.keep": "" });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([
+      { kind: "file", path: "/dev/null" },
+    ]);
+  });
+
+  it("layers user allowedPaths on top of /dev/null, deduped by kind:path", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-allowed-paths-merge");
+
+    const cwd = process.cwd();
+    vol.fromJSON({
+      "/tmp/pi-agent-allowed-paths-merge/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          pathAccess: {
+            allowedPaths: [
+              { kind: "file", path: "/dev/null" },
+              { kind: "directory", path: "~/code" },
+            ],
+          },
+        }),
+      [join(cwd, ".pi/extensions/guardrails.json")]: JSON.stringify({
+        version: pkg.version,
+        pathAccess: {
+          allowedPaths: [
+            { kind: "directory", path: "~/code" },
+            { kind: "file", path: "/var/log/app.log" },
+          ],
+        },
+      }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([
+      { kind: "file", path: "/dev/null" },
+      { kind: "directory", path: "~/code" },
+      { kind: "file", path: "/var/log/app.log" },
+    ]);
+  });
+
+  it("excludes /dev/null when applyBuiltinDefaults is false", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-allowed-paths-no-default");
+    vol.fromJSON({
+      "/tmp/pi-agent-allowed-paths-no-default/extensions/guardrails.json":
+        JSON.stringify({
+          version: pkg.version,
+          applyBuiltinDefaults: false,
+        }),
+    });
+
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+
+    expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([]);
+  });
+});

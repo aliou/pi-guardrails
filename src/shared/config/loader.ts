@@ -98,6 +98,11 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
       );
 
       const mergedPaths = new Map<string, AllowedPath>();
+      if (resolved.applyBuiltinDefaults) {
+        for (const entry of DEFAULT_CONFIG.pathAccess.allowedPaths) {
+          mergedPaths.set(`${entry.kind}:${entry.path}`, entry);
+        }
+      }
       for (const paths of [
         global?.pathAccess?.allowedPaths,
         local?.pathAccess?.allowedPaths,
