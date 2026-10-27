@@ -44,8 +44,10 @@ function isOption(arg: string): boolean {
  *     remotely and option values stay unparsed (identity files named by `-i`
  *     are read locally but shelve with the destination by design); for
  *     `kubectl`, argv after `--` belongs to the pod's command.
- *  6. Search tools (`grep`, `egrep`, `fgrep`, `rg`) — the first non-option
- *     positional is the search pattern, never a path.
+ *  6. Search tools (`grep`, `egrep`, `fgrep`, `rg`, `git grep`) — the first
+ *     non-option positional is the search pattern, never a path. `git log -L`
+ *     and `git blame -L` line ranges are patterns too; only the file after
+ *     the range's last `:` is a path.
  *
  * Everything else returns every token and is filtered downstream by shape and
  * plausibility checks in `extractBashPathCandidates`. Commands that merely
@@ -69,6 +71,7 @@ export function classifyCommandArgs(
     return classifyInterpreterArgs(cmd, args);
   }
   if (SEARCH_COMMANDS.has(cmd)) return classifySearchArgs(args);
+  if (cmd === "git") return classifyGitArgs(args);
   if (cmd === "cut")
     return skipOptionValues(args, new Set(["-d", "--delimiter"]));
   if (cmd === "sort")
@@ -116,6 +119,8 @@ const SEARCH_VALUE_OPTIONS = new Set([
   "--before-context",
   "--context",
   "--max-count",
+  "--max-depth",
+  "--threads",
   "--glob",
   "--type",
   "--type-not",
@@ -185,6 +190,55 @@ function classifySearchArgs(args: string[]): ClassifiedArg[] {
       continue;
     }
     out.push({ token: arg });
+  }
+  return out;
+}
+
+const GIT_GLOBAL_VALUE_OPTIONS = new Set([
+  "-C",
+  "-c",
+  "--git-dir",
+  "--work-tree",
+  "--namespace",
+  "--config-env",
+]);
+
+function classifyGitArgs(args: string[]): ClassifiedArg[] {
+  let sub = 0;
+  while (sub < args.length && isOption(args[sub] as string)) {
+    if (GIT_GLOBAL_VALUE_OPTIONS.has(args[sub] as string)) sub++;
+    sub++;
+  }
+  const head = args.slice(0, sub + 1).map((token) => ({ token }));
+  const rest = args.slice(sub + 1);
+  const subcommand = args[sub];
+  if (subcommand === "grep") return [...head, ...classifySearchArgs(rest)];
+  if (subcommand === "log" || subcommand === "blame") {
+    return [...head, ...classifyLineRangeArgs(rest, subcommand === "log")];
+  }
+  return [...head, ...rest.map((token) => ({ token }))];
+}
+
+function classifyLineRangeArgs(
+  args: string[],
+  rangeHasFile: boolean,
+): ClassifiedArg[] {
+  const out: ClassifiedArg[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string;
+    if (arg === "--") {
+      out.push(...args.slice(i + 1).map((token) => ({ token })));
+      break;
+    }
+    if (!arg.startsWith("-L")) {
+      out.push({ token: arg });
+      continue;
+    }
+    const range = arg === "-L" ? args[++i] : arg.slice(2);
+    const colon = range?.lastIndexOf(":") ?? -1;
+    if (rangeHasFile && range !== undefined && colon !== -1) {
+      out.push({ token: range.slice(colon + 1) });
+    }
   }
   return out;
 }
