@@ -1,6 +1,7 @@
 export {
   checkPathAccess,
   isPathAllowed,
+  isProcessDevicePath,
   type PathAccessState,
   type PathDecision,
 } from "./access";

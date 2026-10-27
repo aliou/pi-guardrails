@@ -1,6 +1,7 @@
 import type { Action, Rule } from "../../src/core";
 import {
   checkPathAccess,
+  isProcessDevicePath,
   normalizeForDisplay,
   type PathAccessState,
 } from "../../src/core/paths";
@@ -17,6 +18,9 @@ export function createPathAccessRule(
     key: "path-access.outside-workspace",
     check(action: Action) {
       if (action.kind !== "file") return { kind: "pass" };
+      if (action.origin === "bash" && isProcessDevicePath(action.path)) {
+        return { kind: "pass" };
+      }
       const displayPath = normalizeForDisplay(action.path, state.cwd);
       const decision = checkPathAccess(action.path, displayPath, state);
       if (decision.kind === "allow") return { kind: "pass" };

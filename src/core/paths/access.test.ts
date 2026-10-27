@@ -1,5 +1,33 @@
 import { assert, describe, expect, it } from "vitest";
-import { checkPathAccess, isPathAllowed, type PathAccessState } from "./access";
+import {
+  checkPathAccess,
+  isPathAllowed,
+  isProcessDevicePath,
+  type PathAccessState,
+} from "./access";
+
+describe("isProcessDevicePath", () => {
+  it.each([
+    "/dev/stdin",
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/tty",
+    "/dev/fd/0",
+    "/dev/fd/1",
+    "/dev/fd/2",
+  ])("matches %s", (path) => {
+    expect(isProcessDevicePath(path)).toBe(true);
+  });
+
+  it.each([
+    "/dev/fd/3",
+    "/dev/null",
+    "/dev/urandom",
+    "/dev/tty/child",
+  ])("does not match %s", (path) => {
+    expect(isProcessDevicePath(path)).toBe(false);
+  });
+});
 
 describe("isPathAllowed", () => {
   describe("when allowedPaths is empty", () => {
