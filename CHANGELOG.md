@@ -1,5 +1,24 @@
 # @aliou/pi-guardrails
 
+## 0.21.0
+
+### Minor Changes
+
+- 8d38528: Add `terminate` pattern option for permission-gate auto-deny rules (pi >= 0.84.1). Patterns can set `terminate: true` so a blocked call ends the agent's turn instead of yielding back to the model, preventing retry loops (e.g. sleep-polling). The turn only ends when every finalized blocked result in the batch sets the flag.
+
+  Also bumps dev dependencies to `@earendil-works/pi-coding-agent` / `@earendil-works/pi-tui` 1.4.0. Peer dependencies remain `"*"`.
+
+### Patch Changes
+
+- b2677af: Resolve relative paths in bash commands against `cd` targets instead of always the session working directory. `cd .pi && cat ../README.md` now reports the path the command actually reads, so monorepo workflows such as `cd frontend && pnpm build > ../.pi/build.log` no longer prompt for (or get blocked on) paths outside the workspace that the command never touches.
+
+  `cd` targets are tracked through sequential commands and `&&` chains. A `cd` inside a pipeline arm, subshell, background statement, coproc, command substitution, or function body only affects paths within that scope. Targets that cannot be tracked or do not exist (`cd -`, variable or glob targets, missing directories) fall back to the session-cwd resolution. A `cd` with more than one operand fails in bash, so it leaves the tracked directory unchanged.
+
+- ef3febe: The built-in `/dev/null` path-access allowance now applies by default instead of being dropped during config merge. Previously it only reached users via a config migration gated on `mode: "ask"`, so block-mode users had every `2>/dev/null` denied with no prompt. It is enabled whenever built-in defaults are on, layers under user-allowed paths, and is deduped by `kind:path`.
+- 1a218f9: path-access: allow bash commands to use their own standard streams and terminal (`/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/tty`, `/dev/fd/0`–`/dev/fd/2`) without a prompt. Other `/dev/*` paths still follow the normal rules.
+- d60d256: pathAccess: stop reporting math and string fragments from `node -e` / `python -c` code (like `/1.055`, `/package.json` from `p + "/package.json"`, or `/api/items` from `spec["paths"]["/api/items"]`) as top-level paths. Only quoted string literals count, and fragments glued to `+` concatenations or used as subscript keys are skipped.
+- 4b1e0fb: pathAccess: stop treating grep/egrep/fgrep/rg search patterns that start with `/` (e.g. `grep -rn "/transition" tests`) as top-level paths. The first positional is the pattern, not a file; real path operands after it are still reported.
+
 ## 0.20.0
 
 ### Minor Changes
