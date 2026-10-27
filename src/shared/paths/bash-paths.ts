@@ -252,17 +252,34 @@ export async function extractBashPathCandidates(
       return false;
     };
 
-    for (const stmt of flattenAndChains(ast.body)) {
-      walkCommands({ ...ast, body: [stmt] }, onCommand, {
-        includeSubstitutions: true,
-      });
+    const walkSequence = (stmts: Statement[]): void => {
+      for (const stmt of flattenAndChains(stmts)) {
+        const cmd = stmt.command;
+        if (cmd.type === "Subshell" || cmd.type === "Block") {
+          walkCommands(
+            { ...ast, body: [{ ...stmt, command: { ...cmd, body: [] } }] },
+            onCommand,
+            { includeSubstitutions: true },
+          );
+          const outer = dir;
+          walkSequence(cmd.body);
+          if (cmd.type === "Subshell" || stmt.background) dir = outer;
+          continue;
+        }
 
-      const cd = cdWords(stmt);
-      if (cd) {
-        const next = nextCdDir(cd, dir, cwd, pathExists);
-        if (next !== undefined) dir = next;
+        walkCommands({ ...ast, body: [stmt] }, onCommand, {
+          includeSubstitutions: true,
+        });
+
+        const cd = cdWords(stmt);
+        if (cd) {
+          const next = nextCdDir(cd, dir, cwd, pathExists);
+          if (next !== undefined) dir = next;
+        }
       }
-    }
+    };
+
+    walkSequence(ast.body);
 
     await Promise.all(pending);
     return results;
