@@ -352,6 +352,41 @@ describe("pathAccess extension hook", () => {
 
     expect(mockState.saves).toHaveLength(0);
   });
+
+  it("lets bash process-device access pass without a prompt", async () => {
+    mockState.pathAccess.mode = "block";
+    vi.mocked(targetsForTool).mockResolvedValueOnce(["/dev/stdin"]);
+    vi.mocked(targetsForTool).mockResolvedValueOnce(["/dev/tty"]);
+
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await expect(
+      toolCallHandler(
+        { ...bashToolCall, input: { command: "cat /dev/stdin" } },
+        ctx,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      toolCallHandler(
+        { ...bashToolCall, input: { command: "foo >/dev/tty" } },
+        ctx,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+    expect(pi.events.emit).not.toHaveBeenCalled();
+  });
 });
 
 describe("pathAccess extension hook write-only applyTo", () => {

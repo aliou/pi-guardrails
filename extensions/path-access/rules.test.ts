@@ -46,4 +46,44 @@ describe("createPathAccessRule", () => {
       kind: "pass",
     });
   });
+
+  it.each([
+    "/dev/stdin",
+    "/dev/stdout",
+    "/dev/stderr",
+    "/dev/tty",
+    "/dev/fd/0",
+    "/dev/fd/1",
+    "/dev/fd/2",
+  ])("passes bash-origin %s in block mode", (path) => {
+    const rule = createPathAccessRule(state());
+    expect(rule.check({ kind: "file", path, origin: "bash" })).toEqual({
+      kind: "pass",
+    });
+  });
+
+  it.each([
+    "/dev/fd/3",
+    "/dev/urandom",
+  ])("still matches bash-origin %s in block mode", (path) => {
+    const rule = createPathAccessRule(state());
+    expect(rule.check({ kind: "file", path, origin: "bash" })).toMatchObject({
+      kind: "match",
+      metadata: { absolutePath: path },
+    });
+  });
+
+  it.each([
+    "/dev/stdin",
+    "/dev/tty",
+  ])("still matches %s for non-bash origins", (path) => {
+    const rule = createPathAccessRule(state());
+    expect(rule.check({ kind: "file", path, origin: "read" })).toMatchObject({
+      kind: "match",
+      metadata: { absolutePath: path },
+    });
+    expect(rule.check({ kind: "file", path })).toMatchObject({
+      kind: "match",
+    });
+  });
 });
