@@ -2,9 +2,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-if [ ! -f .envrc ]; then
-  printf 'use nix\n' > .envrc
-fi
+printf 'use flake\n' > .envrc
 direnv allow
 
 direnv exec . pnpm install
