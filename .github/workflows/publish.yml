@@ -1,11 +1,11 @@
 name: Publish
 
+# Manual-only until the fork has its own package scope and release/deploy setup.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,9 +13,10 @@ concurrency:
 
 jobs:
   publish:
-    permissions:
-      contents: write
-      packages: write
-      pull-requests: write
-      id-token: write
-    uses: aliou/actions/.github/workflows/publish.yml@main
+    # Never publish @aliou packages or use upstream deployment credentials.
+    # Replace this disabled placeholder with fork-owned automation before enabling it.
+    if: ${{ false && github.repository == 'nmdra/pi-guardrails-classifier' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fork publishing is not configured
+        run: echo "Publishing is disabled for nmdra/pi-guardrails-classifier."

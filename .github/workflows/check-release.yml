@@ -1,13 +1,17 @@
 name: Check release
 
+# Do not run upstream release monitoring on the fork's schedule.
 on:
-  schedule:
-    - cron: "0 8,20 * * *" # 8am and 8pm UTC
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check-release:
-    permissions:
-      contents: read
-      issues: write
-    uses: aliou/actions/.github/workflows/check-release.yml@main
+    # Enable only after choosing fork-owned release monitoring and issue behavior.
+    if: ${{ false && github.repository == 'nmdra/pi-guardrails-classifier' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fork release monitoring is not configured
+        run: echo "Release monitoring is disabled for nmdra/pi-guardrails-classifier."
