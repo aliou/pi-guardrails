@@ -4,12 +4,13 @@
 
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
-This package installs four Pi extensions:
+This package installs five Pi extensions:
 
 - **guardrails** for file protection policies, settings, onboarding, and examples.
 - **path-access** for controlling access outside the current workspace.
 - **permission-gate** for confirming or blocking risky shell commands.
 - **herdr** for reporting Guardrails approval prompts to Herdr.
+- **program-status** for reporting Guardrails approval prompts to terminals that support the Program Status Protocol.
 
 ## Install
 
@@ -60,6 +61,16 @@ Useful commands:
 The included Herdr adapter reports active Guardrails approval prompts through Herdr's `herdr:blocked` event. Herdr can then show the Pi pane as blocked while it waits for a permission-gate or path-access decision.
 
 The adapter has no configuration or direct Herdr dependency. Its emitted events have no effect unless Herdr's Pi integration is active.
+
+#### Program status integration
+
+Pi reports its state to terminals that support the [Program Status Protocol (OSC 7501)](https://www.superlogical.com/rex/docs/build/program-status), such as Rex. Pi does not report Guardrails approval prompts as blocked, so the terminal keeps showing Pi as working while it waits for a decision.
+
+The included program-status adapter fills that gap. While a permission-gate or path-access prompt is open, it reports `blocked` with `kind=permission`. When the last prompt closes, it reports `working` again with the session name, matching what Pi reports during a run.
+
+The adapter writes only when stdout is a terminal, and respects `PI_PROGRAM_STATUS=0`. Terminals that do not support the protocol ignore the sequence.
+
+[![Guardrails approval status in Rex](https://assets.aliou.me/github/aliou/pi-guardrails/v0.22.0/program-status.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.22.0/program-status.mp4)
 
 ### path-access
 
