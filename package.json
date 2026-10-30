@@ -37,7 +37,7 @@
     "!extensions/**/*.test.ts"
   ],
   "dependencies": {
-    "@aliou/pi-utils-settings": "^0.19.1",
+    "@aliou/pi-utils-settings": "^0.24.0",
     "@aliou/sh": "^0.3.3"
   },
   "peerDependencies": {

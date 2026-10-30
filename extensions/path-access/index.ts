@@ -1,4 +1,5 @@
 import { dirname } from "node:path";
+import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import {
@@ -37,6 +38,7 @@ import { isReadOnlyTool, targetsForTool } from "./targets";
 
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
+  bindProjectConfig(pi, configLoader);
 
   // Pi docs paths depend only on `PI_PACKAGE_DIR` / the package root and are
   // fixed for the process lifetime, so resolve once at setup.
@@ -126,6 +128,9 @@ export default async function pathAccess(pi: ExtensionAPI) {
         event.toolName !== "ls" && event.toolName !== "find";
       const dirPath = showFileOptions ? parentDir : absolutePath;
       const dirGrantable = !isGrantTooBroad(dirPath);
+      const alwaysEnabled =
+        config.pathAccess.alwaysScope === "global" ||
+        configLoader.getProjectState() === "trusted";
       const promptOpened = createPromptOpenedPayload({
         feature: "pathAccess",
         action: safety.action,
@@ -147,14 +152,24 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
-            { command: bashCommand, dirGrantable },
+            { command: bashCommand, dirGrantable, alwaysEnabled },
           ),
         );
 
         if (customResult === undefined) {
           // RPC mode has no custom component support; fall back to a plain
           // select with the same options as the TUI prompt.
-          const options = promptOptions(showFileOptions, dirGrantable);
+          const options = promptOptions(
+            showFileOptions,
+            dirGrantable,
+            alwaysEnabled,
+          ).filter((option) => !option.disabled);
+          if (!alwaysEnabled) {
+            ctx.ui.notify(
+              '"Always" grants are saved in this project\'s settings, which are ignored because this folder is not trusted. Use /trust and restart Pi to enable them.',
+              "warning",
+            );
+          }
           const dirNote = showFileOptions
             ? "\nDirectory grants apply to the parent directory."
             : "";

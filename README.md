@@ -129,6 +129,8 @@ Advanced users can edit the settings file directly:
 - Global: `~/.pi/agent/extensions/guardrails.json`
 - Project: `.pi/extensions/guardrails.json`
 
+Project settings apply only after Pi trusts the folder. Untrusted project files are ignored and left unchanged; global settings and built-in protections still apply. Use `/trust` and restart Pi to enable project settings. Until then, the Local settings tab and Project examples destination are disabled, as are local "always" path grants. Set `pathAccess.alwaysScope` to `"global"` to save "always" grants user-wide without trusting the project. Once and session grants remain available.
+
 Guardrails writes a `$schema` field to saved settings files, so modern editors provide autocomplete and validation. The generated schema is committed at [`schema.json`](schema.json).
 
 ## Examples

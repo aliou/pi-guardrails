@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@aliou/pi-utils-settings':
-        specifier: ^0.19.1
-        version: 0.19.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)
+        specifier: ^0.24.0
+        version: 0.24.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)
       '@aliou/sh':
         specifier: ^0.3.3
         version: 0.3.3
@@ -62,11 +62,11 @@ packages:
     peerDependencies:
       '@biomejs/biome': '>=2.4.0'
 
-  '@aliou/pi-utils-settings@0.19.1':
-    resolution: {integrity: sha512-bAx2v1GSiqhj+Z9eU+Ixn1NJDVRp6e/h8bBFcWrKl6CnfbD1AfFgT/I4nNOzwZy0VgxnZLAqPFHbV184Ii9vaw==}
+  '@aliou/pi-utils-settings@0.24.0':
+    resolution: {integrity: sha512-XIrqu3YhCdfpz3O7grfsTPzSOkxA36tYbblLthvqeUBfBZhNknm+jTrwB7M8giJzlwo8FeNYCqmtRZpPqULdFA==}
     hasBin: true
     peerDependencies:
-      '@earendil-works/pi-coding-agent': '>=0.74.0 <1'
+      '@earendil-works/pi-coding-agent': '>=1.4.0 <2'
       ts-json-schema-generator: '>=2.4.0 <3'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
@@ -74,11 +74,11 @@ packages:
       ts-json-schema-generator:
         optional: true
 
-  '@aliou/pi-utils-ui@0.4.1':
-    resolution: {integrity: sha512-1oJraVjjlZD8UM41472MF1O8a41/4OvAxdH/HlQsahZH/gBkhahGw/EjlcVqXTWnCQfo+4X6PksRz63erNsPwQ==}
+  '@aliou/pi-utils-ui@0.5.1':
+    resolution: {integrity: sha512-a+m9yo+No2mXBGitWk/sPep+FXam+w3oavpj80WgJRQsnyBzzjlzZFcBikhnweRifL8UASqbWWrHN4NjESIrRw==}
     peerDependencies:
-      '@earendil-works/pi-coding-agent': '>=0.74.0 <1'
-      '@earendil-works/pi-tui': '>=0.74.0 <1'
+      '@earendil-works/pi-coding-agent': '>=0.74.0 <2'
+      '@earendil-works/pi-tui': '>=0.74.0 <2'
     peerDependenciesMeta:
       '@earendil-works/pi-coding-agent':
         optional: true
@@ -1739,16 +1739,16 @@ snapshots:
     dependencies:
       '@biomejs/biome': 2.4.15
 
-  '@aliou/pi-utils-settings@0.19.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)':
+  '@aliou/pi-utils-settings@0.24.0(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)(ts-json-schema-generator@2.9.0)':
     dependencies:
-      '@aliou/pi-utils-ui': 0.4.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)
+      '@aliou/pi-utils-ui': 0.5.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76)
       ts-json-schema-generator: 2.9.0
     transitivePeerDependencies:
       - '@earendil-works/pi-tui'
 
-  '@aliou/pi-utils-ui@0.4.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)':
+  '@aliou/pi-utils-ui@0.5.1(@earendil-works/pi-coding-agent@1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.4.0)':
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.4.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76)
       '@earendil-works/pi-tui': 1.4.0

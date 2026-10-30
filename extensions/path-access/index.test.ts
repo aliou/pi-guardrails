@@ -7,6 +7,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { createMock, type DeepMocked } from "@golevelup/ts-vitest";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { configLoader } from "../../src/shared/config";
 import {
   GUARDRAILS_PROMPT_CLOSED_EVENT,
   GUARDRAILS_PROMPT_OPENED_EVENT,
@@ -33,6 +34,7 @@ const mockState: {
 vi.mock("../../src/shared/config", () => ({
   configLoader: {
     load: vi.fn(async () => undefined),
+    getProjectState: vi.fn(() => "trusted"),
     getConfig: vi.fn(() => ({
       enabled: true,
       features: { pathAccess: true },
@@ -562,6 +564,49 @@ describe("pathAccess extension hook RPC fallback", () => {
     expect(saved.pathAccess.allowedPaths).toEqual([
       { kind: "directory", path: "/outside" },
     ]);
+  });
+
+  it.each([
+    "pending",
+    "untrusted",
+  ] as const)("omits local always grants from RPC while project state is %s", async (state) => {
+    vi.mocked(configLoader.getProjectState).mockReturnValueOnce(state);
+    const { pi, ctx } = setup();
+    ctx.ui.select.mockResolvedValue("Allow file this session");
+
+    const result = await runHandler(pi, ctx, toolCall);
+
+    expect(result).toBeUndefined();
+    expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual([
+      "Allow once",
+      "Allow file this session",
+      "Allow directory this session",
+      "Deny",
+    ]);
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Use /trust and restart Pi"),
+      "warning",
+    );
+    expect(mockState.saves[0].scope).toBe("memory");
+    const component = ctx.ui.custom.mock
+      .calls[0]?.[0] as PathAccessPromptComponent;
+    expect(renderPromptComponent(component)).toContain(
+      "Allow file always (project not trusted)",
+    );
+  });
+
+  it("keeps global always grants available in an untrusted project", async () => {
+    vi.mocked(configLoader.getProjectState).mockReturnValueOnce("untrusted");
+    mockState.pathAccess.alwaysScope = "global";
+    const { pi, ctx } = setup();
+    ctx.ui.select.mockResolvedValue("Allow file always");
+
+    await runHandler(pi, ctx, toolCall);
+
+    expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual(
+      FILE_OPTIONS.map((option) => option.label),
+    );
+    expect(mockState.saves[0].scope).toBe("global");
   });
 
   it("persists fallback always grants to the configured scope", async () => {
