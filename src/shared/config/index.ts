@@ -4,6 +4,7 @@ export { globalConfigMigrations, migrations } from "./migration";
 export type {
   AllowedPath,
   DangerousPattern,
+  DelegationConfig,
   GuardrailsConfig,
   PathAccessConfig,
   PathAccessMode,
