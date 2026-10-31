@@ -1,6 +1,6 @@
 # pi-guardrails
 
-Public Pi extension package providing security hooks for Pi: file protection policies, workspace path access control, dangerous-command confirmation, and Herdr and program-status (OSC 7501) prompt adapters. People depend on this, so treat the public API as backwards-compatibility-sensitive.
+Public Pi extension package providing security hooks for Pi: file protection policies, workspace path access control, dangerous-command confirmation, a classifier decision delegate, and Herdr and program-status (OSC 7501) prompt adapters. People depend on this, so treat the public API as backwards-compatibility-sensitive.
 
 Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extension must stay up to date with Pi or things will break.
 
@@ -21,4 +21,5 @@ Uses pnpm. Package scripts are discoverable in `package.json`. In git worktrees,
 
 - Adding, updating, or removing default policy rules, default permission gate patterns, or example presets: `src/shared/config/defaults.ts` and `extensions/guardrails/commands/settings/examples.ts` are the source of truth. Update `schema.json` with `pnpm gen:schema` if config types changed.
 - Update `README.md` when public behavior, commands, or the discovery flow change.
+- Read and update `docs/decision-delegation.md` when changing what reaches delegates, the delegate contract, or the classifier.
 - Run `pnpm changeset` before committing user-facing changes: `patch` for bug fixes, `minor` for new features/hooks, `major` for breaking changes.

@@ -3,7 +3,10 @@ export { configLoader } from "./loader";
 export { globalConfigMigrations, migrations } from "./migration";
 export type {
   AllowedPath,
+  ClassifierConfig,
+  ClassifierStrategy,
   DangerousPattern,
+  DelegationConfig,
   GuardrailsConfig,
   PathAccessConfig,
   PathAccessMode,

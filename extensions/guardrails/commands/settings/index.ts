@@ -1,4 +1,5 @@
 import {
+  ArrayEditor,
   type ConfigStore,
   createConfigStore,
   getNestedValue,
@@ -54,7 +55,14 @@ const FEATURE_UI: Record<
     label: "Path access",
     description: "Restrict tool access to the current working directory",
   },
+  classifier: {
+    label: "Classifier",
+    description:
+      "Let classifier models allow, block, or escalate actions that would prompt you",
+  },
 };
+
+const DELEGATION_TIMEOUTS_MS = ["5000", "10000", "20000", "30000"];
 
 function createPolicyRuleEditor(options: {
   index: number;
@@ -417,6 +425,24 @@ export function registerGuardrailsSettings(
         };
       }
 
+      function modelListSubmenu(
+        _val: string,
+        submenuDone: (v?: string) => void,
+      ) {
+        const scoped = scopedConfig.classifier?.models;
+        let latest = scoped ?? resolved.classifier.models;
+        return new ArrayEditor({
+          label: "Classifier Models (provider/model)",
+          items: [...latest],
+          theme: settingsTheme,
+          onSave: (items) => {
+            latest = items.map((item) => item.trim()).filter(Boolean);
+            applyDraft("classifier.models", latest);
+          },
+          onDone: () => submenuDone(latest.join(", ") || "none"),
+        });
+      }
+
       const loadedFeatures = options.getLoadedFeatures?.();
       const featureItems: SettingItem[] = (
         Object.keys(FEATURE_UI) as GuardrailsFeatureId[]
@@ -565,6 +591,42 @@ export function registerGuardrailsSettings(
           ],
         },
         {
+          label: "Classifier",
+          items: [
+            {
+              id: "classifier.models",
+              label: "Models",
+              description:
+                "Classifier models as provider/model. Runs only on actions that would prompt you",
+              currentValue: scopedConfig.classifier?.models
+                ? scopedConfig.classifier.models.join(", ") || "none"
+                : `inherited: ${resolved.classifier.models.join(", ") || "none"}`,
+              submenu: modelListSubmenu,
+            },
+            {
+              id: "classifier.strategy",
+              label: "Strategy",
+              description:
+                "fallback: first model that answers decides, random: fallback from a random start, consensus: all models must allow",
+              currentValue:
+                scopedConfig.classifier?.strategy ??
+                `inherited: ${resolved.classifier.strategy}`,
+              values: ["fallback", "random", "consensus"],
+            },
+            {
+              id: "delegation.timeoutMs",
+              label: "Decision timeout (ms)",
+              description:
+                "How long delegates get to decide before the action escalates to you",
+              currentValue:
+                scopedConfig.delegation?.timeoutMs !== undefined
+                  ? String(scopedConfig.delegation.timeoutMs)
+                  : `inherited: ${resolved.delegation.timeoutMs}`,
+              values: DELEGATION_TIMEOUTS_MS,
+            },
+          ],
+        },
+        {
           label: "Permission Gate",
           items: [
             {
@@ -628,6 +690,13 @@ export function registerGuardrailsSettings(
           ...updated.features,
           [featureKey]: newValue === "enabled",
         };
+        return updated;
+      }
+
+      if (id === "delegation.timeoutMs") {
+        const timeoutMs = Number(newValue);
+        if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return null;
+        updated.delegation = { ...updated.delegation, timeoutMs };
         return updated;
       }
 

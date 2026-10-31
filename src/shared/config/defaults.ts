@@ -9,6 +9,14 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     policies: true,
     permissionGate: true,
     pathAccess: false,
+    classifier: false,
+  },
+  delegation: {
+    timeoutMs: 10000,
+  },
+  classifier: {
+    models: ["typesafe/jev-latest"],
+    strategy: "fallback",
   },
   pathAccess: {
     mode: "ask",

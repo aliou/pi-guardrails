@@ -6,6 +6,11 @@ import {
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
 import {
+  createDelegateRoster,
+  delegateDecision,
+  registerDecisionEntryRenderer,
+} from "../../src/shared/delegation";
+import {
   createFeatureRegisterPayload,
   createPromptClosedPayload,
   createPromptOpenedPayload,
@@ -36,6 +41,8 @@ export default async function permissionGate(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "permissionGate");
+  registerDecisionEntryRenderer(pi);
+  const delegates = createDelegateRoster(pi);
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -95,6 +102,36 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason,
         block: { source: "nonInteractive", metadata: safety.metadata },
+        context: { toolName: "bash", input: event.input },
+      });
+      return { block: true, reason };
+    }
+
+    const delegated = await delegateDecision(
+      pi,
+      delegates,
+      {
+        feature: "permissionGate",
+        action: safety.action,
+        reason: safety.reason,
+        metadata: safety.metadata,
+        toolName: "bash",
+        input: event.input,
+      },
+      ctx,
+      { timeoutMs: config.delegation.timeoutMs },
+    );
+    if (delegated?.verdict === "allow") return;
+    if (delegated?.verdict === "block") {
+      const reason = `Blocked by decision delegate: ${delegated.reason}`;
+      emitActionBlocked(pi, {
+        feature: "permissionGate",
+        action: safety.action,
+        reason,
+        block: {
+          source: "delegate",
+          metadata: { risk: safety.metadata, delegation: delegated },
+        },
         context: { toolName: "bash", input: event.input },
       });
       return { block: true, reason };

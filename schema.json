@@ -63,6 +63,9 @@
             },
             "pathAccess": {
               "type": "boolean"
+            },
+            "classifier": {
+              "type": "boolean"
             }
           },
           "description": "Enable or disable individual Guardrails feature extensions."
@@ -120,6 +123,14 @@
             }
           },
           "additionalProperties": false
+        },
+        "delegation": {
+          "$ref": "#/definitions/DelegationConfig",
+          "description": "Settings for delegating would-be prompts to registered decision delegates."
+        },
+        "classifier": {
+          "$ref": "#/definitions/ClassifierConfig",
+          "description": "Built-in classifier delegate. Enable with `features.classifier`."
         },
         "permissionGate": {
           "type": "object",
@@ -340,6 +351,42 @@
         "global"
       ],
       "description": "Where \"Allow … always\" grants from the prompt are persisted.\n- `local`: project config (`{project}/.pi/extensions/guardrails.json`).\n- `global`: user-wide config (`~/.pi/agent/extensions/guardrails.json`),   so the same grant applies in every project."
+    },
+    "DelegationConfig": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": {
+          "type": "number",
+          "description": "How long delegates get to decide before the action escalates to you, in milliseconds. Default: 10000."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClassifierConfig": {
+      "type": "object",
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Classifier models as `provider/model` (e.g. `typesafe/jev-latest`). The first `/` separates the provider from the model id."
+        },
+        "strategy": {
+          "$ref": "#/definitions/ClassifierStrategy",
+          "description": "How to use several models. Default: \"fallback\"."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClassifierStrategy": {
+      "type": "string",
+      "enum": [
+        "fallback",
+        "random",
+        "consensus"
+      ],
+      "description": "How the built-in classifier delegate uses its models.\n- `fallback`: try models in order; the first one that answers decides.\n- `random`: like fallback, starting from a random model each time.\n- `consensus`: ask every model; any block blocks, all must allow to allow,   anything else asks you."
     },
     "DangerousPattern": {
       "type": "object",

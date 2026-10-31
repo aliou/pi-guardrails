@@ -444,3 +444,63 @@ describe("pathAccess.allowedPaths builtin default", () => {
     expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([]);
   });
 });
+
+describe("delegation and classifier resolution", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  async function load(dir: string, config?: Record<string, unknown>) {
+    vi.stubEnv("PI_CODING_AGENT_DIR", dir);
+    vol.fromJSON(
+      config
+        ? {
+            [`${dir}/extensions/guardrails.json`]: JSON.stringify({
+              version: pkg.version,
+              ...config,
+            }),
+          }
+        : { [`${dir}/.keep`]: "" },
+    );
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    return configLoader.getConfig();
+  }
+
+  it("defaults to a disabled classifier with the built-in model", async () => {
+    const config = await load("/tmp/pi-agent-delegation-defaults");
+    expect(config.features.classifier).toBe(false);
+    expect(config.delegation.timeoutMs).toBe(10000);
+    expect(config.classifier).toEqual({
+      models: ["typesafe/jev-latest"],
+      strategy: "fallback",
+    });
+  });
+
+  it("replaces the model list instead of merging it", async () => {
+    const config = await load("/tmp/pi-agent-delegation-models", {
+      classifier: { models: ["cfm/clef", " ", 3] },
+    });
+    expect(config.classifier.models).toEqual(["cfm/clef"]);
+  });
+
+  it.each([
+    [-1, 10000],
+    ["fast", 10000],
+    [120000, 60000],
+    [2500, 2500],
+  ])("bounds delegation.timeoutMs %j to %j", async (timeoutMs, expected) => {
+    const config = await load(`/tmp/pi-agent-delegation-timeout-${expected}`, {
+      delegation: { timeoutMs },
+    });
+    expect(config.delegation.timeoutMs).toBe(expected);
+  });
+
+  it("ignores an unknown strategy", async () => {
+    const config = await load("/tmp/pi-agent-delegation-strategy", {
+      classifier: { strategy: "vibes" },
+    });
+    expect(config.classifier.strategy).toBe("fallback");
+  });
+});

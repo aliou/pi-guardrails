@@ -20,6 +20,7 @@
       "./extensions/path-access/index.ts",
       "./extensions/guardrails/index.ts",
       "./extensions/permission-gate/index.ts",
+      "./extensions/classifier/index.ts",
       "./extensions/herdr/index.ts",
       "./extensions/program-status/index.ts"
     ],

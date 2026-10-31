@@ -105,6 +105,30 @@ export interface PathAccessConfig {
   alwaysScope?: PathAccessAlwaysScope;
 }
 
+/**
+ * How the built-in classifier delegate uses its models.
+ * - `fallback`: try models in order; the first one that answers decides.
+ * - `random`: like fallback, starting from a random model each time.
+ * - `consensus`: ask every model; any block blocks, all must allow to allow,
+ *   anything else asks you.
+ */
+export type ClassifierStrategy = "fallback" | "random" | "consensus";
+
+export interface DelegationConfig {
+  /** How long delegates get to decide before the action escalates to you, in milliseconds. Default: 10000. */
+  timeoutMs?: number;
+}
+
+export interface ClassifierConfig {
+  /**
+   * Classifier models as `provider/model` (e.g. `typesafe/jev-latest`).
+   * The first `/` separates the provider from the model id.
+   */
+  models?: string[];
+  /** How to use several models. Default: "fallback". */
+  strategy?: ClassifierStrategy;
+}
+
 export interface GuardrailsConfig {
   /** JSON Schema URL for editor autocomplete and validation. Added automatically when Guardrails writes the file. */
   $schema?: string;
@@ -144,6 +168,10 @@ export interface GuardrailsConfig {
     onlyBlockIfExists?: boolean;
     blockMessage?: string;
   };
+  /** Settings for delegating would-be prompts to registered decision delegates. */
+  delegation?: DelegationConfig;
+  /** Built-in classifier delegate. Enable with `features.classifier`. */
+  classifier?: ClassifierConfig;
   /** Dangerous bash command detection and confirmation settings. */
   permissionGate?: {
     /** Additional dangerous command patterns. */
@@ -172,6 +200,13 @@ export interface ResolvedConfig {
     applyTo: PathAccessApplyTo;
     allowedPaths: AllowedPath[];
     alwaysScope: PathAccessAlwaysScope;
+  };
+  delegation: {
+    timeoutMs: number;
+  };
+  classifier: {
+    models: string[];
+    strategy: ClassifierStrategy;
   };
   permissionGate: {
     patterns: DangerousPattern[];

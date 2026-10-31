@@ -10,8 +10,17 @@ export const GUARDRAILS_PROMPT_OPENED_EVENT = "guardrails:prompt:opened";
 export const GUARDRAILS_PROMPT_CLOSED_EVENT = "guardrails:prompt:closed";
 /** @deprecated Use GUARDRAILS_PROMPT_OPENED_EVENT. */
 export const GUARDRAILS_ACTION_PROMPTED_EVENT = "guardrails:action:prompted";
+export const GUARDRAILS_DELEGATE_REQUEST_EVENT = "guardrails:delegate:request";
+export const GUARDRAILS_DELEGATE_REGISTER_EVENT =
+  "guardrails:delegate:register";
+export const GUARDRAILS_DECISION_DELEGATED_EVENT =
+  "guardrails:decision:delegated";
 
-export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
+export type GuardrailsFeatureId =
+  | "policies"
+  | "permissionGate"
+  | "pathAccess"
+  | "classifier";
 
 export interface GuardrailsEventBase {
   source: "guardrails";
@@ -37,7 +46,8 @@ export type GuardrailsBlockSource =
   | "permission"
   | "user"
   | "user-stop"
-  | "nonInteractive";
+  | "nonInteractive"
+  | "delegate";
 
 export type GuardrailsActionBlockedPayload<TMeta = unknown> =
   GuardrailsEventBase & {
