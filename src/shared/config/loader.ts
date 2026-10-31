@@ -126,6 +126,14 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
         .find((value) => value === "local" || value === "global");
       resolved.pathAccess.alwaysScope = alwaysScope ?? "local";
 
+      const timeoutMs = resolved.delegation.timeoutMs;
+      resolved.delegation.timeoutMs =
+        typeof timeoutMs === "number" &&
+        Number.isFinite(timeoutMs) &&
+        timeoutMs > 0
+          ? Math.min(timeoutMs, 60_000)
+          : DEFAULT_CONFIG.delegation.timeoutMs;
+
       return resolved;
     },
   });

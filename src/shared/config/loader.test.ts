@@ -444,3 +444,44 @@ describe("pathAccess.allowedPaths builtin default", () => {
     expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([]);
   });
 });
+
+describe("delegation resolution", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  async function load(dir: string, config?: Record<string, unknown>) {
+    vi.stubEnv("PI_CODING_AGENT_DIR", dir);
+    vol.fromJSON(
+      config
+        ? {
+            [`${dir}/extensions/guardrails.json`]: JSON.stringify({
+              version: pkg.version,
+              ...config,
+            }),
+          }
+        : { [`${dir}/.keep`]: "" },
+    );
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    return configLoader.getConfig();
+  }
+
+  it("defaults the delegation timeout to 10s", async () => {
+    const config = await load("/tmp/pi-agent-delegation-defaults");
+    expect(config.delegation.timeoutMs).toBe(10000);
+  });
+
+  it.each([
+    [-1, 10000],
+    ["fast", 10000],
+    [120000, 60000],
+    [2500, 2500],
+  ])("bounds delegation.timeoutMs %j to %j", async (timeoutMs, expected) => {
+    const config = await load(`/tmp/pi-agent-delegation-timeout-${expected}`, {
+      delegation: { timeoutMs },
+    });
+    expect(config.delegation.timeoutMs).toBe(expected);
+  });
+});

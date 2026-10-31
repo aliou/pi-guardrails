@@ -10,6 +10,9 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     permissionGate: true,
     pathAccess: false,
   },
+  delegation: {
+    timeoutMs: 10000,
+  },
   pathAccess: {
     mode: "ask",
     applyTo: "all",
