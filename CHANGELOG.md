@@ -1,5 +1,17 @@
 # @aliou/pi-guardrails
 
+## 0.22.0
+
+### Minor Changes
+
+- 26742e6: Add a program-status extension that reports open Guardrails approval prompts as `blocked` to terminals that support the Program Status Protocol (OSC 7501), such as Rex. When the last prompt closes, it reports `working` again with the session name.
+
+### Patch Changes
+
+- 35fc154: Stop treating `git grep` search patterns and `git log -L` / `git blame -L` line ranges as paths. `git grep -n "/transition" -- src` and `git log -L '/def foo/,/^def bar/:backend/x.py'` no longer prompt for (or get blocked on) a path at the top of the filesystem. The file named in a `git log -L` range, and every other argument, is still checked.
+- e15ab4f: Follow `cd` inside `( ... )` subshells and `{ ...; }` groups when resolving relative paths in bash commands. `(cd packages/dashboard && bun dev > ../../.pi/tmp/dev.log 2>&1 &)` now resolves the log path against `packages/dashboard`, so it no longer prompts for (or gets blocked on) a path outside the workspace. A `cd` inside a subshell still does not change the directory for commands after it; a `cd` inside a `{ ...; }` group does, as in bash.
+- 7ade1b8: Apply project settings only in trusted folders. Disable project-scoped persistent grants and preset destinations until trust is granted, while retaining global protections and session grants.
+
 ## 0.21.0
 
 ### Minor Changes
