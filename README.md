@@ -58,9 +58,19 @@ The included Herdr adapter reports active Guardrails approval prompts through He
 
 Approval prompts also report `blocked` program status (OSC 7501) natively through the `blocked` option of `ctx.ui.custom()`, so terminals such as Rex show Pi as blocked while a prompt waits; no extension is needed for that anymore.
 
+## Decision delegation
+
+Before permission-gate or path-access prompts you, other extensions can decide for you. If every registered delegate allows the action, it runs without a prompt; if any blocks it, it is blocked; anything else, including a timeout, falls back to the usual prompt. Each decision shows up under the tool call as a `[guardrails]` line.
+
+The built-in classifier delegate uses Pi classifier models to judge whether a flagged action is in scope of what you asked. Enable it with `features.classifier` (Settings → Features → Classifier).
+
+See [docs/decision-delegation.md](docs/decision-delegation.md) for the rules, the classifier, and how to write a delegate, with runnable examples in `examples/delegates/`.
+
 ## Extension events
 
 Guardrails emits paired events on Pi's shared event bus: `guardrails:prompt:opened` when an interactive prompt starts waiting for input and `guardrails:prompt:closed` when it stops. Both carry the same `prompt.id` for correlation.
+
+Decision delegation events are listed in [docs/decision-delegation.md](docs/decision-delegation.md#events).
 
 ## Configuration
 
