@@ -445,7 +445,7 @@ describe("pathAccess.allowedPaths builtin default", () => {
   });
 });
 
-describe("delegation resolution", () => {
+describe("delegation and classifier resolution", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vol.reset();
@@ -468,9 +468,21 @@ describe("delegation resolution", () => {
     return configLoader.getConfig();
   }
 
-  it("defaults the delegation timeout to 10s", async () => {
+  it("defaults to a disabled classifier with the built-in model", async () => {
     const config = await load("/tmp/pi-agent-delegation-defaults");
+    expect(config.features.classifier).toBe(false);
     expect(config.delegation.timeoutMs).toBe(10000);
+    expect(config.classifier).toEqual({
+      models: ["typesafe/jev-latest"],
+      strategy: "fallback",
+    });
+  });
+
+  it("replaces the model list instead of merging it", async () => {
+    const config = await load("/tmp/pi-agent-delegation-models", {
+      classifier: { models: ["cfm/clef", " ", 3] },
+    });
+    expect(config.classifier.models).toEqual(["cfm/clef"]);
   });
 
   it.each([
@@ -483,5 +495,12 @@ describe("delegation resolution", () => {
       delegation: { timeoutMs },
     });
     expect(config.delegation.timeoutMs).toBe(expected);
+  });
+
+  it("ignores an unknown strategy", async () => {
+    const config = await load("/tmp/pi-agent-delegation-strategy", {
+      classifier: { strategy: "vibes" },
+    });
+    expect(config.classifier.strategy).toBe("fallback");
   });
 });
