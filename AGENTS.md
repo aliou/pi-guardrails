@@ -66,12 +66,14 @@ extensions/
     index.ts              # Registers permission-gate hook and feature registration
   herdr/                  # Maps Guardrails prompt lifecycle to Herdr blocked state
     index.ts              # Registers event adapter and reload-safe cleanup
+  program-status/         # Maps Guardrails prompt lifecycle to OSC 7501 blocked state
+    index.ts              # Writes program status reports to the terminal
 tests/
   utils/                  # Test utilities (memfs setup, theme, tmpdir, vitest setup)
   vitest.setup.ts         # Global test setup
 ```
 
-The package registers four independent extensions. The three Guardrails features each own one Pi `tool_call` hook and communicate feature presence through the Pi event bus. The Herdr adapter owns no tool hook and only maps prompt lifecycle events to `herdr:blocked`.
+The package registers five independent extensions. The three Guardrails features each own one Pi `tool_call` hook and communicate feature presence through the Pi event bus. The Herdr adapter owns no tool hook and only maps prompt lifecycle events to `herdr:blocked`. The program-status adapter owns no tool hook and only maps prompt lifecycle events to OSC 7501 reports on stdout.
 
 ## Conventions
 
