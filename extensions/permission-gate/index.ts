@@ -1,3 +1,4 @@
+import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import {
   type ExtensionAPI,
   isToolCallEventType,
@@ -26,6 +27,7 @@ import {
 
 export default async function permissionGate(pi: ExtensionAPI) {
   await configLoader.load();
+  bindProjectConfig(pi, configLoader);
 
   pi.events.on(GUARDRAILS_FEATURE_REQUEST_EVENT, () => {
     pi.events.emit(

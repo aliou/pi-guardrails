@@ -142,14 +142,20 @@ export const DIR_OPTIONS: PromptOption[] = [
 export function promptOptions(
   showFileOptions: boolean,
   dirGrantable = true,
-): PromptOption[] {
+  alwaysEnabled = true,
+): (PromptOption & { disabled: boolean })[] {
   const options = showFileOptions ? FILE_OPTIONS : DIR_OPTIONS;
-  if (dirGrantable) return options;
-  return options.filter(
-    (option) =>
-      option.result !== "allow-dir-session" &&
-      option.result !== "allow-dir-always",
-  );
+  return options
+    .filter(
+      (option) =>
+        dirGrantable ||
+        (option.result !== "allow-dir-session" &&
+          option.result !== "allow-dir-always"),
+    )
+    .map((option) => ({
+      ...option,
+      disabled: !alwaysEnabled && option.result.endsWith("-always"),
+    }));
 }
 
 const OPTION_INDENT = " ";
@@ -168,7 +174,11 @@ export function createPathAccessPromptComponent(
   displayDir: string,
   cwd: string,
   showFileOptions: boolean,
-  opts: { command?: string; dirGrantable?: boolean } = {},
+  opts: {
+    command?: string;
+    dirGrantable?: boolean;
+    alwaysEnabled?: boolean;
+  } = {},
 ) {
   return (
     tui: { terminal: { columns: number }; requestRender(): void },
@@ -180,7 +190,11 @@ export function createPathAccessPromptComponent(
     _kb: unknown,
     done: (result: PromptResult) => void,
   ) => {
-    const options = promptOptions(showFileOptions, opts.dirGrantable ?? true);
+    const options = promptOptions(
+      showFileOptions,
+      opts.dirGrantable ?? true,
+      opts.alwaysEnabled ?? true,
+    );
     let selectedIndex = 0;
     let commandExpanded = false;
     let commandCanExpand = false;
@@ -232,10 +246,10 @@ export function createPathAccessPromptComponent(
       render: (width: number) => {
         const available = Math.max(1, width - visibleWidth(OPTION_INDENT));
         return options.map((option, index) => {
-          const raw = ` ${option.key ?? " "} ${option.label} `;
+          const raw = ` ${option.key ?? " "} ${option.label}${option.disabled ? " (project not trusted)" : ""} `;
           const truncated = truncateVisibleEnd(raw, available);
           const styled =
-            index === selectedIndex
+            index === selectedIndex && !option.disabled
               ? theme.bg("selectedBg", theme.fg("accent", truncated))
               : theme.fg("dim", truncated);
           const pad = Math.max(0, available - visibleWidth(truncated));
@@ -245,6 +259,18 @@ export function createPathAccessPromptComponent(
       invalidate: () => {},
     };
     container.addChild(optionList);
+    if (options.some((option) => option.disabled)) {
+      container.addChild(
+        new Text(
+          theme.fg(
+            "dim",
+            '"Always" grants are saved in this project\'s settings, which are ignored because this folder is not trusted. Use /trust and restart Pi to enable them.',
+          ),
+          1,
+          0,
+        ),
+      );
+    }
 
     container.addChild(new Spacer(1));
     const footerLine = new Text("", 1, 0);
@@ -255,8 +281,10 @@ export function createPathAccessPromptComponent(
     };
 
     const moveLinear = (direction: number) => {
-      selectedIndex =
-        (selectedIndex + direction + options.length) % options.length;
+      do {
+        selectedIndex =
+          (selectedIndex + direction + options.length) % options.length;
+      } while (options[selectedIndex].disabled);
       requestRender();
     };
 
@@ -286,7 +314,7 @@ export function createPathAccessPromptComponent(
             : "x expand command"
           : "";
         const shortcutHint = options
-          .filter((option) => option.key)
+          .filter((option) => option.key && !option.disabled)
           .map((option) => option.key)
           .join("/");
         const hints = `↑/↓/Tab · Enter · ${shortcutHint} · Esc deny`;
@@ -341,12 +369,14 @@ export function createPathAccessPromptComponent(
           requestRender();
           return;
         }
-        const shortcut = options.find((option) => option.key === data);
+        const shortcut = options.find(
+          (option) => option.key === data && !option.disabled,
+        );
         if (shortcut) {
           done(shortcut.result);
           return;
         }
-        if (matchesKey(data, Key.enter)) {
+        if (matchesKey(data, Key.enter) && !options[selectedIndex].disabled) {
           done(options[selectedIndex].result);
           return;
         }

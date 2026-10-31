@@ -1,5 +1,6 @@
 import {
   type ConfigStore,
+  createConfigStore,
   getNestedValue,
   registerSettingsCommand,
   type Scope,
@@ -263,11 +264,7 @@ function createSettingsConfigStore(): ConfigStore<
   ResolvedConfig
 > {
   return {
-    save: (scope, config) => configLoader.save(scope, config),
-    getConfig: () => configLoader.getConfig(),
-    getRawConfig: (scope) => configLoader.getRawConfig(scope),
-    hasScope: (scope) => configLoader.hasScope(scope),
-    hasConfig: (scope) => configLoader.hasConfig(scope),
+    ...createConfigStore(configLoader),
     getEnabledScopes: () => {
       const enabled = new Set(configLoader.getEnabledScopes());
       return (["memory", "local", "global"] as Scope[]).filter((scope) =>

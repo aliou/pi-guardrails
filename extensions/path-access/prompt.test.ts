@@ -28,7 +28,11 @@ function renderPrompt(command?: string, width = 100): string[] {
 function createPrompt(
   width = 100,
   command?: string,
-  opts: { showFileOptions?: boolean; dirGrantable?: boolean } = {},
+  opts: {
+    showFileOptions?: boolean;
+    dirGrantable?: boolean;
+    alwaysEnabled?: boolean;
+  } = {},
 ) {
   const done = vi.fn();
   const requestRender = vi.fn();
@@ -38,7 +42,11 @@ function createPrompt(
     "/outside",
     "/workspace",
     opts.showFileOptions !== false,
-    { command, dirGrantable: opts.dirGrantable },
+    {
+      command,
+      dirGrantable: opts.dirGrantable,
+      alwaysEnabled: opts.alwaysEnabled,
+    },
   );
   const prompt = component(
     { terminal: { columns: width }, requestRender },
@@ -52,6 +60,89 @@ function createPrompt(
 }
 
 describe("createPathAccessPromptComponent", () => {
+  it("dims unavailable always grants and explains project trust", () => {
+    const done = vi.fn();
+    const styledTheme = {
+      ...theme,
+      fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
+    };
+    const prompt = createPathAccessPromptComponent(
+      "read",
+      "/outside/file",
+      "/outside",
+      "/workspace",
+      true,
+      { alwaysEnabled: false },
+    )(
+      { terminal: { columns: 200 }, requestRender: vi.fn() },
+      styledTheme,
+      undefined,
+      done,
+    );
+    const rendered = prompt.render(200).join("\n");
+    expect(rendered).toContain(
+      "<dim> F Allow file always (project not trusted) </dim>",
+    );
+    expect(rendered).toContain(
+      "<dim> D Allow directory always (project not trusted) </dim>",
+    );
+    expect(rendered).toContain("Use /trust and restart Pi to enable them.");
+  });
+
+  it.each(["F", "D"])("ignores the disabled %s shortcut", (key) => {
+    const { done, prompt } = createPrompt(100, undefined, {
+      alwaysEnabled: false,
+    });
+    prompt.handleInput?.(key);
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "\t",
+    "\x1b[B",
+    "\x1b[C",
+  ])("skips disabled options moving forward with %j", (key) => {
+    const { done, prompt } = createPrompt(100, undefined, {
+      alwaysEnabled: false,
+    });
+    prompt.handleInput?.(key);
+    prompt.handleInput?.(key);
+    prompt.handleInput?.("\r");
+    expect(done).toHaveBeenLastCalledWith("allow-dir-session");
+    prompt.handleInput?.(key);
+    prompt.handleInput?.("\r");
+    expect(done).toHaveBeenLastCalledWith("deny");
+  });
+
+  it.each([
+    "\x1b[Z",
+    "\x1b[A",
+    "\x1b[D",
+  ])("skips disabled options moving backward with %j", (key) => {
+    const { done, prompt } = createPrompt(100, undefined, {
+      alwaysEnabled: false,
+    });
+    prompt.handleInput?.(key);
+    prompt.handleInput?.(key);
+    prompt.handleInput?.("\r");
+    expect(done).toHaveBeenLastCalledWith("allow-dir-session");
+    prompt.handleInput?.(key);
+    prompt.handleInput?.("\r");
+    expect(done).toHaveBeenLastCalledWith("allow-file-session");
+  });
+
+  it.each([
+    { key: "o", result: "allow-file-once" },
+    { key: "f", result: "allow-file-session" },
+    { key: "d", result: "allow-dir-session" },
+  ])("keeps $result available without project trust", ({ key, result }) => {
+    const { done, prompt } = createPrompt(100, undefined, {
+      alwaysEnabled: false,
+    });
+    prompt.handleInput?.(key);
+    expect(done).toHaveBeenCalledWith(result);
+  });
+
   it("shows the command when provided", () => {
     expect(renderPrompt("cat /outside/secret.txt").join("\n")).toContain(
       "Command: cat /outside/secret.txt",

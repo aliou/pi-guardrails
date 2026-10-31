@@ -1,3 +1,4 @@
+import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
@@ -67,6 +68,7 @@ function setupPolicyHook(pi: ExtensionAPI): void {
 
 export default async function guardrails(pi: ExtensionAPI) {
   await configLoader.load();
+  bindProjectConfig(pi, configLoader);
 
   const loadedFeatures = new Set<GuardrailsFeatureId>(["policies"]);
 

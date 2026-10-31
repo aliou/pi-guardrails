@@ -111,6 +111,23 @@ class ExamplesWelcomeStep implements Component {
       this.theme.label("  Save examples to", true),
     ];
 
+    if (
+      configLoader.hasScope("local") &&
+      configLoader.getProjectState() !== "trusted"
+    ) {
+      lines.push(
+        this.theme.hint(
+          "  Project (.pi/extensions/guardrails.json) (project not trusted)",
+        ),
+      );
+      lines.push(
+        ...wrapText(
+          "Use /trust and restart Pi to enable project settings.",
+          width,
+        ),
+      );
+    }
+
     for (let index = 0; index < this.scopes.length; index++) {
       const scope = this.scopes[index];
       if (!scope) continue;
@@ -461,8 +478,10 @@ function createExamplesWizard(
 
 function getExampleScopes(): ExampleScope[] {
   const enabled = new Set(configLoader.getEnabledScopes());
-  return (["local", "global"] as ExampleScope[]).filter((scope) =>
-    enabled.has(scope),
+  return (["local", "global"] as ExampleScope[]).filter(
+    (scope) =>
+      enabled.has(scope) &&
+      (scope !== "local" || configLoader.getProjectState() === "trusted"),
   );
 }
 
@@ -484,7 +503,6 @@ async function applyExample(
   }
 
   await configLoader.save(scope, updated);
-  await configLoader.load();
 }
 
 export function registerGuardrailsExamplesCommand(pi: ExtensionAPI): void {

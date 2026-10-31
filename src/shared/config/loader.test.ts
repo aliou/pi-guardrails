@@ -7,6 +7,18 @@ import pkg from "../../../package.json" with { type: "json" };
 import { createGuardrailsConfigLoader } from "./loader";
 
 describe("guardrails config persistence", () => {
+  it("ignores project settings during setup without modifying the file", async () => {
+    vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/pi-agent-trust");
+    const configPath = join(process.cwd(), ".pi/extensions/guardrails.json");
+    const contents = JSON.stringify({ enabled: false });
+    vol.fromJSON({ [configPath]: contents });
+    const loader = createGuardrailsConfigLoader();
+
+    await loader.load();
+
+    expect(loader.getConfig().enabled).toBe(true);
+    expect(await readFile(configPath, "utf-8")).toBe(contents);
+  });
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -23,6 +35,10 @@ describe("guardrails config persistence", () => {
     const configLoader = createGuardrailsConfigLoader();
 
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     await configLoader.save("local", {
       pathAccess: {
         allowedPaths: [{ kind: "directory", path: "/tmp/outside" }],
@@ -36,6 +52,10 @@ describe("guardrails config persistence", () => {
     ]);
 
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
 
     expect(existsSync(backupPath)).toBe(false);
   });
@@ -51,6 +71,10 @@ describe("guardrails config persistence", () => {
     const configLoader = createGuardrailsConfigLoader();
 
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     await configLoader.save("local", {
       version: "0.9.0-20260327",
       enabled: false,
@@ -90,6 +114,10 @@ describe("guardrails config persistence", () => {
     const configLoader = createGuardrailsConfigLoader();
 
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
 
     const messages = configLoader.drainMessages();
     expect(messages).toContain(
@@ -115,6 +143,10 @@ describe("guardrails config persistence", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
 
     const messages = configLoader.drainMessages();
     expect(messages).toHaveLength(1);
@@ -127,6 +159,10 @@ describe("guardrails config persistence", () => {
     });
     const otherLoader = createGuardrailsConfigLoader();
     await otherLoader.load();
+    await otherLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     expect(otherLoader.drainMessages()).toEqual([]);
 
     // Config already stamped at/after 0.19.0 does not re-trigger, even with
@@ -142,6 +178,10 @@ describe("guardrails config persistence", () => {
     });
     const freshLoader = createGuardrailsConfigLoader();
     await freshLoader.load();
+    await freshLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     expect(freshLoader.drainMessages()).toEqual([]);
   });
 });
@@ -195,6 +235,10 @@ describe("pathAccess.alwaysScope resolution", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("local");
 
     await configLoader.save("memory", {
@@ -220,6 +264,10 @@ describe("pathAccess.alwaysScope resolution", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
 
     expect(configLoader.getConfig().pathAccess.alwaysScope).toBe("global");
   });
@@ -265,6 +313,10 @@ describe("permission gate pattern merging across scopes", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     const config = configLoader.getConfig();
 
     const patterns = config.permissionGate.autoDenyPatterns.map(
@@ -299,6 +351,10 @@ describe("permission gate pattern merging across scopes", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
     const config = configLoader.getConfig();
 
     // Defaults are included (same as builtin policy rules); scope arrays are
@@ -360,6 +416,10 @@ describe("pathAccess.allowedPaths builtin default", () => {
 
     const configLoader = createGuardrailsConfigLoader();
     await configLoader.load();
+    await configLoader.loadProject({
+      cwd: process.cwd(),
+      isProjectTrusted: () => true,
+    });
 
     expect(configLoader.getConfig().pathAccess.allowedPaths).toEqual([
       { kind: "file", path: "/dev/null" },

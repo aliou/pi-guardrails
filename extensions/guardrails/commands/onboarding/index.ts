@@ -41,7 +41,6 @@ export function registerGuardrailsOnboardingCommand(
         result.pathAccessEnabled,
       );
       await configLoader.save("global", merged);
-      await configLoader.load();
 
       onCompleted?.();
       ctx.ui.notify("[Guardrails] onboarding completed.", "info");
