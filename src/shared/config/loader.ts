@@ -134,6 +134,17 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
           ? Math.min(timeoutMs, 60_000)
           : DEFAULT_CONFIG.delegation.timeoutMs;
 
+      const strategy = resolved.classifier.strategy;
+      if (!["fallback", "random", "consensus"].includes(strategy)) {
+        resolved.classifier.strategy = DEFAULT_CONFIG.classifier.strategy;
+      }
+      resolved.classifier.models = Array.isArray(resolved.classifier.models)
+        ? resolved.classifier.models.filter(
+            (model): model is string =>
+              typeof model === "string" && model.trim() !== "",
+          )
+        : [...DEFAULT_CONFIG.classifier.models];
+
       return resolved;
     },
   });
