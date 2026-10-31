@@ -105,6 +105,11 @@ export interface PathAccessConfig {
   alwaysScope?: PathAccessAlwaysScope;
 }
 
+export interface DelegationConfig {
+  /** How long delegates get to decide before the action escalates to you, in milliseconds. Default: 10000. */
+  timeoutMs?: number;
+}
+
 export interface GuardrailsConfig {
   /** JSON Schema URL for editor autocomplete and validation. Added automatically when Guardrails writes the file. */
   $schema?: string;
@@ -144,6 +149,8 @@ export interface GuardrailsConfig {
     onlyBlockIfExists?: boolean;
     blockMessage?: string;
   };
+  /** Settings for delegating would-be prompts to registered decision delegates. */
+  delegation?: DelegationConfig;
   /** Dangerous bash command detection and confirmation settings. */
   permissionGate?: {
     /** Additional dangerous command patterns. */
@@ -172,6 +179,9 @@ export interface ResolvedConfig {
     applyTo: PathAccessApplyTo;
     allowedPaths: AllowedPath[];
     alwaysScope: PathAccessAlwaysScope;
+  };
+  delegation: {
+    timeoutMs: number;
   };
   permissionGate: {
     patterns: DangerousPattern[];

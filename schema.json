@@ -121,6 +121,10 @@
           },
           "additionalProperties": false
         },
+        "delegation": {
+          "$ref": "#/definitions/DelegationConfig",
+          "description": "Settings for delegating would-be prompts to registered decision delegates."
+        },
         "permissionGate": {
           "type": "object",
           "properties": {
@@ -340,6 +344,16 @@
         "global"
       ],
       "description": "Where \"Allow … always\" grants from the prompt are persisted.\n- `local`: project config (`{project}/.pi/extensions/guardrails.json`).\n- `global`: user-wide config (`~/.pi/agent/extensions/guardrails.json`),   so the same grant applies in every project."
+    },
+    "DelegationConfig": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": {
+          "type": "number",
+          "description": "How long delegates get to decide before the action escalates to you, in milliseconds. Default: 10000."
+        }
+      },
+      "additionalProperties": false
     },
     "DangerousPattern": {
       "type": "object",
