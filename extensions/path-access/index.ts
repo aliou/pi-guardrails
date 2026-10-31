@@ -9,6 +9,11 @@ import {
 } from "../../src/core/paths";
 import { configLoader } from "../../src/shared/config";
 import {
+  createDelegateRoster,
+  delegateDecision,
+  registerDecisionEntryRenderer,
+} from "../../src/shared/delegation";
+import {
   createFeatureRegisterPayload,
   createPromptClosedPayload,
   createPromptOpenedPayload,
@@ -64,6 +69,8 @@ export default async function pathAccess(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "pathAccess");
+  registerDecisionEntryRenderer(pi);
+  const delegates = createDelegateRoster(pi);
 
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
@@ -88,13 +95,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
       ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
     ];
     const acceptedGrants: PendingPathGrant[] = [];
-
-    for (const absolutePath of targets) {
-      const action = {
-        kind: "file" as const,
-        path: absolutePath,
-        origin: event.toolName,
-      };
+    const checkTarget = (absolutePath: string) => {
       const state: PathAccessState = {
         cwd: ctx.cwd,
         mode: config.pathAccess.mode,
@@ -106,7 +107,19 @@ export default async function pathAccess(pi: ExtensionAPI) {
         ],
         hasUI: ctx.hasUI,
       };
-      const safety = await checkAction(action, [createPathAccessRule(state)]);
+      return checkAction(
+        { kind: "file", path: absolutePath, origin: event.toolName },
+        [createPathAccessRule(state)],
+      );
+    };
+    type FlaggedSafety = Extract<
+      Awaited<ReturnType<typeof checkTarget>>,
+      { kind: "dangerous" }
+    >;
+
+    const flagged: { absolutePath: string; safety: FlaggedSafety }[] = [];
+    for (const absolutePath of targets) {
+      const safety = await checkTarget(absolutePath);
       if (safety.kind === "safe") continue;
 
       if (config.pathAccess.mode === "block" || !ctx.hasUI) {
@@ -122,6 +135,54 @@ export default async function pathAccess(pi: ExtensionAPI) {
         });
         return { block: true, reason: safety.reason };
       }
+      flagged.push({ absolutePath, safety });
+    }
+
+    const delegations = await Promise.all(
+      flagged.map(async ({ absolutePath, safety }) => ({
+        absolutePath,
+        safety,
+        delegated: await delegateDecision(
+          pi,
+          delegates,
+          {
+            feature: "pathAccess",
+            action: safety.action,
+            reason: safety.reason,
+            metadata: safety.metadata,
+            toolName: event.toolName,
+            input,
+          },
+          ctx,
+          { timeoutMs: config.delegation.timeoutMs },
+        ),
+      })),
+    );
+    const blocked = delegations.find(
+      ({ delegated }) => delegated?.verdict === "block",
+    );
+    if (blocked?.delegated) {
+      const reason = `Blocked by decision delegate: ${blocked.delegated.reason}`;
+      emitActionBlocked(pi, {
+        feature: "pathAccess",
+        action: blocked.safety.action,
+        reason,
+        block: {
+          source: "delegate",
+          metadata: {
+            risk: blocked.safety.metadata,
+            delegation: blocked.delegated,
+          },
+        },
+        context: { toolName: event.toolName, input },
+      });
+      return { block: true, reason };
+    }
+
+    for (const { absolutePath, delegated } of delegations) {
+      if (delegated?.verdict === "allow") continue;
+      const safety = await checkTarget(absolutePath);
+      if (safety.kind === "safe") continue;
 
       const parentDir = dirname(absolutePath);
       const showFileOptions =
