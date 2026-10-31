@@ -9,6 +9,7 @@ import { createMock, type DeepMocked } from "@golevelup/ts-vitest";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { configLoader } from "../../src/shared/config";
 import {
+  GUARDRAILS_DELEGATE_REQUEST_EVENT,
   GUARDRAILS_PROMPT_CLOSED_EVENT,
   GUARDRAILS_PROMPT_OPENED_EVENT,
   type GuardrailsPromptOpenedPayload,
@@ -39,6 +40,7 @@ vi.mock("../../src/shared/config", () => ({
       enabled: true,
       features: { pathAccess: true },
       pathAccess: mockState.pathAccess,
+      delegation: { timeoutMs: 1000 },
     })),
     getRawConfig: vi.fn(() => null),
     save: vi.fn(async (scope: string, config: Record<string, unknown>) => {
@@ -104,6 +106,12 @@ function emittedPromptOpened(pi: DeepMocked<ExtensionAPI>) {
   return pi.events.emit.mock.calls.find(
     ([event]) => event === GUARDRAILS_PROMPT_OPENED_EVENT,
   )?.[1] as GuardrailsPromptOpenedPayload | undefined;
+}
+
+function nonHandshakeEmits(pi: DeepMocked<ExtensionAPI>) {
+  return pi.events.emit.mock.calls.filter(
+    ([event]) => event !== GUARDRAILS_DELEGATE_REQUEST_EVENT,
+  );
 }
 
 function registeredExtensionHandler(
@@ -387,7 +395,7 @@ describe("pathAccess extension hook", () => {
     ).resolves.toBeUndefined();
 
     expect(ctx.ui.custom).not.toHaveBeenCalled();
-    expect(pi.events.emit).not.toHaveBeenCalled();
+    expect(nonHandshakeEmits(pi)).toEqual([]);
   });
 });
 
@@ -424,7 +432,7 @@ describe("pathAccess extension hook write-only applyTo", () => {
     await expect(toolCallHandler(toolCall, ctx)).resolves.toBeUndefined();
 
     expect(ctx.ui.custom).not.toHaveBeenCalled();
-    expect(pi.events.emit).not.toHaveBeenCalled();
+    expect(nonHandshakeEmits(pi)).toEqual([]);
   });
 
   it("still gates write tools", async () => {
