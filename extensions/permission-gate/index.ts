@@ -117,6 +117,12 @@ export default async function permissionGate(pi: ExtensionAPI) {
     try {
       const customResult = await ctx.ui.custom<ConfirmResult>(
         createPermissionGateConfirmComponent(command, safety.reason),
+        {
+          blocked: {
+            kind: "permission",
+            message: "Guardrails approval required",
+          },
+        },
       );
 
       if (customResult === undefined) {
