@@ -20,8 +20,7 @@
       "./extensions/path-access/index.ts",
       "./extensions/guardrails/index.ts",
       "./extensions/permission-gate/index.ts",
-      "./extensions/herdr/index.ts",
-      "./extensions/program-status/index.ts"
+      "./extensions/herdr/index.ts"
     ],
     "video": "https://assets.aliou.me/github/aliou/pi-guardrails/demo.mp4",
     "image": "https://assets.aliou.me/github/aliou/pi-guardrails/banner.png"
@@ -42,15 +41,15 @@
     "@aliou/sh": "^0.3.3"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "@earendil-works/pi-coding-agent": ">=1.5.0",
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@aliou/biome-plugins": "^0.8.1",
     "@biomejs/biome": "^2.4.15",
     "@changesets/cli": "^2.27.11",
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@earendil-works/pi-tui": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@earendil-works/pi-tui": "1.5.0",
     "@golevelup/ts-vitest": "^4.0.0",
     "@sinclair/typebox": "^0.34.48",
     "@types/node": "^25.0.10",

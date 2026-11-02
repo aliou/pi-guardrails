@@ -154,6 +154,12 @@ export default async function pathAccess(pi: ExtensionAPI) {
             showFileOptions,
             { command: bashCommand, dirGrantable, alwaysEnabled },
           ),
+          {
+            blocked: {
+              kind: "permission",
+              message: "Guardrails approval required",
+            },
+          },
         );
 
         if (customResult === undefined) {

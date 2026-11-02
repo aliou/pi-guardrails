@@ -4,13 +4,12 @@
 
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
-The package installs five Pi extensions:
+The package installs four Pi extensions:
 
 - **guardrails** — file protection policies, settings, onboarding, and examples.
 - **path-access** — controlling access outside the current workspace.
 - **permission-gate** — confirming or blocking risky shell commands.
 - **herdr** — reporting Guardrails approval prompts to Herdr.
-- **program-status** — reporting Guardrails approval prompts to terminals that support the Program Status Protocol.
 
 ## Install
 
@@ -54,11 +53,7 @@ Command, policy, and path checks also look inside command and process substituti
 
 The included Herdr adapter reports active Guardrails approval prompts through Herdr's `herdr:blocked` event, so Herdr can show the Pi pane as blocked while a prompt waits for a decision. It has no configuration and no effect unless Herdr's Pi integration is active.
 
-### program-status
-
-Reports Guardrails approval prompts to terminals that support the [Program Status Protocol (OSC 7501)](https://www.superlogical.com/rex/docs/build/program-status), such as Rex. While a prompt is open, the terminal shows Pi as `blocked` instead of `working`; once the last prompt closes, it reports `working` again. It writes only when stdout is a terminal and can be disabled with `PI_PROGRAM_STATUS=0`.
-
-[![Guardrails approval status in Rex](https://assets.aliou.me/github/aliou/pi-guardrails/v0.22.0/program-status.gif)](https://assets.aliou.me/github/aliou/pi-guardrails/v0.22.0/program-status.mp4)
+Approval prompts also report `blocked` program status (OSC 7501) natively through the `blocked` option of `ctx.ui.custom()`, so terminals such as Rex show Pi as blocked while a prompt waits; no extension is needed for that anymore.
 
 ## Extension events
 
