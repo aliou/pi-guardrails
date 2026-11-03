@@ -71,10 +71,8 @@ export async function classifyWithModel(
   if (!model) return done(unavailable(`${label} is not available`));
 
   try {
-    const outcome = (await registry.classify(model, request, {
-      signal,
-    })) as ClassifierOutcome;
-    return done(decide(outcome, { hasTaskContext }));
+    const outcome = await registry.classify(model, request, { signal });
+    return done(decide(outcome as ClassifierOutcome, { hasTaskContext }));
   } catch (error) {
     return done(unavailable(`${label} failed: ${errorText(error)}`));
   }
@@ -156,7 +154,8 @@ export async function runClassifier(
   let chosen: ModelRun | undefined;
 
   if (options.strategy === "consensus") {
-    runs.push(...(await Promise.all(refs.map(run))));
+    const settled = await Promise.all(refs.map(run));
+    runs.push(...settled);
     chosen = combineRuns(runs);
   } else {
     const order =

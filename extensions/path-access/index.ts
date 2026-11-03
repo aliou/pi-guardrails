@@ -1,6 +1,7 @@
 import { dirname } from "node:path";
 import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { Safety } from "../../src/core";
 import { checkAction } from "../../src/core";
 import {
   type AllowedPath,
@@ -38,8 +39,10 @@ import {
   type PromptResult,
   promptOptions,
 } from "./prompt";
-import { createPathAccessRule } from "./rules";
+import { createPathAccessRule, type PathAccessMeta } from "./rules";
 import { isReadOnlyTool, targetsForTool } from "./targets";
+
+type FlaggedSafety = Extract<Safety<PathAccessMeta>, { kind: "dangerous" }>;
 
 export default async function pathAccess(pi: ExtensionAPI) {
   await configLoader.load();
@@ -116,10 +119,6 @@ export default async function pathAccess(pi: ExtensionAPI) {
         [createPathAccessRule(state)],
       );
     };
-    type FlaggedSafety = Extract<
-      Awaited<ReturnType<typeof checkTarget>>,
-      { kind: "dangerous" }
-    >;
 
     const flagged: { absolutePath: string; safety: FlaggedSafety }[] = [];
     for (const absolutePath of targets) {
