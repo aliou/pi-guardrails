@@ -57,9 +57,12 @@ export class DelegationBoard {
   };
 
   private setWidget(content: typeof this.factory | undefined): void {
+    // Widget rendering is best-effort; never fail the run because of it.
     try {
       this.ui?.setWidget(DELEGATION_WIDGET_KEY, content);
-    } catch {}
+    } catch {
+      return;
+    }
   }
 }
 

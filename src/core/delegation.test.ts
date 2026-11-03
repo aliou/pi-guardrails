@@ -66,13 +66,16 @@ describe("combineDelegateOutcomes", () => {
     ["timeout", "b timed out"],
     ["error", "b failed"],
     ["cancelled", "b was cancelled"],
-  ] as const)("asks when a delegate %s instead of allowing", (status, reason) => {
-    const result = combineDelegateOutcomes([
-      answered("a", "allow"),
-      missing("b", status),
-    ]);
-    expect(result).toMatchObject({ verdict: "ask", reason });
-  });
+  ] as const)(
+    "asks when a delegate %s instead of allowing",
+    (status, reason) => {
+      const result = combineDelegateOutcomes([
+        answered("a", "allow"),
+        missing("b", status),
+      ]);
+      expect(result).toMatchObject({ verdict: "ask", reason });
+    },
+  );
 
   it("explains an explicit ask before a missing answer", () => {
     const result = combineDelegateOutcomes([

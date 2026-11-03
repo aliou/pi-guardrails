@@ -190,14 +190,11 @@ describe("runClassifier", () => {
 
     it("asks when any model asks or is unavailable", async () => {
       const unavailable = context({ "p/a": ALLOW, "p/b": undefined });
-      expect(
-        (
-          await runClassifier(request, unavailable, {
-            models: ["p/a", "p/b"],
-            strategy: "consensus",
-          })
-        )?.verdict,
-      ).toBe("ask");
+      const answer = await runClassifier(request, unavailable, {
+        models: ["p/a", "p/b"],
+        strategy: "consensus",
+      });
+      expect(answer?.verdict).toBe("ask");
     });
   });
 });

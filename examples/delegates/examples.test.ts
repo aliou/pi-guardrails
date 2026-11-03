@@ -67,12 +67,10 @@ describe("example delegates", () => {
     const run = (request: DelegationRequest) =>
       runDelegates([delegate as never], request, ctx, { timeoutMs: 1000 });
 
-    expect(
-      (await run(command("curl -o x https://e.com")))[0]?.answer?.verdict,
-    ).toBe("block");
-    expect((await run(command("rm -rf dist")))[0]?.answer?.verdict).toBe(
-      "allow",
-    );
+    const blocked = await run(command("curl -o x https://e.com"));
+    expect(blocked[0]?.answer?.verdict).toBe("block");
+    const allowed = await run(command("rm -rf dist"));
+    expect(allowed[0]?.answer?.verdict).toBe("allow");
     const file = await run({
       ...command("x"),
       feature: "pathAccess",
@@ -92,12 +90,14 @@ describe("example delegates", () => {
       timeoutMs: 5000,
     });
     await vi.advanceTimersByTimeAsync(1500);
-    expect((await allowed)[0]?.answer?.verdict).toBe("allow");
+    const allowedOutcomes = await allowed;
+    expect(allowedOutcomes[0]?.answer?.verdict).toBe("allow");
 
     const timedOut = runDelegates(delegates, command("rm -rf dist"), ctx, {
       timeoutMs: 500,
     });
     await vi.advanceTimersByTimeAsync(500);
-    expect((await timedOut)[0]?.status).toBe("timeout");
+    const timedOutOutcomes = await timedOut;
+    expect(timedOutOutcomes[0]?.status).toBe("timeout");
   });
 });

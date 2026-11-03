@@ -123,13 +123,16 @@ describe("decisionLine", () => {
     ["allow", "success", "✓ allowed:"],
     ["block", "error", "✗ blocked:"],
     ["ask", "warning", "? escalated:"],
-  ] as const)("colors the %s mark and verb %s after an accent tag", (verdict, color, verb) => {
-    expect(decisionLine(decision(verdict, []), taggingTheme)).toMatch(
-      new RegExp(
-        `^\\[accent:\\[guardrails\\]\\] \\[${color}:${verb.replace("?", "\\?")}\\]`,
-      ),
-    );
-  });
+  ] as const)(
+    "colors the %s mark and verb %s after an accent tag",
+    (verdict, color, verb) => {
+      expect(decisionLine(decision(verdict, []), taggingTheme)).toMatch(
+        new RegExp(
+          `^\\[accent:\\[guardrails\\]\\] \\[${color}:${verb.replace("?", "\\?")}\\]`,
+        ),
+      );
+    },
+  );
 
   it("mutes delegate names and dims the time", () => {
     const line = decisionLine(escalated, taggingTheme);

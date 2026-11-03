@@ -121,7 +121,10 @@ export async function runDelegates(
     const outcome = await run(delegate);
     try {
       options.onOutcome?.(index, outcome);
-    } catch {}
+    } catch {
+      // Delegate callbacks must not break the delegation run.
+      return outcome;
+    }
     return outcome;
   };
 

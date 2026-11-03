@@ -71,7 +71,7 @@ export function unavailable(
 function readAuthorization(
   answer: AnswerLike | undefined,
 ): { label: AuthorizationLabel; probability: number } | null {
-  if (!answer || answer.type !== "choice") return null;
+  if (answer?.type !== "choice") return null;
   if (!(AUTHORIZATION_LABELS as readonly string[]).includes(answer.choice)) {
     return null;
   }
@@ -87,7 +87,7 @@ function readAuthorization(
 }
 
 function readBool(answer: AnswerLike | undefined): number | null {
-  if (!answer || answer.type !== "bool") return null;
+  if (answer?.type !== "bool") return null;
   if (!finite(answer.probability)) return null;
   return clamp01(answer.probability);
 }
@@ -95,7 +95,7 @@ function readBool(answer: AnswerLike | undefined): number | null {
 function readScore(
   answer: AnswerLike | undefined,
 ): { level: number; confidence: number } | null {
-  if (!answer || answer.type !== "score") return null;
+  if (answer?.type !== "score") return null;
   if (!finite(answer.score) || !finite(answer.confidence)) return null;
   return {
     level: Math.min(4, Math.max(0, answer.score)),
