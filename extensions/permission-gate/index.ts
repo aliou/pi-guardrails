@@ -25,6 +25,8 @@ import {
   matchCommandPattern,
 } from "./rules";
 
+type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
+
 export default async function permissionGate(pi: ExtensionAPI) {
   await configLoader.load();
   bindProjectConfig(pi, configLoader);
@@ -100,7 +102,6 @@ export default async function permissionGate(pi: ExtensionAPI) {
       return { block: true, reason };
     }
 
-    type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
     const promptOpened = createPromptOpenedPayload({
       feature: "permissionGate",
       action: safety.action,

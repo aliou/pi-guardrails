@@ -51,17 +51,17 @@ describe("outside-workspace plausibility filter", () => {
       ['uvx ctx7 docs /websites/apisix "routes"', "uvx"],
       ["ctx7 skills install /aliou/pi-guardrails", "skills install"],
     ])("ignores the library id in %s (%s)", async (command) => {
-      expect(await extract(command)).toEqual([]);
+      await expect(extract(command)).resolves.toEqual([]);
     });
 
     it("ignores library ids inside a nested shell program", async () => {
-      expect(
-        await extract(`bash -c 'npx ctx7 docs /websites/apisix "routes"'`),
-      ).toEqual([]);
+      await expect(
+        extract(`bash -c 'npx ctx7 docs /websites/apisix "routes"'`),
+      ).resolves.toEqual([]);
     });
 
     it("still extracts real paths passed to an unknown runner", async () => {
-      expect(await extract("npx some-cli /etc/passwd")).toEqual([
+      await expect(extract("npx some-cli /etc/passwd")).resolves.toEqual([
         "/etc/passwd",
       ]);
     });
@@ -74,52 +74,56 @@ describe("outside-workspace plausibility filter", () => {
       "go vet ./pkg/...",
       "go list github.com/user/repo/...",
     ])("ignores the package pattern in %s", async (command) => {
-      expect(await extract(command)).toEqual([]);
+      await expect(extract(command)).resolves.toEqual([]);
     });
 
     it("keeps a real directory passed to go -C", async () => {
       // `go -C /tmp test ./...` really does chdir to /tmp: that is a genuine
       // outside-workspace access and should still be surfaced.
-      expect(await extract("go -C /tmp test ./...")).toEqual(["/tmp"]);
+      await expect(extract("go -C /tmp test ./...")).resolves.toEqual(["/tmp"]);
     });
   });
 
   describe("other identifier-shaped arguments", () => {
     it("ignores owner/repo slugs", async () => {
-      expect(
-        await extract("gh pr view 12 --repo /aliou/pi-guardrails"),
-      ).toEqual([]);
+      await expect(
+        extract("gh pr view 12 --repo /aliou/pi-guardrails"),
+      ).resolves.toEqual([]);
     });
 
     it("ignores docker volume specs", async () => {
       // Not a shape rule: `/tmp:` simply does not exist.
-      expect(await extract("docker run -v /tmp:/tmp alpine")).toEqual([]);
-    });
-
-    it("ignores URLs", async () => {
-      expect(await extract("curl https://example.com/a/b")).toEqual([]);
-    });
-
-    it("ignores scp/rsync remote targets", async () => {
-      expect(await extract("scp report.txt deploy@host:/etc/passwd")).toEqual(
+      await expect(extract("docker run -v /tmp:/tmp alpine")).resolves.toEqual(
         [],
       );
     });
 
+    it("ignores URLs", async () => {
+      await expect(extract("curl https://example.com/a/b")).resolves.toEqual(
+        [],
+      );
+    });
+
+    it("ignores scp/rsync remote targets", async () => {
+      await expect(
+        extract("scp report.txt deploy@host:/etc/passwd"),
+      ).resolves.toEqual([]);
+    });
+
     it("ignores git ssh remotes", async () => {
-      expect(
-        await extract("git clone git@github.com:aliou/pi-guardrails.git"),
-      ).toEqual([]);
+      await expect(
+        extract("git clone git@github.com:aliou/pi-guardrails.git"),
+      ).resolves.toEqual([]);
     });
   });
 
   describe("unchanged behaviour for known regressions", () => {
     it("still surfaces the interpreter wrapper bypass (issue #76)", async () => {
-      expect(
-        await extract(
+      await expect(
+        extract(
           `powershell -Command "Get-Content -Path '/etc/passwd' -TotalCount 1"`,
         ),
-      ).toEqual(["/etc/passwd"]);
+      ).resolves.toEqual(["/etc/passwd"]);
     });
 
     it("does not add outside-workspace candidates for find/xargs pipelines (issue #79)", async () => {
@@ -137,7 +141,9 @@ describe("outside-workspace plausibility filter", () => {
     it("leaves unexpanded policy targets in the workspace alone (PR #84)", async () => {
       // `$SC/.env` stays a candidate so the policies feature can still judge
       // it; plausibility filtering never runs on in-workspace tokens.
-      expect(await extract('head "$SC/.env"')).toEqual([`${CWD}/$SC/.env`]);
+      await expect(extract('head "$SC/.env"')).resolves.toEqual([
+        `${CWD}/$SC/.env`,
+      ]);
     });
   });
 
@@ -152,7 +158,7 @@ describe("outside-workspace plausibility filter", () => {
         ["/work/project/aliou/pi-guardrails"],
       ],
     ])("%s", async (command, expected) => {
-      expect(await extract(command)).toEqual(expected);
+      await expect(extract(command)).resolves.toEqual(expected);
     });
   });
 
@@ -171,13 +177,13 @@ describe("outside-workspace plausibility filter", () => {
         "home concatenation",
       ],
     ])("ignores the fragment in %s (%s)", async (command) => {
-      expect(await extract(command)).toEqual([]);
+      await expect(extract(command)).resolves.toEqual([]);
     });
 
     it("still surfaces a quoted read in inline code", async () => {
-      expect(await extract(`node -e 'require("/etc/passwd")'`)).toEqual([
-        "/etc/passwd",
-      ]);
+      await expect(
+        extract(`node -e 'require("/etc/passwd")'`),
+      ).resolves.toEqual(["/etc/passwd"]);
     });
   });
 
@@ -189,26 +195,28 @@ describe("outside-workspace plausibility filter", () => {
       ["tail -f /var/log/system.log", ["/var/log/system.log"]],
       ["ls /tmp", ["/tmp"]],
     ])("%s", async (command, expected) => {
-      expect(await extract(command)).toEqual(expected);
+      await expect(extract(command)).resolves.toEqual(expected);
     });
 
     it("surfaces reads hidden in an interpreter program", async () => {
-      expect(await extract(`python3 -c 'open("/etc/passwd").read()'`)).toEqual([
-        "/etc/passwd",
-      ]);
+      await expect(
+        extract(`python3 -c 'open("/etc/passwd").read()'`),
+      ).resolves.toEqual(["/etc/passwd"]);
     });
 
     it("surfaces reads hidden in a nested shell program", async () => {
-      expect(await extract(`sh -c 'cat /etc/passwd'`)).toEqual(["/etc/passwd"]);
+      await expect(extract(`sh -c 'cat /etc/passwd'`)).resolves.toEqual([
+        "/etc/passwd",
+      ]);
     });
   });
 
   describe("existence suppression cannot be used to escape", () => {
     it("never suppresses a redirect target", async () => {
       // /exfil does not exist, but the redirect creates the file.
-      expect(await extract("cat secrets.txt > /exfil/dump.txt")).toEqual([
-        "/exfil/dump.txt",
-      ]);
+      await expect(
+        extract("cat secrets.txt > /exfil/dump.txt"),
+      ).resolves.toEqual(["/exfil/dump.txt"]);
     });
 
     it.each([
@@ -223,27 +231,25 @@ describe("outside-workspace plausibility filter", () => {
     });
 
     it("never suppresses an install -D destination", async () => {
-      expect(
-        await extract("install -D secrets.txt /exfil/data/secrets.txt"),
-      ).toContain("/exfil/data/secrets.txt");
+      await expect(
+        extract("install -D secrets.txt /exfil/data/secrets.txt"),
+      ).resolves.toContain("/exfil/data/secrets.txt");
     });
 
     it("never suppresses paths from an interpreter program", async () => {
       // The program can call os.makedirs itself, so a missing parent proves
       // nothing about whether the write will land.
-      expect(
-        await extract(
+      await expect(
+        extract(
           `python3 -c 'import os; os.makedirs("/exfil/sub"); open("/exfil/sub/data", "w")'`,
         ),
-      ).toContain("/exfil/sub/data");
+      ).resolves.toContain("/exfil/sub/data");
     });
 
     it("never suppresses curl --create-dirs destinations", async () => {
-      expect(
-        await extract(
-          "curl --create-dirs -o /exfil/sub/f https://example.com/f",
-        ),
-      ).toEqual(["/exfil/sub/f"]);
+      await expect(
+        extract("curl --create-dirs -o /exfil/sub/f https://example.com/f"),
+      ).resolves.toEqual(["/exfil/sub/f"]);
     });
 
     it.each([
@@ -262,21 +268,21 @@ describe("outside-workspace plausibility filter", () => {
       "strace mkdir -p /exfil/data",
       "pnpm exec --filter=foo mkdir -p /exfil/data",
     ])("looks through wrappers to find the real command: %s", async (cmd) => {
-      expect(await extract(cmd)).toContain("/exfil/data");
+      await expect(extract(cmd)).resolves.toContain("/exfil/data");
     });
 
     it("does not treat a path basename as a path-creating command", async () => {
       // `/websites/tar` must not disable suppression just because its
       // basename matches an entry in the path-creating list.
-      expect(await extract("ctx7 docs /websites/tar")).toEqual([]);
+      await expect(extract("ctx7 docs /websites/tar")).resolves.toEqual([]);
     });
 
     it("still suppresses identifiers behind the same wrappers", async () => {
       // Wrapper unwrapping only feeds the path-creating lookup; it must not
       // resurrect the ctx7 false positive.
-      expect(
-        await extract("sudo npx ctx7@latest docs /websites/apisix"),
-      ).toEqual([]);
+      await expect(
+        extract("sudo npx ctx7@latest docs /websites/apisix"),
+      ).resolves.toEqual([]);
     });
 
     it.each([
@@ -290,24 +296,26 @@ describe("outside-workspace plausibility filter", () => {
       "cat $SECRETS/../../../etc/shadow",
       "cat `pwd`/../../etc/shadow",
     ])("never suppresses an unexpanded shell reference: %s", async (cmd) => {
-      expect(await extract(cmd)).not.toEqual([]);
+      await expect(extract(cmd)).resolves.not.toEqual([]);
     });
 
     it("surfaces a colon-bearing path that really exists", async () => {
       vol.fromJSON({ "/tmp/odd:/data": "" });
-      expect(await extract("cat /tmp/odd:/data")).toEqual(["/tmp/odd:/data"]);
+      await expect(extract("cat /tmp/odd:/data")).resolves.toEqual([
+        "/tmp/odd:/data",
+      ]);
     });
 
     it("never suppresses a path-creating command nested in a shell", async () => {
-      expect(await extract(`bash -c 'mkdir -p /exfil/data'`)).toContain(
-        "/exfil/data",
-      );
+      await expect(
+        extract(`bash -c 'mkdir -p /exfil/data'`),
+      ).resolves.toContain("/exfil/data");
     });
 
     it("surfaces a write once the parent exists", async () => {
       // The two-step evasion (create the root, then write into it) fails:
       // /tmp exists, so nothing is suppressed.
-      expect(await extract("cp secrets.txt /tmp/exfil.txt")).toEqual([
+      await expect(extract("cp secrets.txt /tmp/exfil.txt")).resolves.toEqual([
         "/tmp/exfil.txt",
       ]);
     });
@@ -320,7 +328,7 @@ describe("outside-workspace plausibility filter", () => {
       // Resolves outside the workspace, so existence suppression applies.
       ["cat '../$USER/config.json'", "single-quoted `$USER` path"],
     ])("suppresses the quoted literal from %s (%s)", async (command) => {
-      expect(await extract(command)).toEqual([]);
+      await expect(extract(command)).resolves.toEqual([]);
     });
 
     it.each([
@@ -329,11 +337,11 @@ describe("outside-workspace plausibility filter", () => {
       ["cat `pwd`/../etc/shadow", "command substitution"],
       ['cat "$(pwd)/../../etc/shadow"', "nested command substitution"],
     ])("still reports the real expansion in %s (%s)", async (command) => {
-      expect(await extract(command)).not.toEqual([]);
+      await expect(extract(command)).resolves.not.toEqual([]);
     });
 
     it("still reports the real file argument of a sed range", async () => {
-      expect(await extract("sed -n '/pat/,$p' /etc/passwd")).toEqual([
+      await expect(extract("sed -n '/pat/,$p' /etc/passwd")).resolves.toEqual([
         "/etc/passwd",
       ]);
     });

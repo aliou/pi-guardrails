@@ -84,9 +84,13 @@ export default async function pathAccess(pi: ExtensionAPI) {
     }
     const bashCommand =
       event.toolName === "bash" ? String(input.command ?? "") : undefined;
-    const targets = [
-      ...new Set(await targetsForTool(event.toolName, input, ctx.cwd)),
-    ];
+    const matched = await targetsForTool(
+      event.toolName,
+      input,
+      ctx.cwd,
+      pi.exec,
+    );
+    const targets = [...new Set(matched)];
     const acceptedGrants: PendingPathGrant[] = [];
 
     for (const absolutePath of targets) {

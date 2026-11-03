@@ -97,39 +97,37 @@ describe("createPathAccessPromptComponent", () => {
     expect(done).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "\t",
-    "\x1b[B",
-    "\x1b[C",
-  ])("skips disabled options moving forward with %j", (key) => {
-    const { done, prompt } = createPrompt(100, undefined, {
-      alwaysEnabled: false,
-    });
-    prompt.handleInput?.(key);
-    prompt.handleInput?.(key);
-    prompt.handleInput?.("\r");
-    expect(done).toHaveBeenLastCalledWith("allow-dir-session");
-    prompt.handleInput?.(key);
-    prompt.handleInput?.("\r");
-    expect(done).toHaveBeenLastCalledWith("deny");
-  });
+  it.each(["\t", "\x1b[B", "\x1b[C"])(
+    "skips disabled options moving forward with %j",
+    (key) => {
+      const { done, prompt } = createPrompt(100, undefined, {
+        alwaysEnabled: false,
+      });
+      prompt.handleInput?.(key);
+      prompt.handleInput?.(key);
+      prompt.handleInput?.("\r");
+      expect(done).toHaveBeenLastCalledWith("allow-dir-session");
+      prompt.handleInput?.(key);
+      prompt.handleInput?.("\r");
+      expect(done).toHaveBeenLastCalledWith("deny");
+    },
+  );
 
-  it.each([
-    "\x1b[Z",
-    "\x1b[A",
-    "\x1b[D",
-  ])("skips disabled options moving backward with %j", (key) => {
-    const { done, prompt } = createPrompt(100, undefined, {
-      alwaysEnabled: false,
-    });
-    prompt.handleInput?.(key);
-    prompt.handleInput?.(key);
-    prompt.handleInput?.("\r");
-    expect(done).toHaveBeenLastCalledWith("allow-dir-session");
-    prompt.handleInput?.(key);
-    prompt.handleInput?.("\r");
-    expect(done).toHaveBeenLastCalledWith("allow-file-session");
-  });
+  it.each(["\x1b[Z", "\x1b[A", "\x1b[D"])(
+    "skips disabled options moving backward with %j",
+    (key) => {
+      const { done, prompt } = createPrompt(100, undefined, {
+        alwaysEnabled: false,
+      });
+      prompt.handleInput?.(key);
+      prompt.handleInput?.(key);
+      prompt.handleInput?.("\r");
+      expect(done).toHaveBeenLastCalledWith("allow-dir-session");
+      prompt.handleInput?.(key);
+      prompt.handleInput?.("\r");
+      expect(done).toHaveBeenLastCalledWith("allow-file-session");
+    },
+  );
 
   it.each([
     { key: "o", result: "allow-file-once" },

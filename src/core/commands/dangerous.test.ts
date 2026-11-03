@@ -514,16 +514,19 @@ describe("checkDangerousCommand", () => {
     ["logical command", "echo ok && sudo true", "superuser command"],
     ["pipeline", "echo ok | sudo tee /tmp/out", "superuser command"],
     ["subshell", "(sudo true)", "superuser command"],
-  ])("matches dangerous commands nested in a %s", (_label, command, description) => {
-    const result = checkDangerousCommand({
-      command,
-      patterns: [],
-      useBuiltinMatchers: true,
-      fallbackPatterns: [],
-    });
+  ])(
+    "matches dangerous commands nested in a %s",
+    (_label, command, description) => {
+      const result = checkDangerousCommand({
+        command,
+        patterns: [],
+        useBuiltinMatchers: true,
+        fallbackPatterns: [],
+      });
 
-    expect(result).toEqual({ description, pattern: "(structural)" });
-  });
+      expect(result).toEqual({ description, pattern: "(structural)" });
+    },
+  );
 });
 
 describe("matchDangerousCommand", () => {

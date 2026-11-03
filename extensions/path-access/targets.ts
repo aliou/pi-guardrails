@@ -1,4 +1,5 @@
 import { resolveFromCwd } from "../../src/core/paths";
+import type { ExecFn } from "../../src/shared/glob";
 import { extractBashPathCandidates } from "../../src/shared/paths";
 
 /** Tools that only read. Bash is never read-only: a command can write. */
@@ -12,6 +13,7 @@ export async function targetsForTool(
   toolName: string,
   input: Record<string, unknown>,
   cwd: string,
+  exec?: ExecFn,
 ): Promise<string[]> {
   if (["read", "write", "edit", "grep", "find", "ls"].includes(toolName)) {
     const raw = String(input.file_path ?? input.path ?? "").trim();
@@ -19,7 +21,9 @@ export async function targetsForTool(
   }
 
   if (toolName === "bash") {
-    return extractBashPathCandidates(String(input.command ?? ""), cwd);
+    return extractBashPathCandidates(String(input.command ?? ""), cwd, {
+      exec,
+    });
   }
 
   return [];

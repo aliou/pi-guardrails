@@ -20,14 +20,15 @@ import {
   wordToString,
 } from "../../core/shell/ast";
 import { classifyCommandArgs } from "../../core/shell/command-args";
-import { expandGlob, hasGlobChars } from "../glob";
+import { type ExecFn, expandGlob, hasGlobChars } from "../glob";
 
 async function expandCandidate(
   candidate: string,
   cwd: string,
+  exec?: ExecFn,
 ): Promise<string[]> {
   if (!hasGlobChars(candidate)) return [candidate];
-  const matches = await expandGlob(candidate, { cwd });
+  const matches = await expandGlob(candidate, { cwd, exec });
   return matches.length > 0 ? matches : [candidate];
 }
 
@@ -101,6 +102,8 @@ export type ExtractOptions = {
   depth?: number;
   /** Filesystem existence probe. Injectable for tests. */
   pathExists?: (path: string) => boolean;
+  /** Command executor used to expand globs with `fd` (e.g. `pi.exec`). */
+  exec?: ExecFn;
 };
 
 /**
@@ -122,7 +125,7 @@ export async function extractBashPathCandidates(
   cwd: string,
   options: ExtractOptions = {},
 ): Promise<string[]> {
-  const { depth = 0, pathExists = existsSync } = options;
+  const { depth = 0, pathExists = existsSync, exec } = options;
   const seen = new Set<string>();
   const results: string[] = [];
 
@@ -147,7 +150,7 @@ export async function extractBashPathCandidates(
       commandCreatesPaths(commandName, commandArgs) ||
       programText;
 
-    const expanded = await expandCandidate(token, dir);
+    const expanded = await expandCandidate(token, dir, exec);
     for (const file of expanded) {
       const abs = resolve(dir, expandHomePath(file));
       // Tokens with repeated separators (`//`, `cat .//`) collapse to the
@@ -203,6 +206,7 @@ export async function extractBashPathCandidates(
               extractBashPathCandidates(arg.token, dir, {
                 depth: depth + 1,
                 pathExists,
+                exec,
               }).then((nested) => {
                 for (const abs of nested) {
                   if (!seen.has(abs)) {
@@ -296,7 +300,7 @@ export async function extractBashPathCandidates(
         maybePathLike(token) &&
         !hasNonPathShape(token)
       ) {
-        const expanded = await expandCandidate(token, cwd);
+        const expanded = await expandCandidate(token, cwd, exec);
         for (const file of expanded) {
           const abs = resolve(cwd, expandHomePath(file));
           if (!seen.has(abs)) {

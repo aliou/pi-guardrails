@@ -528,26 +528,25 @@ describe("pathAccess extension hook RPC fallback", () => {
     { label: "Allow once", saves: 0, blocked: false },
     { label: "Deny", saves: 0, blocked: true },
     { label: undefined, saves: 0, blocked: true },
-  ])("maps selection %j to the expected result", async ({
-    label,
-    saves,
-    blocked,
-  }) => {
-    const { pi, ctx } = setup();
-    ctx.ui.select.mockResolvedValue(label);
+  ])(
+    "maps selection %j to the expected result",
+    async ({ label, saves, blocked }) => {
+      const { pi, ctx } = setup();
+      ctx.ui.select.mockResolvedValue(label);
 
-    const result = await runHandler(pi, ctx, toolCall);
+      const result = await runHandler(pi, ctx, toolCall);
 
-    if (blocked) {
-      expect(result).toEqual({
-        block: true,
-        reason: "User denied access outside working directory",
-      });
-    } else {
-      expect(result).toBeUndefined();
-    }
-    expect(mockState.saves).toHaveLength(saves);
-  });
+      if (blocked) {
+        expect(result).toEqual({
+          block: true,
+          reason: "User denied access outside working directory",
+        });
+      } else {
+        expect(result).toBeUndefined();
+      }
+      expect(mockState.saves).toHaveLength(saves);
+    },
+  );
 
   it("maps 'Allow directory always' to a parent-directory grant", async () => {
     const { pi, ctx } = setup();
@@ -566,34 +565,34 @@ describe("pathAccess extension hook RPC fallback", () => {
     ]);
   });
 
-  it.each([
-    "pending",
-    "untrusted",
-  ] as const)("omits local always grants from RPC while project state is %s", async (state) => {
-    vi.mocked(configLoader.getProjectState).mockReturnValueOnce(state);
-    const { pi, ctx } = setup();
-    ctx.ui.select.mockResolvedValue("Allow file this session");
+  it.each(["pending", "untrusted"] as const)(
+    "omits local always grants from RPC while project state is %s",
+    async (state) => {
+      vi.mocked(configLoader.getProjectState).mockReturnValueOnce(state);
+      const { pi, ctx } = setup();
+      ctx.ui.select.mockResolvedValue("Allow file this session");
 
-    const result = await runHandler(pi, ctx, toolCall);
+      const result = await runHandler(pi, ctx, toolCall);
 
-    expect(result).toBeUndefined();
-    expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual([
-      "Allow once",
-      "Allow file this session",
-      "Allow directory this session",
-      "Deny",
-    ]);
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Use /trust and restart Pi"),
-      "warning",
-    );
-    expect(mockState.saves[0].scope).toBe("memory");
-    const component = ctx.ui.custom.mock
-      .calls[0]?.[0] as PathAccessPromptComponent;
-    expect(renderPromptComponent(component)).toContain(
-      "Allow file always (project not trusted)",
-    );
-  });
+      expect(result).toBeUndefined();
+      expect(ctx.ui.select.mock.calls[0]?.[1]).toEqual([
+        "Allow once",
+        "Allow file this session",
+        "Allow directory this session",
+        "Deny",
+      ]);
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        expect.stringContaining("Use /trust and restart Pi"),
+        "warning",
+      );
+      expect(mockState.saves[0].scope).toBe("memory");
+      const component = ctx.ui.custom.mock
+        .calls[0]?.[0] as PathAccessPromptComponent;
+      expect(renderPromptComponent(component)).toContain(
+        "Allow file always (project not trusted)",
+      );
+    },
+  );
 
   it("keeps global always grants available in an untrusted project", async () => {
     vi.mocked(configLoader.getProjectState).mockReturnValueOnce("untrusted");

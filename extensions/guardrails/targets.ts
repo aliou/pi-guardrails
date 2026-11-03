@@ -8,7 +8,7 @@ import {
   wordHasExpansion,
   wordToString,
 } from "../../src/core/shell";
-import { expandGlob, hasGlobChars } from "../../src/shared/glob";
+import { type ExecFn, expandGlob, hasGlobChars } from "../../src/shared/glob";
 import type { CompiledPolicy } from "./rules";
 import { candidateTargetForms, normalizeTarget } from "./rules";
 
@@ -23,9 +23,12 @@ export interface ExtractedTarget {
   unresolved: boolean;
 }
 
-async function expandCandidate(candidate: string): Promise<string[]> {
+async function expandCandidate(
+  candidate: string,
+  exec?: ExecFn,
+): Promise<string[]> {
   if (!hasGlobChars(candidate)) return [candidate];
-  const matches = await expandGlob(candidate);
+  const matches = await expandGlob(candidate, { exec });
   return matches.length > 0 ? matches : [candidate];
 }
 
@@ -33,6 +36,7 @@ export async function extractTargets(
   event: { toolName: string; input: Record<string, unknown> },
   cwd: string,
   policies: CompiledPolicy[],
+  exec?: ExecFn,
 ): Promise<ExtractedTarget[]> {
   if (
     ["read", "write", "edit", "grep", "find", "ls"].includes(event.toolName)
@@ -48,7 +52,7 @@ export async function extractTargets(
   const targets = new Map<string, boolean>();
   const maybeAdd = async (candidate: string, unresolved: boolean) => {
     if (!candidate || candidate.startsWith("-")) return;
-    for (const file of await expandCandidate(candidate)) {
+    for (const file of await expandCandidate(candidate, exec)) {
       const forms = unresolved
         ? [normalizeTarget(file, cwd)]
         : candidateTargetForms(file, cwd);

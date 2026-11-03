@@ -154,12 +154,11 @@ export function createPolicyRules(
       if (anyMatch(policy.allowedPatterns)) {
         return { kind: "pass" };
       }
-      if (
-        policy.onlyIfExists &&
-        !action.unresolved &&
-        !(await fileExists(path, cwd))
-      ) {
-        return { kind: "pass" };
+      if (policy.onlyIfExists && !action.unresolved) {
+        const pathExists = await fileExists(path, cwd);
+        if (!pathExists) {
+          return { kind: "pass" };
+        }
       }
       if (policy.protection === "none") return { kind: "pass" };
       return {

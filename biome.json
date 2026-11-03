@@ -1,11 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-  "plugins": [
-    "./node_modules/@aliou/biome-plugins/plugins/no-inline-imports.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-js-import-extension.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-ts-import-extension.grit",
-    "./node_modules/@aliou/biome-plugins/plugins/no-emojis.grit"
-  ],
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "extends": ["@aliou/biome-plugins/configs/pi"],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -25,7 +20,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "recommended"
     }
   },
   "formatter": {

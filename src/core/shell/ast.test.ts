@@ -13,7 +13,8 @@ function argWord(command: string) {
   const simple = program.body.find(
     (stmt) => stmt.command.type === "SimpleCommand",
   );
-  const words = (simple?.command as { words?: unknown[] }).words ?? [];
+  const words =
+    (simple?.command as { words?: unknown[] } | undefined)?.words ?? [];
   return words[1] as Parameters<typeof wordHasExpansion>[0];
 }
 
@@ -77,11 +78,14 @@ describe("walkCommands substitution traversal", () => {
     "cat <<'EOF'\n$(cat .env)\nEOF\n",
     // Bash performs quote removal, not command substitution, on a delimiter.
     "cat <<$(cat .env)\nbody\n$(cat .env)\n",
-  ])("does not interpret literal text or heredoc delimiters in %j", (command) => {
-    expect(
-      commands(command, true).filter((words) => words.includes(".env")),
-    ).toEqual([]);
-  });
+  ])(
+    "does not interpret literal text or heredoc delimiters in %j",
+    (command) => {
+      expect(
+        commands(command, true).filter((words) => words.includes(".env")),
+      ).toEqual([]);
+    },
+  );
 
   it("documents that unquoted heredoc bodies stay raw text", () => {
     // Bash *does* perform command substitution in an unquoted heredoc body,

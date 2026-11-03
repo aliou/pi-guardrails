@@ -17,7 +17,7 @@ describe("guardrails config persistence", () => {
     await loader.load();
 
     expect(loader.getConfig().enabled).toBe(true);
-    expect(await readFile(configPath, "utf-8")).toBe(contents);
+    await expect(readFile(configPath, "utf-8")).resolves.toBe(contents);
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -45,7 +45,8 @@ describe("guardrails config persistence", () => {
       },
     });
 
-    const saved = JSON.parse(await readFile(configPath, "utf-8"));
+    const savedContents = await readFile(configPath, "utf-8");
+    const saved = JSON.parse(savedContents);
     expect(saved.version).toBe(pkg.version);
     expect(saved.pathAccess.allowedPaths).toEqual([
       { kind: "directory", path: "/tmp/outside" },
@@ -83,7 +84,8 @@ describe("guardrails config persistence", () => {
       },
     });
 
-    const saved = JSON.parse(await readFile(configPath, "utf-8"));
+    const savedContents = await readFile(configPath, "utf-8");
+    const saved = JSON.parse(savedContents);
     expect(saved).toMatchObject({
       version: "0.9.0-20260327",
       enabled: false,

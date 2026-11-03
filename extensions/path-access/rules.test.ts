@@ -62,28 +62,28 @@ describe("createPathAccessRule", () => {
     });
   });
 
-  it.each([
-    "/dev/fd/3",
-    "/dev/urandom",
-  ])("still matches bash-origin %s in block mode", (path) => {
-    const rule = createPathAccessRule(state());
-    expect(rule.check({ kind: "file", path, origin: "bash" })).toMatchObject({
-      kind: "match",
-      metadata: { absolutePath: path },
-    });
-  });
+  it.each(["/dev/fd/3", "/dev/urandom"])(
+    "still matches bash-origin %s in block mode",
+    (path) => {
+      const rule = createPathAccessRule(state());
+      expect(rule.check({ kind: "file", path, origin: "bash" })).toMatchObject({
+        kind: "match",
+        metadata: { absolutePath: path },
+      });
+    },
+  );
 
-  it.each([
-    "/dev/stdin",
-    "/dev/tty",
-  ])("still matches %s for non-bash origins", (path) => {
-    const rule = createPathAccessRule(state());
-    expect(rule.check({ kind: "file", path, origin: "read" })).toMatchObject({
-      kind: "match",
-      metadata: { absolutePath: path },
-    });
-    expect(rule.check({ kind: "file", path })).toMatchObject({
-      kind: "match",
-    });
-  });
+  it.each(["/dev/stdin", "/dev/tty"])(
+    "still matches %s for non-bash origins",
+    (path) => {
+      const rule = createPathAccessRule(state());
+      expect(rule.check({ kind: "file", path, origin: "read" })).toMatchObject({
+        kind: "match",
+        metadata: { absolutePath: path },
+      });
+      expect(rule.check({ kind: "file", path })).toMatchObject({
+        kind: "match",
+      });
+    },
+  );
 });

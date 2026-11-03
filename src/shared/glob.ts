@@ -6,14 +6,31 @@
  * if any expanded path matches a protected pattern.
  */
 
-import { execFile } from "node:child_process";
 import { resolve } from "node:path";
+
+/** Options for a spawned command. Compatible with pi's `ExecOptions`. */
+export interface ExecCommandOptions {
+  cwd?: string;
+  timeout?: number;
+}
+
+/**
+ * Command executor. Extensions pass `pi.exec`; failing to spawn (e.g. `fd`
+ * missing) yields a nonzero `code`, mirroring pi's exec contract.
+ */
+export type ExecFn = (
+  command: string,
+  args: string[],
+  options?: ExecCommandOptions,
+) => Promise<{ code: number; stdout: string }>;
 
 interface ExpandGlobOptions {
   cwd?: string;
   maxDepth?: number;
   maxResults?: number;
   timeout?: number;
+  /** Executor used to spawn `fd`. When omitted, glob expansion is skipped. */
+  exec?: ExecFn;
 }
 
 /**
@@ -31,46 +48,41 @@ export async function expandGlob(
     maxDepth = 3,
     maxResults = 50,
     timeout = 2000,
+    exec,
   } = options;
+  if (!exec) return [];
 
   // Convert glob to fd-compatible regex.
   // fd uses regex by default, so we convert glob chars.
   const fdPattern = globToFdRegex(pattern);
 
-  return new Promise((res) => {
-    const args = [
-      "--type",
-      "f",
-      "--max-depth",
-      String(maxDepth),
-      "--max-results",
-      String(maxResults),
-      "--no-ignore",
-      "--hidden",
-      fdPattern,
-    ];
+  const args = [
+    "--type",
+    "f",
+    "--max-depth",
+    String(maxDepth),
+    "--max-results",
+    String(maxResults),
+    "--no-ignore",
+    "--hidden",
+    fdPattern,
+  ];
 
-    const child = execFile("fd", args, { cwd, timeout }, (err, stdout) => {
-      if (err) {
-        res([]);
-        return;
-      }
+  let result: { code: number; stdout: string };
+  try {
+    result = await exec("fd", args, { cwd, timeout });
+  } catch {
+    return [];
+  }
+  if (result.code !== 0) {
+    return [];
+  }
 
-      const files = stdout
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((f) => resolve(cwd, f));
-
-      res(files);
-    });
-
-    // Safety net: kill if timeout isn't handled by execFile
-    setTimeout(() => {
-      child.kill();
-      res([]);
-    }, timeout + 500);
-  });
+  return result.stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((f) => resolve(cwd, f));
 }
 
 /**

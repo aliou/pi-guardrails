@@ -175,11 +175,14 @@ describe("extractBashPathCandidates", () => {
       ["cd frontend && cd missing && cat ../README.md"],
       ["cd frontend && cd -x && cat ../README.md"],
       ["cd frontend && cd -- - && cat ../README.md"],
-    ])("falls back to the session cwd when the cd target is untracked: %j", async (command) => {
-      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
-        "/work/README.md",
-      ]);
-    });
+    ])(
+      "falls back to the session cwd when the cd target is untracked: %j",
+      async (command) => {
+        await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
+          "/work/README.md",
+        ]);
+      },
+    );
   });
   describe("executable substitutions", () => {
     it.each([
@@ -346,60 +349,54 @@ describe("extractBashPathCandidates", () => {
       const command =
         "node ./scripts/call_api.js --endpoint /safety/location/record/add --payload '{}'";
 
-      expect(await extractBashPathCandidates(command, CWD)).toEqual([
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual([
         `${CWD}/scripts/call_api.js`,
       ]);
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "node ./scripts/call_api.js --endpoint '/safety/location/record/add' --payload '{}'",
           CWD,
         ),
-      ).toEqual([`${CWD}/scripts/call_api.js`]);
+      ).resolves.toEqual([`${CWD}/scripts/call_api.js`]);
     });
 
     it("ignores an API path passed to a Python script", async () => {
-      expect(
-        await extractBashPathCandidates(
-          "python3 ./client.py /v1/users/me",
-          CWD,
-        ),
-      ).toEqual([`${CWD}/client.py`]);
+      await expect(
+        extractBashPathCandidates("python3 ./client.py /v1/users/me", CWD),
+      ).resolves.toEqual([`${CWD}/client.py`]);
     });
 
     it("applies the same filtering inside a nested shell", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "bash -c 'node ./scripts/call_api.js --endpoint /safety/location/record/add'",
           CWD,
         ),
-      ).toEqual([`${CWD}/scripts/call_api.js`]);
+      ).resolves.toEqual([`${CWD}/scripts/call_api.js`]);
     });
 
     it("keeps inline program paths separate from script argv", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           `python3 -c 'open("/exfil/sub/data", "w")' --endpoint /v1/users/me`,
           CWD,
         ),
-      ).toEqual(["/exfil/sub/data"]);
+      ).resolves.toEqual(["/exfil/sub/data"]);
     });
 
     it("still surfaces an existing path passed as script argv", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "node ./scripts/read_file.js /etc/passwd",
           CWD,
         ),
-      ).toEqual([`${CWD}/scripts/read_file.js`, "/etc/passwd"]);
+      ).resolves.toEqual([`${CWD}/scripts/read_file.js`, "/etc/passwd"]);
     });
 
     it("treats missing script argv like other command arguments", async () => {
-      expect(
-        await extractBashPathCandidates(
-          "python3 ./deploy.py /exfil/new/data",
-          CWD,
-        ),
-      ).toEqual([`${CWD}/deploy.py`]);
+      await expect(
+        extractBashPathCandidates("python3 ./deploy.py /exfil/new/data", CWD),
+      ).resolves.toEqual([`${CWD}/deploy.py`]);
     });
   });
 
@@ -436,16 +433,15 @@ describe("extractBashPathCandidates", () => {
 
   describe("when command has path arguments", () => {
     it("extracts a single absolute path", async () => {
-      expect(await extractBashPathCandidates("cat /etc/hosts", CWD)).toEqual([
-        "/etc/hosts",
-      ]);
+      await expect(
+        extractBashPathCandidates("cat /etc/hosts", CWD),
+      ).resolves.toEqual(["/etc/hosts"]);
     });
 
     it("extracts multiple absolute paths", async () => {
-      expect(await extractBashPathCandidates("cp /a /b", CWD)).toEqual([
-        "/a",
-        "/b",
-      ]);
+      await expect(extractBashPathCandidates("cp /a /b", CWD)).resolves.toEqual(
+        ["/a", "/b"],
+      );
     });
 
     it.each([
@@ -475,19 +471,21 @@ describe("extractBashPathCandidates", () => {
         ["/tmp/project-secret.tar", `${CWD}/secrets.txt`],
       ],
     ])("extracts every path operand in %s", async (command, expected) => {
-      expect(await extractBashPathCandidates(command, CWD)).toEqual(expected);
+      await expect(extractBashPathCandidates(command, CWD)).resolves.toEqual(
+        expected,
+      );
     });
 
     it("resolves a relative path with ./ against cwd", async () => {
-      expect(await extractBashPathCandidates("cat ./foo/bar", CWD)).toEqual([
-        "/work/project/foo/bar",
-      ]);
+      await expect(
+        extractBashPathCandidates("cat ./foo/bar", CWD),
+      ).resolves.toEqual(["/work/project/foo/bar"]);
     });
 
     it("expands ~ to home", async () => {
-      expect(await extractBashPathCandidates("cat ~/file", CWD)).toEqual([
-        `${HOME}/file`,
-      ]);
+      await expect(
+        extractBashPathCandidates("cat ~/file", CWD),
+      ).resolves.toEqual([`${HOME}/file`]);
     });
 
     it("detects Windows-style paths", async () => {
@@ -508,27 +506,31 @@ describe("extractBashPathCandidates", () => {
 
   describe("when command has flags and redirects", () => {
     it("ignores flag arguments", async () => {
-      expect(await extractBashPathCandidates("ls -la /tmp", CWD)).toEqual([
-        "/tmp",
-      ]);
+      await expect(
+        extractBashPathCandidates("ls -la /tmp", CWD),
+      ).resolves.toEqual(["/tmp"]);
     });
 
     it("extracts redirect targets", async () => {
-      expect(
-        await extractBashPathCandidates("echo foo > /tmp/out", CWD),
-      ).toEqual(["/tmp/out"]);
-      expect(
-        await extractBashPathCandidates("echo foo >& /tmp/out", CWD),
-      ).toEqual(["/tmp/out"]);
+      await expect(
+        extractBashPathCandidates("echo foo > /tmp/out", CWD),
+      ).resolves.toEqual(["/tmp/out"]);
+      await expect(
+        extractBashPathCandidates("echo foo >& /tmp/out", CWD),
+      ).resolves.toEqual(["/tmp/out"]);
     });
 
     it("extracts paths from multiple commands and redirects", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "cat ./input && grep needle /tmp/log > ./out",
           CWD,
         ),
-      ).toEqual(["/work/project/input", "/work/project/out", "/tmp/log"]);
+      ).resolves.toEqual([
+        "/work/project/input",
+        "/work/project/out",
+        "/tmp/log",
+      ]);
     });
 
     it("extracts trailing redirects attached to compound commands", async () => {
@@ -547,36 +549,39 @@ describe("extractBashPathCandidates", () => {
 
     it("ignores file-descriptor duplication redirects", async () => {
       // `2>&1` and friends target fds, not files — must not extract `1`.
-      expect(await extractBashPathCandidates("echo hi 2>&1", CWD)).toEqual([]);
-      expect(await extractBashPathCandidates("cat file 3<&0", CWD)).toEqual([]);
-      expect(await extractBashPathCandidates("exec 3>&-", CWD)).toEqual([]);
+      await expect(
+        extractBashPathCandidates("echo hi 2>&1", CWD),
+      ).resolves.toEqual([]);
+      await expect(
+        extractBashPathCandidates("cat file 3<&0", CWD),
+      ).resolves.toEqual([]);
+      await expect(
+        extractBashPathCandidates("exec 3>&-", CWD),
+      ).resolves.toEqual([]);
       // `&>` redirects stdout AND stderr to a real file — keep it.
-      expect(
-        await extractBashPathCandidates("echo hi &> /tmp/log", CWD),
-      ).toEqual(["/tmp/log"]);
+      await expect(
+        extractBashPathCandidates("echo hi &> /tmp/log", CWD),
+      ).resolves.toEqual(["/tmp/log"]);
     });
   });
 
   describe("when a command uses heredocs", () => {
     it("does not treat heredoc delimiters as paths", async () => {
-      expect(
-        await extractBashPathCandidates("cat <<'EOF'\nnot a path\nEOF", CWD),
-      ).toEqual([]);
-      expect(
-        await extractBashPathCandidates(
-          "cat > out.txt <<'EOF'\ntext\nEOF",
-          CWD,
-        ),
-      ).toEqual(["/work/project/out.txt"]);
+      await expect(
+        extractBashPathCandidates("cat <<'EOF'\nnot a path\nEOF", CWD),
+      ).resolves.toEqual([]);
+      await expect(
+        extractBashPathCandidates("cat > out.txt <<'EOF'\ntext\nEOF", CWD),
+      ).resolves.toEqual(["/work/project/out.txt"]);
     });
 
     it("does not extract paths written inside heredoc bodies", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "cat <<'EOF'\nread /etc/hosts here\nEOF",
           CWD,
         ),
-      ).toEqual([]);
+      ).resolves.toEqual([]);
     });
   });
 
@@ -586,38 +591,40 @@ describe("extractBashPathCandidates", () => {
     // command that continues after it. Relies on @aliou/sh 0.3.3 accepting
     // operator continuations (aliou/sh#24).
     it("ignores comment text after an operator, keeping the continuation", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "echo ok && # see /secret/db.pem\ncat /tmp/log",
           CWD,
         ),
-      ).toEqual(["/tmp/log"]);
+      ).resolves.toEqual(["/tmp/log"]);
     });
 
     it("does not treat URL fragments as paths", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "open https://example.com/#/helm/state-backend",
           CWD,
         ),
-      ).toEqual([]);
+      ).resolves.toEqual([]);
     });
   });
 
   describe("when tokens resolve to the filesystem root", () => {
     it("never returns the root as a prompt target", async () => {
-      expect(await extractBashPathCandidates("cat //", CWD)).toEqual([]);
+      await expect(extractBashPathCandidates("cat //", CWD)).resolves.toEqual(
+        [],
+      );
     });
   });
 
   describe("when a command runs on a remote host", () => {
     it("does not treat ssh remote argv as local paths", async () => {
-      expect(
-        await extractBashPathCandidates(
+      await expect(
+        extractBashPathCandidates(
           "ssh -i ~/.ssh/id user@host 'cat /etc/passwd'",
           CWD,
         ),
-      ).toEqual([]);
+      ).resolves.toEqual([]);
     });
 
     it("does not surface argv kubectl passes to the pod command", async () => {
@@ -633,25 +640,31 @@ describe("extractBashPathCandidates", () => {
 
   describe("when command has no path-like tokens", () => {
     it("returns an empty array for bare filenames (no separators)", async () => {
-      expect(await extractBashPathCandidates("cat README.md", CWD)).toEqual([]);
+      await expect(
+        extractBashPathCandidates("cat README.md", CWD),
+      ).resolves.toEqual([]);
     });
 
     it("returns an empty array for commands with no file arguments", async () => {
-      expect(await extractBashPathCandidates("echo hello", CWD)).toEqual([]);
+      await expect(
+        extractBashPathCandidates("echo hello", CWD),
+      ).resolves.toEqual([]);
     });
   });
 
   describe("when command uses quoting", () => {
     it("handles quoted paths with spaces", async () => {
-      expect(
-        await extractBashPathCandidates('cat "/tmp/hello world"', CWD),
-      ).toEqual(["/tmp/hello world"]);
+      await expect(
+        extractBashPathCandidates('cat "/tmp/hello world"', CWD),
+      ).resolves.toEqual(["/tmp/hello world"]);
     });
   });
 
   describe("when command has duplicate paths", () => {
     it("deduplicates results", async () => {
-      expect(await extractBashPathCandidates("cat /a /a", CWD)).toEqual(["/a"]);
+      await expect(
+        extractBashPathCandidates("cat /a /a", CWD),
+      ).resolves.toEqual(["/a"]);
     });
   });
 

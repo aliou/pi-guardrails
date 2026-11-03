@@ -19,14 +19,12 @@ describe("isProcessDevicePath", () => {
     expect(isProcessDevicePath(path)).toBe(true);
   });
 
-  it.each([
-    "/dev/fd/3",
-    "/dev/null",
-    "/dev/urandom",
-    "/dev/tty/child",
-  ])("does not match %s", (path) => {
-    expect(isProcessDevicePath(path)).toBe(false);
-  });
+  it.each(["/dev/fd/3", "/dev/null", "/dev/urandom", "/dev/tty/child"])(
+    "does not match %s",
+    (path) => {
+      expect(isProcessDevicePath(path)).toBe(false);
+    },
+  );
 });
 
 describe("isPathAllowed", () => {
@@ -96,17 +94,17 @@ describe("isPathAllowed", () => {
       { path: "/bar/anything", expected: true },
       { path: "/foo/other.ts", expected: false },
       { path: "/baz", expected: false },
-    ])("with mixed file + directory grants, returns $expected for $path", ({
-      path,
-      expected,
-    }) => {
-      expect(
-        isPathAllowed(path, [
-          { kind: "file", path: "/foo/file.ts" },
-          { kind: "directory", path: "/bar" },
-        ]),
-      ).toBe(expected);
-    });
+    ])(
+      "with mixed file + directory grants, returns $expected for $path",
+      ({ path, expected }) => {
+        expect(
+          isPathAllowed(path, [
+            { kind: "file", path: "/foo/file.ts" },
+            { kind: "directory", path: "/bar" },
+          ]),
+        ).toBe(expected);
+      },
+    );
   });
 });
 
@@ -133,15 +131,15 @@ describe("checkPathAccess", () => {
   });
 
   describe("when path is inside cwd", () => {
-    it.each([
-      { mode: "block" as const },
-      { mode: "ask" as const },
-    ])("returns allow in $mode mode", ({ mode }) => {
-      const state = base({ mode });
-      expect(
-        checkPathAccess("/work/project/src/file", "src/file", state).kind,
-      ).toBe("allow");
-    });
+    it.each([{ mode: "block" as const }, { mode: "ask" as const }])(
+      "returns allow in $mode mode",
+      ({ mode }) => {
+        const state = base({ mode });
+        expect(
+          checkPathAccess("/work/project/src/file", "src/file", state).kind,
+        ).toBe("allow");
+      },
+    );
 
     it("returns allow when path equals cwd", () => {
       expect(checkPathAccess(cwd, ".", base({ mode: "ask" })).kind).toBe(

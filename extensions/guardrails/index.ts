@@ -39,6 +39,7 @@ function setupPolicyHook(pi: ExtensionAPI): void {
       { toolName: event.toolName, input },
       ctx.cwd,
       policies,
+      pi.exec,
     );
     const rules = createPolicyRules(policies, ctx.cwd);
 

@@ -11,9 +11,10 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
 import type { GuardrailsConfig } from "../../../../src/shared/config";
 import { configLoader } from "../../../../src/shared/config";
+import { truncateToWidth } from "../../../shared/truncate";
 import {
   appendDangerousPattern,
   appendPolicyRule,

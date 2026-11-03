@@ -75,15 +75,12 @@ describe("createsPaths", () => {
     expect(createsPaths(command)).toBe(true);
   });
 
-  it.each([
-    "cat",
-    "ctx7",
-    "go",
-    "grep",
-    undefined,
-  ])("does not treat %s as path-creating", (command) => {
-    expect(createsPaths(command)).toBe(false);
-  });
+  it.each(["cat", "ctx7", "go", "grep", undefined])(
+    "does not treat %s as path-creating",
+    (command) => {
+      expect(createsPaths(command)).toBe(false);
+    },
+  );
 });
 
 describe("commandCreatesPaths", () => {

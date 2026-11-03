@@ -1,12 +1,7 @@
 import type { Component, SettingsListTheme } from "@earendil-works/pi-tui";
-import {
-  Input,
-  Key,
-  matchesKey,
-  truncateToWidth,
-  visibleWidth,
-} from "@earendil-works/pi-tui";
+import { Input, Key, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
 import type { Action } from "../../../src/core";
+import { truncateToWidth } from "../../shared/truncate";
 
 /**
  * A submenu component for editing an array of {pattern, description, regex?} objects.

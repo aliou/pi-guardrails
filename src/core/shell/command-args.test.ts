@@ -93,9 +93,12 @@ describe("classifyCommandArgs", () => {
       ["fgrep", ["/api/v1", "./src"], ["./src"]],
       ["rg", ["-n", "/upload|\\.detail|413", "backend"], ["backend"]],
       ["/usr/bin/grep", ["/api/v1", "./src"], ["./src"]],
-    ] as const)("treats the pattern of %s as text, not a path", (command, args, expected) => {
-      expect(tokens(command, [...args])).toEqual(expected);
-    });
+    ] as const)(
+      "treats the pattern of %s as text, not a path",
+      (command, args, expected) => {
+        expect(tokens(command, [...args])).toEqual(expected);
+      },
+    );
 
     it("keeps every positional after the pattern", () => {
       expect(tokens("grep", ["-rn", "foo", "/"])).toEqual(["/"]);
@@ -205,9 +208,12 @@ describe("classifyCommandArgs", () => {
         ["blame", "-L:foo", "backend/x.py"],
         ["blame", "backend/x.py"],
       ],
-    ] as const)("keeps only the file of a -L line range: %j", (args, expected) => {
-      expect(tokens("git", [...args])).toEqual(expected);
-    });
+    ] as const)(
+      "keeps only the file of a -L line range: %j",
+      (args, expected) => {
+        expect(tokens("git", [...args])).toEqual(expected);
+      },
+    );
 
     it("keeps arguments of other git subcommands", () => {
       expect(tokens("git", ["diff", "/tmp/a", "./b"])).toEqual([
