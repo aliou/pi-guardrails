@@ -1,5 +1,18 @@
 # @aliou/pi-guardrails
 
+## 0.22.0
+
+### Minor Changes
+
+- 82a314d: Approval prompts report `blocked` program status. The permission-gate confirmation and the path-access prompt now report pi as blocked on user input (OSC 7501, kind `permission`) through the `blocked` option of `ctx.ui.custom()` (pi >= 1.5.0), so terminals that support program status, such as Rex, show blocked instead of working while an approval waits.
+
+### Patch Changes
+
+- add9316: Ship `CHANGELOG.md` in the npm tarball so pi can show the changelog when the extension updates.
+- 35fc154: Stop treating `git grep` search patterns and `git log -L` / `git blame -L` line ranges as paths. `git grep -n "/transition" -- src` and `git log -L '/def foo/,/^def bar/:backend/x.py'` no longer prompt for (or get blocked on) a path at the top of the filesystem. The file named in a `git log -L` range, and every other argument, is still checked.
+- e15ab4f: Follow `cd` inside `( ... )` subshells and `{ ...; }` groups when resolving relative paths in bash commands. `(cd packages/dashboard && bun dev > ../../.pi/tmp/dev.log 2>&1 &)` now resolves the log path against `packages/dashboard`, so it no longer prompts for (or gets blocked on) a path outside the workspace. A `cd` inside a subshell still does not change the directory for commands after it; a `cd` inside a `{ ...; }` group does, as in bash.
+- 7ade1b8: Apply project settings only in trusted folders. Disable project-scoped persistent grants and preset destinations until trust is granted, while retaining global protections and session grants.
+
 ## 0.21.0
 
 ### Minor Changes
