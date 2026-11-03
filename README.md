@@ -2,6 +2,9 @@
 
 # Guardrails
 
+> [!WARNING]
+> I am not responsible for any issues, damage, or data loss caused by agents, even when using Guardrails. Guardrails is not a sandbox and does not guarantee safety. You are responsible for adding and maintaining rules that prevent dangerous operations in your environment; do not rely on the defaults alone.
+
 Guardrails adds safety checks to Pi so agents are less likely to read secrets, write protected files, access paths outside the workspace, or run dangerous shell commands by accident.
 
 The package installs four Pi extensions:
