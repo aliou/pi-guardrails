@@ -107,8 +107,8 @@ instead. It is still ordinary extension code and can use its own `pi` API.
 
 ### `respond(request, context)`
 
-Answers a prompt while it is open, for example by asking a person somewhere
-else: a chat channel, a phone, another machine. `decide` runs within
+Answers a prompt while it is open, for example by asking someone outside the
+terminal through another process, service, or device. `decide` runs within
 `delegation.timeoutMs` before any prompt; `respond` has no deadline of its own
 and races the local prompt for as long as it stays open.
 
@@ -119,7 +119,7 @@ const delegate = {
   async respond(request, context) {
     // post request.action and request.promptId somewhere, then wait for a
     // reply bound to that prompt ID; stop when context.signal aborts
-    return { choice: "allow", reason: "approved in #ops" };
+    return { choice: "allow", reason: "approved remotely" };
   },
 };
 ```

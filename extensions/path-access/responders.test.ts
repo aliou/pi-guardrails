@@ -80,7 +80,11 @@ async function setup(delegate?: Partial<GuardrailsDelegate>) {
 
   await pathAccess(pi);
   if (delegate) {
-    registerDelegate(pi, { id: "test:slack", name: "slack", ...delegate });
+    registerDelegate(pi, {
+      id: "test:approver",
+      name: "approver",
+      ...delegate,
+    });
   }
 
   const custom = awayCustom();
@@ -153,7 +157,7 @@ describe("path access prompt responders", () => {
 
     await expect(run()).resolves.toEqual({
       block: true,
-      reason: "Denied by slack: not that file",
+      reason: "Denied by approver: not that file",
     });
     expect(blocked).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -63,7 +63,7 @@ describe("racePrompt", () => {
     let localSignal: AbortSignal | undefined;
     const respond = vi.fn(async () => ({
       choice: "allow" as const,
-      reason: "approved in #ops",
+      reason: "approved remotely",
     }));
 
     const outcome = await racePrompt([responder(respond)], request, ctx, {
@@ -76,7 +76,7 @@ describe("racePrompt", () => {
     expect(outcome).toMatchObject({
       by: "responder",
       responder: { id: "test:remote", name: "remote" },
-      response: { choice: "allow", reason: "approved in #ops" },
+      response: { choice: "allow", reason: "approved remotely" },
     });
     expect(localSignal?.aborted).toBe(true);
     expect(respond).toHaveBeenCalledWith(
@@ -110,7 +110,7 @@ describe("racePrompt", () => {
       [
         responder(() => undefined, "abstains"),
         responder(() => {
-          throw new Error("slack is down");
+          throw new Error("transport is down");
         }, "throws"),
         responder(async () => Promise.reject(new Error("rejected")), "rejects"),
         responder(
@@ -268,8 +268,8 @@ describe("promptWaitHint", () => {
   });
 
   it("names responders and the timeout", () => {
-    expect(promptWaitHint([{ name: "slack" }], 300_000)).toBe(
-      "Also waiting on slack; the first answer wins. Denied after 5m without an answer.",
+    expect(promptWaitHint([{ name: "approver" }], 300_000)).toBe(
+      "Also waiting on approver; the first answer wins. Denied after 5m without an answer.",
     );
   });
 });

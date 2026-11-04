@@ -76,7 +76,11 @@ async function setup(delegate?: Partial<GuardrailsDelegate>) {
   } as unknown as ExtensionAPI;
 
   if (delegate) {
-    registerDelegate(pi, { id: "test:slack", name: "slack", ...delegate });
+    registerDelegate(pi, {
+      id: "test:approver",
+      name: "approver",
+      ...delegate,
+    });
   }
   await permissionGate(pi);
 
@@ -128,7 +132,7 @@ describe("permission gate prompt responders", () => {
   it("lets a responder allow once while the local prompt is open", async () => {
     const respond = vi.fn(async () => ({
       choice: "allow" as const,
-      reason: "approved by @jas",
+      reason: "approved remotely",
     }));
     const { run, makeCtx, notify, opened, closed } = await setup({ respond });
     const custom = tuiCustom();
@@ -150,7 +154,7 @@ describe("permission gate prompt responders", () => {
       expect.objectContaining({ prompt: { id: promptId } }),
     );
     expect(notify).toHaveBeenCalledWith(
-      "Allowed by slack: approved by @jas",
+      "Allowed by approver: approved remotely",
       "info",
     );
   });
@@ -162,7 +166,7 @@ describe("permission gate prompt responders", () => {
 
     await expect(run(makeCtx({ custom: tuiCustom() }))).resolves.toEqual({
       block: true,
-      reason: "Denied by slack: not on prod",
+      reason: "Denied by approver: not on prod",
     });
     expect(blocked).toHaveBeenCalledWith(
       expect.objectContaining({
