@@ -5,8 +5,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // Answers Guardrails prompts from outside the terminal. Each open prompt is
 // written to <dir>/<promptId>.json; writing "allow" or "deny" to
-// <dir>/<promptId>.answer answers that prompt, and only that prompt. A chat
-// bridge (Slack, Telegram, …) has the same shape: post the request, wait for
+// <dir>/<promptId>.answer answers that prompt, and only that prompt. Any other
+// transport (a web hook, a messaging service, another device) has the same shape: post the request, wait for
 // a reply bound to the prompt ID, stop waiting once the signal aborts.
 
 const POLL_MS = 500;
