@@ -329,6 +329,7 @@ describe("permissionGate extension hook", () => {
         "Deny",
         "Decline and stop",
       ]),
+      { signal: expect.any(AbortSignal) },
     );
     expect(result).toEqual({
       block: true,

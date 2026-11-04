@@ -18,6 +18,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     applyTo: "all",
     allowedPaths: [{ kind: "file", path: "/dev/null" }],
     alwaysScope: "local",
+    promptTimeoutMs: 0,
   },
   policies: {
     rules: [
@@ -119,5 +120,6 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     requireConfirmation: true,
     allowedPatterns: [],
     autoDenyPatterns: [],
+    promptTimeoutMs: 0,
   },
 };

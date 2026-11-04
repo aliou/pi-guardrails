@@ -25,6 +25,13 @@ function ensureConfigVersion(config: GuardrailsConfig): GuardrailsConfig {
   return { ...config, version: pkg.version };
 }
 
+/** A prompt timeout in milliseconds, or 0 (wait forever) when unset or invalid. */
+function promptTimeout(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.round(value)
+    : 0;
+}
+
 function mergePatternArrays<T extends { pattern: string }>(
   ...lists: (T[] | undefined)[]
 ): T[] {
@@ -133,6 +140,13 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
         timeoutMs > 0
           ? Math.min(timeoutMs, 60_000)
           : DEFAULT_CONFIG.delegation.timeoutMs;
+
+      resolved.pathAccess.promptTimeoutMs = promptTimeout(
+        resolved.pathAccess.promptTimeoutMs,
+      );
+      resolved.permissionGate.promptTimeoutMs = promptTimeout(
+        resolved.permissionGate.promptTimeoutMs,
+      );
 
       return resolved;
     },

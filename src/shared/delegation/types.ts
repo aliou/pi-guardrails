@@ -23,14 +23,39 @@ export interface DelegationContext {
   modelRegistry: ExtensionContext["modelRegistry"];
 }
 
+/** What a responder may answer for an open prompt. `allow` allows the action once. */
+export type PromptChoice = "allow" | "deny";
+
+export interface PromptResponseRequest extends DelegationRequest {
+  /** The same ID as the matching `guardrails:prompt:opened` event. */
+  promptId: string;
+  /** The answers this prompt accepts from a responder. */
+  choices: readonly PromptChoice[];
+}
+
+export interface PromptResponse {
+  choice: PromptChoice;
+  reason: string;
+}
+
 export interface GuardrailsDelegate {
   id: string;
   name: string;
   isEnabled?(): boolean;
-  decide(
+  /** Decides before any prompt opens, within `delegation.timeoutMs`. */
+  decide?(
     request: DelegationRequest,
     context: DelegationContext,
   ): DelegateAnswer | undefined | Promise<DelegateAnswer | undefined>;
+  /**
+   * Answers a prompt while it is open, racing the local user. The first
+   * answer wins; `context.signal` aborts once the prompt closes. Return
+   * `undefined` to leave the prompt to someone else.
+   */
+  respond?(
+    request: PromptResponseRequest,
+    context: DelegationContext,
+  ): PromptResponse | undefined | Promise<PromptResponse | undefined>;
 }
 
 export interface GuardrailsDelegateRequestPayload {

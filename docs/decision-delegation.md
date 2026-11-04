@@ -1,7 +1,8 @@
 # Decision delegation
 
 How permission-gate and path-access let other extensions decide an action
-before prompting the user, and how to write such a delegate.
+before prompting the user, or answer the prompt while it is open, and how to
+write such a delegate.
 
 ## Flow
 
@@ -23,6 +24,11 @@ permission-gate / path-access  tool_call
 ├─ allow → the tool runs, no prompt
 ├─ block → { block: true }, guardrails:action:blocked with block.source "delegate"
 └─ ask   → the usual prompt (RPC uses its select dialog)
+   └─ racePrompt()                                    src/shared/delegation/respond.ts
+      ├─ the local prompt opens, as before
+      ├─ every enabled delegate with respond() is asked at the same time
+      ├─ the first answer wins: the user, a responder, or the prompt timeout
+      └─ the rest are dismissed (local prompt) or aborted (context.signal)
 ```
 
 Merge rule:
@@ -63,8 +69,11 @@ Runnable examples:
 - `examples/delegates/no-network.ts`: synchronous rules that block, allow, or abstain.
 - `examples/delegates/slow-review.ts`: async work that honors `context.signal`.
 - `examples/delegates/classifier.ts`: a delegate backed by Pi classifier models.
+- `examples/delegates/remote-approval.ts`: answers open prompts from outside the terminal.
 
 Load one with `pi -e examples/delegates/no-network.ts`.
+
+A delegate implements `decide`, `respond`, or both.
 
 ### `decide(request, context)`
 
@@ -95,6 +104,71 @@ when the action is blocked.
 
 A delegate cannot prompt the user through this contract; it returns `ask`
 instead. It is still ordinary extension code and can use its own `pi` API.
+
+### `respond(request, context)`
+
+Answers a prompt while it is open, for example by asking a person somewhere
+else: a chat channel, a phone, another machine. `decide` runs within
+`delegation.timeoutMs` before any prompt; `respond` has no deadline of its own
+and races the local prompt for as long as it stays open.
+
+```ts
+const delegate = {
+  id: "example:remote-approval",
+  name: "remote-approval",
+  async respond(request, context) {
+    // post request.action and request.promptId somewhere, then wait for a
+    // reply bound to that prompt ID; stop when context.signal aborts
+    return { choice: "allow", reason: "approved in #ops" };
+  },
+};
+```
+
+Return `{ choice, reason }`, a promise of it, or `undefined` to leave the
+prompt to the user. Throwing, abstaining, or a choice outside
+`request.choices` leaves the prompt open. The first answer wins:
+
+| first answer | result |
+|---|---|
+| the local user | as before; responders are aborted |
+| a responder, `allow` | the action runs once; no grant is saved |
+| a responder, `deny` | blocked, `guardrails:action:blocked` with block.source `"responder"` |
+| the prompt timeout | blocked, block.source `"timeout"` |
+
+`request` is the `decide` request plus:
+
+| field | example |
+|---|---|
+| `promptId` | the same ID as the `guardrails:prompt:opened` event |
+| `choices` | the answers this prompt accepts: `["allow", "deny"]` |
+
+`request.action` is the exact action that runs if allowed: the full command,
+or the resolved absolute path. When one path-access call prompts for several
+paths, each path is its own prompt with its own `promptId`.
+
+`context` is the same as for `decide`. Its `signal` aborts once the prompt
+closes, whoever answered; stop waiting and clean up when it fires.
+
+While responders are registered, the prompt footer names them:
+`Also waiting on remote-approval; the first answer wins.`
+
+Runnable example: `examples/delegates/remote-approval.ts` writes each open
+prompt to `$GUARDRAILS_APPROVAL_DIR/<promptId>.json` (default under the
+system temp directory) and answers it once `allow` or `deny` is written to
+`<promptId>.answer`.
+
+### Prompt timeouts
+
+```json
+{
+  "permissionGate": { "promptTimeoutMs": 300000 },
+  "pathAccess": { "promptTimeoutMs": 300000 }
+}
+```
+
+A prompt nobody answers within `promptTimeoutMs` is denied, and the agent is
+told why. The default, `0`, waits forever as before. The timeout covers the
+whole prompt, including the time responders spend waiting.
 
 ## What the user sees
 

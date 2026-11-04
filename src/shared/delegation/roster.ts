@@ -20,7 +20,8 @@ function isDelegate(value: unknown): value is GuardrailsDelegate {
     typeof delegate.id === "string" &&
     delegate.id.trim() !== "" &&
     typeof delegate.name === "string" &&
-    typeof delegate.decide === "function"
+    (typeof delegate.decide === "function" ||
+      typeof delegate.respond === "function")
   );
 }
 
