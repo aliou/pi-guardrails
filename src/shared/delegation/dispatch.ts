@@ -77,7 +77,7 @@ export async function runDelegates(
 
     try {
       const result = await Promise.race([
-        Promise.resolve().then(() => delegate.decide(request, context)),
+        Promise.resolve().then(() => delegate.decide?.(request, context)),
         aborted,
       ]);
 
@@ -143,7 +143,9 @@ export async function delegateDecision(
   ctx: DelegationCtx,
   options: { timeoutMs: number },
 ): Promise<DelegatedDecision | undefined> {
-  const delegates = roster.list();
+  const delegates = roster
+    .list()
+    .filter((delegate) => typeof delegate.decide === "function");
   if (delegates.length === 0) return undefined;
 
   const startedAt = performance.now();

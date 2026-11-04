@@ -43,7 +43,9 @@ export type GuardrailsBlockSource =
   | "user"
   | "user-stop"
   | "nonInteractive"
-  | "delegate";
+  | "delegate"
+  | "responder"
+  | "timeout";
 
 export type GuardrailsActionBlockedPayload<TMeta = unknown> =
   GuardrailsEventBase & {

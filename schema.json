@@ -159,6 +159,10 @@
                 "$ref": "#/definitions/PatternConfig"
               },
               "description": "Command patterns that are always blocked without prompting."
+            },
+            "promptTimeoutMs": {
+              "type": "number",
+              "description": "Deny the confirmation prompt after this many milliseconds without an answer. 0 waits forever. Default: 0."
             }
           },
           "additionalProperties": false,
@@ -278,6 +282,10 @@
         "alwaysScope": {
           "$ref": "#/definitions/PathAccessAlwaysScope",
           "description": "Config scope used when the user picks \"Allow … always\" in the prompt. Default: \"local\"."
+        },
+        "promptTimeoutMs": {
+          "type": "number",
+          "description": "Deny the access prompt after this many milliseconds without an answer. 0 waits forever. Default: 0."
         }
       },
       "additionalProperties": false
