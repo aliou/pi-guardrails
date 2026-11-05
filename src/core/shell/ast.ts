@@ -37,7 +37,10 @@ function partToString(part: WordPart): string {
     case "SglQuoted":
       return part.value;
     case "DblQuoted":
+    case "LocaleStr":
       return part.parts.map(partToString).join("");
+    case "AnsiC":
+      return part.value;
     case "ParamExp": {
       if (part.short) return `$${part.param.value}`;
       const inner = `${part.excl ? "!" : ""}${part.length ? "#" : ""}${part.param.value}${part.exp ? `${part.exp.op}${part.exp.word ? wordToString(part.exp.word) : ""}` : ""}`;
@@ -53,6 +56,12 @@ function partToString(part: WordPart): string {
       return part.elems.map(wordToString).join(",");
     case "ExtGlob":
       return `${part.op}${part.pattern})`;
+    default: {
+      const exhaustive: never = part;
+      throw new Error(
+        `unhandled word part type: ${(exhaustive as WordPart).type}`,
+      );
+    }
   }
 }
 
@@ -295,7 +304,7 @@ type SubstitutionNode =
 /**
  * Visit only word-bearing fields here. Statement bodies belong to
  * walkCommandBody; revisiting them would duplicate callbacks. Literal text
- * (including the parser's raw heredoc bodies) is never parsed as shell code.
+ * is never parsed as shell code.
  */
 function walkSubstitutions(
   node: SubstitutionNode,
@@ -316,7 +325,10 @@ function walkSubstitutions(
       return walkStatements(node.stmts, callback, options);
     case "Word":
     case "DblQuoted":
+    case "LocaleStr":
       return visit(...node.parts);
+    case "ExtGlob":
+      return visit(node.word);
     case "ParamExp":
       return visit(
         node.index,
@@ -329,9 +341,11 @@ function walkSubstitutions(
     case "BraceExp":
       return visit(...node.elems);
     case "Redirect":
-      // Heredoc delimiters undergo quote removal, not command substitution.
-      // Here-string targets, in contrast, are expanded by the shell.
-      return node.op !== "<<" && node.op !== "<<-" && visit(node.target);
+      // Heredoc delimiters undergo quote removal, not command substitution,
+      // but an unquoted heredoc body is expanded by the shell and parsed
+      // into structured parts. Here-string targets are expanded too.
+      if (node.op === "<<" || node.op === "<<-") return visit(node.heredoc);
+      return visit(node.target);
     case "SimpleCommand":
       return visit(...(node.words ?? []), ...(node.assignments ?? []));
     case "DeclClause":
