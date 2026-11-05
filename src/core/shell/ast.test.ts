@@ -53,6 +53,8 @@ describe("walkCommands substitution traversal", () => {
     'select value in "$(cat .env)"; do break; done',
     'case "$(cat .env)" in *) echo ok;; esac',
     'case value in "$(cat .env)") echo ok;; esac',
+    'echo $"$(cat .env)"',
+    "echo ?($(cat .env))",
     '[[ -n "$(cat .env)" ]]',
     'if true; then echo "$(cat .env)"; fi',
     'while false; do echo "$(cat .env)"; done',
@@ -87,14 +89,32 @@ describe("walkCommands substitution traversal", () => {
     },
   );
 
-  it("documents that unquoted heredoc bodies stay raw text", () => {
-    // Bash *does* perform command substitution in an unquoted heredoc body,
-    // but the parser keeps heredoc bodies as raw text, so traversal cannot
-    // see them. This pins the gap as an intentional parser limitation — the
-    // quoted-body and delimiter cases above are true exclusions; this one is
-    // a known blind spot, tracked alongside extglob patterns and
-    // `${var:-$(...)}` operands in the README.
-    expect(commands("cat <<EOF\n$(cat .env)\nEOF\n", true)).toEqual([["cat"]]);
+  it.each(["cat <<EOF\n$(cat .env)\nEOF\n", "cat <<-EOF\n$(cat .env)\nEOF\n"])(
+    "visits substitutions in the expanding heredoc body of %j",
+    (command) => {
+      expect(commands(command, true)).toEqual([["cat"], ["cat", ".env"]]);
+    },
+  );
+
+  it("renders ANSI-C quoting as its decoded value", () => {
+    expect(commands("rm $'-rf /important'")).toEqual([
+      ["rm", "-rf /important"],
+    ]);
+  });
+
+  it("renders locale strings from their inner parts", () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional bash locale-string test input
+    expect(commands('echo $"deleted ${x}"')).toEqual([
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional bash locale-string test input
+      ["echo", "deleted ${x}"],
+    ]);
+  });
+
+  it("throws on a word part type it does not handle", () => {
+    const word = {
+      parts: [{ type: "FuturePart" }],
+    } as unknown as Parameters<typeof wordToString>[0];
+    expect(() => wordToString(word)).toThrow("unhandled word part type");
   });
 
   it("stops the entire walk when a nested callback returns true", () => {
