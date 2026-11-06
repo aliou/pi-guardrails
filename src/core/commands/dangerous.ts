@@ -1,4 +1,4 @@
-import { parse } from "@aliou/sh";
+import { type Program, parse } from "@aliou/sh";
 import { walkCommands, wordToString } from "../shell/ast";
 
 /**
@@ -411,12 +411,23 @@ export function checkDangerousCommand({
   useBuiltinMatchers,
   fallbackPatterns,
 }: DangerousCommandCheckOptions): DangerousCommandMatch | undefined {
-  let parsedSuccessfully = false;
+  // Recovery returns a best-effort partial AST next to the errors that
+  // triggered it. Structural matching on a recovered AST only adds detections;
+  // the substring fallbacks still run for every parse that did not come back
+  // clean, so a partial AST is never the sole basis for treating a command as
+  // safe.
+  let parsedCleanly = false;
+  let ast: Program | undefined;
+  try {
+    const result = parse(command, { recoverErrors: true });
+    ast = result.ast;
+    parsedCleanly = (result.errors?.length ?? 0) === 0;
+  } catch {
+    ast = undefined;
+  }
 
   if (useBuiltinMatchers) {
-    try {
-      const { ast } = parse(command);
-      parsedSuccessfully = true;
+    if (ast && ast.body.length > 0) {
       let match: DangerousCommandMatch | undefined;
       walkCommands(
         ast,
@@ -435,7 +446,8 @@ export function checkDangerousCommand({
         { includeSubstitutions: true },
       );
       if (match) return match;
-    } catch {
+    }
+    if (!parsedCleanly) {
       for (const pattern of fallbackPatterns) {
         if (command.includes(pattern.pattern)) {
           return {
@@ -451,7 +463,7 @@ export function checkDangerousCommand({
     const source = compiled.source;
     if (
       useBuiltinMatchers &&
-      parsedSuccessfully &&
+      parsedCleanly &&
       !source.regex &&
       BUILTIN_KEYWORD_PATTERNS.has(source.pattern)
     ) {

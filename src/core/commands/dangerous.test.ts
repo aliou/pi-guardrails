@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "../../shared/config/defaults";
 import {
   BUILTIN_MATCHERS,
   checkDangerousCommand,
@@ -527,6 +528,80 @@ describe("checkDangerousCommand", () => {
       expect(result).toEqual({ description, pattern: "(structural)" });
     },
   );
+
+  describe("error recovery", () => {
+    it("matches structurally when the parse recovers with a partial AST", () => {
+      // Strict parsing throws on the unterminated `if`; recovery preserves
+      // the rm statement, and structural matching must still run on it.
+      const result = checkDangerousCommand({
+        command: "rm -r -f /tmp/x\nif",
+        patterns: [],
+        useBuiltinMatchers: true,
+        fallbackPatterns: [],
+      });
+
+      expect(result).toEqual({
+        description: "recursive force delete",
+        pattern: "(structural)",
+      });
+    });
+
+    it("still runs fallback patterns when recovery yields no statements", () => {
+      // The unclosed quote leaves recovery with an empty AST; the fallback
+      // scan must behave exactly as it did when parsing threw.
+      const result = checkDangerousCommand({
+        command: "dd of=/dev/sda 'unterminated",
+        patterns: [],
+        useBuiltinMatchers: true,
+        fallbackPatterns: [
+          { pattern: "dd of=", description: "disk write operation" },
+        ],
+      });
+
+      expect(result).toEqual({
+        description: "disk write operation",
+        pattern: "dd of=",
+      });
+    });
+
+    it("matches an unterminated-heredoc command that bash executes with a warning", () => {
+      // bash runs this after a `here-document delimited by end-of-file`
+      // warning. Until @aliou/sh preserves heredoc commands during recovery,
+      // the default fallback patterns are what keep this matched; once that
+      // lands, the structural matcher takes over.
+      const result = checkDangerousCommand({
+        command: "rm -r -f /important <<$EOF\nx\nEOF\n",
+        patterns: compileCommandPatterns(
+          DEFAULT_CONFIG.permissionGate.patterns,
+        ),
+        useBuiltinMatchers: true,
+        fallbackPatterns: DEFAULT_CONFIG.permissionGate.patterns,
+      });
+
+      expect(result).toEqual({
+        description: "recursive force delete",
+        pattern: "rm -r -f",
+      });
+    });
+
+    it("does not run fallback patterns on a clean parse", () => {
+      // A clean parse means the structural matchers saw everything; the
+      // fallback scan stays reserved for non-clean parses.
+      const result = checkDangerousCommand({
+        command: "rm -rf /tmp/example",
+        patterns: [],
+        useBuiltinMatchers: true,
+        fallbackPatterns: [
+          { pattern: "never-matches-anyway", description: "nope" },
+        ],
+      });
+
+      expect(result).toEqual({
+        description: "recursive force delete",
+        pattern: "(structural)",
+      });
+    });
+  });
 });
 
 describe("matchDangerousCommand", () => {
