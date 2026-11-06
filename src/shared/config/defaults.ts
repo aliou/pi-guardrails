@@ -95,6 +95,12 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   permissionGate: {
     patterns: [
       { pattern: "rm -rf", description: "recursive force delete" },
+      // Split-flag and long-flag rm spellings as raw fallbacks: when parsing
+      // fails or only recovers partially (e.g. unterminated heredocs, which
+      // bash still executes), the structural rm matcher never runs, and these
+      // spellings would otherwise evade the default configuration entirely.
+      { pattern: "rm -r -f", description: "recursive force delete" },
+      { pattern: "rm --recursive", description: "recursive force delete" },
       { pattern: "sudo", description: "superuser command" },
       { pattern: "dd of=", description: "disk write operation" },
       { pattern: "mkfs.", description: "filesystem format" },
