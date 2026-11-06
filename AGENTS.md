@@ -1,6 +1,6 @@
 # pi-guardrails
 
-Public Pi extension package providing security hooks for Pi: file protection policies, workspace path access control, dangerous-command confirmation, a classifier decision delegate, and a Herdr prompt adapter. People depend on this, so treat the public API as backwards-compatibility-sensitive.
+Public Pi extension package providing security hooks for Pi: file protection policies, workspace path access control, dangerous-command confirmation, a decision delegate contract, and a Herdr prompt adapter. People depend on this, so treat the public API as backwards-compatibility-sensitive.
 
 Pi is pre-1.0.0, so breaking changes can happen between Pi versions. This extension must stay up to date with Pi or things will break.
 

@@ -16,11 +16,7 @@ export const GUARDRAILS_DELEGATE_REGISTER_EVENT =
 export const GUARDRAILS_DECISION_DELEGATED_EVENT =
   "guardrails:decision:delegated";
 
-export type GuardrailsFeatureId =
-  | "policies"
-  | "permissionGate"
-  | "pathAccess"
-  | "classifier";
+export type GuardrailsFeatureId = "policies" | "permissionGate" | "pathAccess";
 
 export interface GuardrailsEventBase {
   source: "guardrails";

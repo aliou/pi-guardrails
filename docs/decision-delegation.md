@@ -62,6 +62,7 @@ Runnable examples:
 
 - `examples/delegates/no-network.ts`: synchronous rules that block, allow, or abstain.
 - `examples/delegates/slow-review.ts`: async work that honors `context.signal`.
+- `examples/delegates/classifier.ts`: a delegate backed by Pi classifier models.
 
 Load one with `pi -e examples/delegates/no-network.ts`.
 
@@ -122,36 +123,11 @@ instead. It is still ordinary extension code and can use its own `pi` API.
 
 Types: `src/shared/delegation/types.ts`.
 
-## Built-in classifier delegate
+## Model-backed delegates
 
-`extensions/classifier` is a delegate backed by Pi classifier models. It is
-off by default; enable `features.classifier`.
-
-For each flagged action it asks the model three questions, using the user's
-recent requests in the session as the only source of authorization:
-
-1. Is there enough context to judge the action?
-2. Is it in scope of what the user asked, unclear, or out of scope?
-3. What is its impact, from 0 (read-only) to 4 (system-wide or exfiltrating)?
-
-The answers map to a verdict with fixed thresholds
-(`extensions/classifier/decision.ts`):
-
-- confidently out of scope with impact ≥ 2 → block
-- in scope, confident, and impact below 2.5 → allow
-- anything else, including missing context or a model failure → ask
-
-```json
-{
-  "features": { "classifier": true },
-  "classifier": {
-    "models": ["typesafe/jev-latest"],
-    "strategy": "fallback"
-  }
-}
-```
-
-`models` are `provider/model`; the first `/` separates the provider. With
-several models, `strategy` is `fallback` (the first model that answers
-decides), `random` (fallback from a random start), or `consensus` (every model
-must allow; any block blocks).
+A delegate can call Pi classifier models through `context.modelRegistry`
+(`getModelOfType("classifier", …)` + `classify()`).
+`examples/delegates/classifier.ts` is a full example: for each flagged action
+it asks the model three questions (enough context? in scope of the user's
+request? impact 0–4?) and maps the answers to a verdict. Copy it into your
+own extensions and tune its models, rubric, and thresholds there.

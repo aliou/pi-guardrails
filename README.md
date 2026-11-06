@@ -62,9 +62,7 @@ Approval prompts also report `blocked` program status (OSC 7501) natively throug
 
 Before permission-gate or path-access prompts you, other extensions can decide for you. If every registered delegate allows the action, it runs without a prompt; if any blocks it, it is blocked; anything else, including a timeout, falls back to the usual prompt. Each decision shows up under the tool call as a `[guardrails]` line.
 
-The built-in classifier delegate uses Pi classifier models to judge whether a flagged action is in scope of what you asked. Enable it with `features.classifier` (Settings → Features → Classifier).
-
-See [docs/decision-delegation.md](docs/decision-delegation.md) for the rules, the classifier, and how to write a delegate, with runnable examples in `examples/delegates/`.
+See [docs/decision-delegation.md](docs/decision-delegation.md) for the rules and how to write a delegate, with runnable examples in `examples/delegates/` — including a classifier-model delegate you can copy and tune for your own policies.
 
 ## Extension events
 
