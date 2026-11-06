@@ -12,8 +12,8 @@ importers:
         specifier: ^0.24.0
         version: 0.24.0(@earendil-works/pi-coding-agent@1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.5.0)(ts-json-schema-generator@2.9.0)
       '@aliou/sh':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: ^0.4.1
+        version: 0.4.1
     devDependencies:
       '@aliou/biome-plugins':
         specifier: ^0.17.0
@@ -85,8 +85,8 @@ packages:
       '@earendil-works/pi-tui':
         optional: true
 
-  '@aliou/sh@0.4.0':
-    resolution: {integrity: sha512-T2KscpuYq6MrcYqAO1cIJjXYrB5WTBgZdrazqQxfuDe2CxPP1x9htMEzUkPPpbw3WdkgSNitoTa+sl95rz7CpA==}
+  '@aliou/sh@0.4.1':
+    resolution: {integrity: sha512-2Yjm6sHF8bf8EOjXo5XkFHOMArl8F0ErLvr2kMnZ+xoUqqbIaT2T8m4lhTnMK5jXoKar3gAO1aGnoL5ioy0DBA==}
     engines: {node: '>=22'}
 
   '@anthropic-ai/sdk@0.129.0':
@@ -1769,7 +1769,7 @@ snapshots:
       '@earendil-works/pi-coding-agent': 1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76)
       '@earendil-works/pi-tui': 1.5.0
 
-  '@aliou/sh@0.4.0': {}
+  '@aliou/sh@0.4.1': {}
 
   '@anthropic-ai/sdk@0.129.0(zod@3.25.76)':
     dependencies:
