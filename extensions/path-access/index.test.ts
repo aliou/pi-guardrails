@@ -3,6 +3,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   LsToolCallEvent,
+  PowerShellToolCallEvent,
   ReadToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
 import { createMock, type DeepMocked } from "@golevelup/ts-vitest";
@@ -73,6 +74,13 @@ const bashToolCall = {
   toolName: "bash",
   input: { command: "cat /outside/secret.txt" },
 } satisfies BashToolCallEvent;
+
+const powershellToolCall = {
+  type: "tool_call",
+  toolCallId: "test-call",
+  toolName: "powershell",
+  input: { command: "Get-Content /outside/secret.txt" },
+} satisfies PowerShellToolCallEvent;
 
 const lsToolCall = {
   type: "tool_call",
@@ -234,6 +242,32 @@ describe("pathAccess extension hook", () => {
     assert(promptComponent, "path access prompt should be shown");
     expect(renderPromptComponent(promptComponent)).toContain(
       "Command: cat /outside/secret.txt",
+    );
+  });
+
+  it("shows the PowerShell command in the outside-path prompt", async () => {
+    const pi = createMock<ExtensionAPI>();
+    const ctx = createMock<ExtensionContext>({
+      cwd: "/workspace",
+      hasUI: true,
+      mode: "tui",
+    });
+    ctx.ui.custom.mockResolvedValue("allow-file-once");
+    await pathAccess(pi);
+
+    const toolCallHandler = registeredExtensionHandler(pi, "tool_call");
+    assert(
+      typeof toolCallHandler === "function",
+      "tool_call handler should be registered",
+    );
+    await toolCallHandler(powershellToolCall, ctx);
+
+    const promptComponent = ctx.ui.custom.mock.calls[0]?.[0] as
+      | PathAccessPromptComponent
+      | undefined;
+    assert(promptComponent, "path access prompt should be shown");
+    expect(renderPromptComponent(promptComponent)).toContain(
+      "Command: Get-Content /outside/secret.txt",
     );
   });
 

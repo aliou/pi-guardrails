@@ -92,8 +92,10 @@ export default async function pathAccess(pi: ExtensionAPI) {
     ) {
       return;
     }
-    const bashCommand =
-      event.toolName === "bash" ? String(input.command ?? "") : undefined;
+    const shellCommand =
+      event.toolName === "bash" || event.toolName === "powershell"
+        ? String(input.command ?? "")
+        : undefined;
     const matched = await targetsForTool(
       event.toolName,
       input,
@@ -216,7 +218,7 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
-            { command: bashCommand, dirGrantable, alwaysEnabled },
+            { command: shellCommand, dirGrantable, alwaysEnabled },
           ),
           {
             blocked: {

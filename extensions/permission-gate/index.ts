@@ -49,10 +49,15 @@ export default async function permissionGate(pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     const config = configLoader.getConfig();
     if (!config.enabled || !config.features.permissionGate) return;
-    if (!isToolCallEventType("bash", event)) return;
+    if (
+      !isToolCallEventType("bash", event) &&
+      !isToolCallEventType("powershell", event)
+    )
+      return;
 
     const command = event.input.command;
-    const action = { kind: "command" as const, command, origin: "bash" };
+    const toolName = event.toolName;
+    const action = { kind: "command" as const, command, origin: toolName };
     if (isCommandAllowed(command)) return;
 
     const autoDenyMatch = matchCommandPattern(
@@ -68,7 +73,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action,
         reason,
         block: { source: "permission", metadata: autoDenyMatch },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName, input: event.input },
       });
 
       return {
@@ -89,7 +94,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
     emitRiskDetected(pi, {
       feature: "permissionGate",
       risk: safety,
-      context: { toolName: "bash", input: event.input },
+      context: { toolName, input: event.input },
     });
 
     if (!config.permissionGate.requireConfirmation) {
@@ -104,7 +109,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason,
         block: { source: "nonInteractive", metadata: safety.metadata },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName, input: event.input },
       });
       return { block: true, reason };
     }
@@ -117,7 +122,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason: safety.reason,
         metadata: safety.metadata,
-        toolName: "bash",
+        toolName,
         input: event.input,
       },
       ctx,
@@ -134,7 +139,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
           source: "delegate",
           metadata: { risk: safety.metadata, delegation: delegated },
         },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName, input: event.input },
       });
       return { block: true, reason };
     }
@@ -147,7 +152,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         kind: "permission",
         metadata: safety.metadata,
       },
-      context: { toolName: "bash", input: event.input },
+      context: { toolName, input: event.input },
     });
     pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
@@ -196,7 +201,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
         action: safety.action,
         reason,
         block: { source: "user-stop", metadata: safety.metadata },
-        context: { toolName: "bash", input: event.input },
+        context: { toolName, input: event.input },
       });
       ctx.abort();
       return { block: true, reason };
@@ -208,7 +213,7 @@ export default async function permissionGate(pi: ExtensionAPI) {
       action: safety.action,
       reason,
       block: { source: "user", metadata: safety.metadata },
-      context: { toolName: "bash", input: event.input },
+      context: { toolName, input: event.input },
     });
     return { block: true, reason };
   });
