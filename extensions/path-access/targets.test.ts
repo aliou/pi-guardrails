@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { vol } from "memfs";
 import { describe, expect, it } from "vitest";
 import { isReadOnlyTool, targetsForTool } from "./targets";
@@ -19,6 +19,32 @@ describe("targetsForTool", () => {
     ).resolves.toEqual([join(cwd, "README.md")]);
   });
 
+  it("extracts paths from the PowerShell tool", async () => {
+    vol.fromJSON({ "/outside/secret.txt": "secret" });
+
+    await expect(
+      targetsForTool(
+        "powershell",
+        { command: "Get-Content /outside/secret.txt" },
+        "/repo",
+      ),
+    ).resolves.toEqual([resolve("/outside/secret.txt")]);
+    await expect(
+      targetsForTool(
+        "powershell",
+        { command: "Remove-Item -Recurse -Force .\\dir" },
+        "/repo",
+      ),
+    ).resolves.toEqual([resolve("/repo", ".\\dir")]);
+    await expect(
+      targetsForTool(
+        "powershell",
+        { command: "Get-Content C:\\outside\\secret.txt" },
+        "C:\\repo",
+      ),
+    ).resolves.toEqual([resolve("C:\\repo", "C:\\outside\\secret.txt")]);
+  });
+
   it("extracts paths from PowerShell command strings", async () => {
     const path = "/home/user/.pi/agent/AGENTS.md";
     vol.fromJSON({ [path]: "# global" });
@@ -31,7 +57,7 @@ describe("targetsForTool", () => {
         },
         "/repo",
       ),
-    ).resolves.toEqual([path]);
+    ).resolves.toEqual([resolve(path)]);
   });
 
   it("extracts paths from Python command strings", async () => {

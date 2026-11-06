@@ -26,5 +26,12 @@ export async function targetsForTool(
     });
   }
 
+  if (toolName === "powershell") {
+    const command = String(input.command ?? "").replaceAll("'", "'\\''");
+    return extractBashPathCandidates(`pwsh -Command '${command}'`, cwd, {
+      exec,
+    });
+  }
+
   return [];
 }

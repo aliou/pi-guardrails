@@ -3,6 +3,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ExtensionHandler,
+  PowerShellToolCallEvent,
   ReadToolCallEvent,
   ToolCallEvent,
   ToolCallEventResult,
@@ -135,6 +136,34 @@ describe("permissionGate extension hook", () => {
       createCtx(),
     );
     expect(result).toBeUndefined();
+  });
+
+  it("checks dangerous PowerShell tool commands", async () => {
+    vi.mocked(configLoader.getConfig).mockReturnValue(
+      makeConfig({
+        patterns: [{ pattern: "Remove-Item", description: "recursive delete" }],
+      }),
+    );
+    assert(toolCallHandler, "tool_call handler should be registered");
+
+    const ctx = createCtx({
+      ui: { custom: vi.fn().mockResolvedValue("deny"), select: vi.fn() },
+    });
+    const result = await toolCallHandler(
+      {
+        type: "tool_call",
+        toolCallId: "powershell-call",
+        toolName: "powershell",
+        input: { command: "Remove-Item -Recurse -Force .\\dir" },
+      } satisfies PowerShellToolCallEvent,
+      ctx,
+    );
+
+    expect(result).toEqual({
+      block: true,
+      reason: "User denied dangerous command",
+    });
+    expect(ctx.ui.custom).toHaveBeenCalledOnce();
   });
 
   it("auto-deny returns terminate: true when the pattern opts in", async () => {
