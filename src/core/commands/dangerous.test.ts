@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../../shared/config/defaults";
 import {
   BUILTIN_MATCHERS,
   checkDangerousCommand,
@@ -566,21 +565,19 @@ describe("checkDangerousCommand", () => {
 
     it("matches an unterminated-heredoc command that bash executes with a warning", () => {
       // bash runs this after a `here-document delimited by end-of-file`
-      // warning. Until @aliou/sh preserves heredoc commands during recovery,
-      // the default fallback patterns are what keep this matched; once that
-      // lands, the structural matcher takes over.
+      // warning. @aliou/sh 0.4.1 preserves the heredoc command during
+      // recovery, so the structural matcher sees the rm statement despite
+      // the parse error.
       const result = checkDangerousCommand({
         command: "rm -r -f /important <<$EOF\nx\nEOF\n",
-        patterns: compileCommandPatterns(
-          DEFAULT_CONFIG.permissionGate.patterns,
-        ),
+        patterns: [],
         useBuiltinMatchers: true,
-        fallbackPatterns: DEFAULT_CONFIG.permissionGate.patterns,
+        fallbackPatterns: [],
       });
 
       expect(result).toEqual({
         description: "recursive force delete",
-        pattern: "rm -r -f",
+        pattern: "(structural)",
       });
     });
 
