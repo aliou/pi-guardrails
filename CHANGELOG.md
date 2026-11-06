@@ -1,5 +1,17 @@
 # @aliou/pi-guardrails
 
+## 0.23.0
+
+### Minor Changes
+
+- 22ae3a2: Add decision delegation: before permission-gate or path-access prompts, registered delegates can allow, block, or escalate the action (any block blocks, every delegate must allow, anything else prompts). Each decision is recorded as a `[guardrails]` session entry. Runnable delegate examples live in [`examples/delegates/`](https://github.com/aliou/pi-guardrails/tree/main/examples/delegates).
+
+### Patch Changes
+
+- 48b6d33: Inspect Pi's built-in PowerShell tool with path-access and permission-gate.
+- d5ca339: Keep builtin dangerous-command matching working when shell parsing only partially recovers. `checkDangerousCommand` now parses with `recoverErrors` and runs the structural matchers on any recovered AST, while the raw fallback patterns keep running for every parse that did not come back clean — a recovered AST can only add detections, never replace the fallbacks. Together with `@aliou/sh` 0.4.1, dangerous commands cut short by an unterminated heredoc that bash still executes are structurally matched again.
+- fd711a6: Fix builtin dangerous-command matching silently dropping arguments quoted with ANSI-C (`$'...'`) or locale (`$"..."`) strings after the `@aliou/sh` 0.4.0 AST change, and detect expansions hidden inside locale strings, extglob patterns, and expanding heredoc bodies during substitution traversal.
+
 ## 0.22.0
 
 ### Minor Changes
