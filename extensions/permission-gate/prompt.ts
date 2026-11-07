@@ -1,3 +1,4 @@
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import {
   Container,
@@ -8,7 +9,6 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "../shared/truncate";
 
 interface MinimalTheme {
   fg(color: string, text: string): string;

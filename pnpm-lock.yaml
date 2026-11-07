@@ -11,13 +11,16 @@ importers:
       '@aliou/pi-utils-settings':
         specifier: ^0.24.0
         version: 0.24.0(@earendil-works/pi-coding-agent@1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.5.0)(ts-json-schema-generator@2.9.0)
+      '@aliou/pi-utils-ui':
+        specifier: ^0.6.0
+        version: 0.6.0(@earendil-works/pi-coding-agent@1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.5.0)
       '@aliou/sh':
         specifier: ^0.4.1
         version: 0.4.1
     devDependencies:
       '@aliou/biome-plugins':
-        specifier: ^0.17.0
-        version: 0.17.0(@biomejs/biome@2.6.4)
+        specifier: ^0.18.1
+        version: 0.18.1(@biomejs/biome@2.6.4)
       '@biomejs/biome':
         specifier: ^2.6.4
         version: 2.6.4
@@ -57,8 +60,8 @@ importers:
 
 packages:
 
-  '@aliou/biome-plugins@0.17.0':
-    resolution: {integrity: sha512-y87aE3x3fnvOWC99EjzXRdHqJQh8wtkrMbU9mlthIfX1FfFDL1euwWW0Y6Am/upW8XzNgR09s7v0EfcQ2AHzxw==}
+  '@aliou/biome-plugins@0.18.1':
+    resolution: {integrity: sha512-0TC0dxaK8lYV7Gig20kAN49R9FRn5emdhVy2X+24sbzJYNPb0vbY9ZJMgfFJkM5oZKd8u0a949JLb0TJZkrSOg==}
     peerDependencies:
       '@biomejs/biome': '>=2.6.0'
 
@@ -76,6 +79,17 @@ packages:
 
   '@aliou/pi-utils-ui@0.5.1':
     resolution: {integrity: sha512-a+m9yo+No2mXBGitWk/sPep+FXam+w3oavpj80WgJRQsnyBzzjlzZFcBikhnweRifL8UASqbWWrHN4NjESIrRw==}
+    peerDependencies:
+      '@earendil-works/pi-coding-agent': '>=0.74.0 <2'
+      '@earendil-works/pi-tui': '>=0.74.0 <2'
+    peerDependenciesMeta:
+      '@earendil-works/pi-coding-agent':
+        optional: true
+      '@earendil-works/pi-tui':
+        optional: true
+
+  '@aliou/pi-utils-ui@0.6.0':
+    resolution: {integrity: sha512-vIntLJiiz3at40VMJqA4JOcRZMEQt6TWf2UdFI5RnHXo0QTwkDSyV95+OeJUAMKqpCxu7mQQKJOTFS8v062vKQ==}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.74.0 <2'
       '@earendil-works/pi-tui': '>=0.74.0 <2'
@@ -669,7 +683,9 @@ packages:
   '@smithy/core@3.36.2':
     resolution: {integrity: sha512-oRw0rB9QSUiCZfEs23G5F4Af+b2rQt1lItIICWu5IejFNd+uPM8SWqiKLMpQ6bX1Q7slsLbjuoE2niErFtkVPQ==}
     engines: {node: '>=18.0.0'}
-    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
+    deprecated: |-
+      Deprecated due to a bug in custom logger data redaction. Upgrade to the latest version. If you used a custom logger with this
+        version, review your logs and rotate any credentials or other secrets. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.5.2':
     resolution: {integrity: sha512-A9uSdn72ozbRUSit0eib0TW7nXuNPlaeM0zcGkJ+nE6tFcSDbnmtwoxbTCFBukVQcszDAyvsd7+rTduPTXpygg==}
@@ -1751,7 +1767,7 @@ packages:
 
 snapshots:
 
-  '@aliou/biome-plugins@0.17.0(@biomejs/biome@2.6.4)':
+  '@aliou/biome-plugins@0.18.1(@biomejs/biome@2.6.4)':
     dependencies:
       '@biomejs/biome': 2.6.4
 
@@ -1765,6 +1781,11 @@ snapshots:
       - '@earendil-works/pi-tui'
 
   '@aliou/pi-utils-ui@0.5.1(@earendil-works/pi-coding-agent@1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.5.0)':
+    optionalDependencies:
+      '@earendil-works/pi-coding-agent': 1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76)
+      '@earendil-works/pi-tui': 1.5.0
+
+  '@aliou/pi-utils-ui@0.6.0(@earendil-works/pi-coding-agent@1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76))(@earendil-works/pi-tui@1.5.0)':
     optionalDependencies:
       '@earendil-works/pi-coding-agent': 1.5.0(@aws-sdk/credential-provider-node@3.972.88)(@smithy/signature-v4@5.7.4)(zod@3.25.76)
       '@earendil-works/pi-tui': 1.5.0

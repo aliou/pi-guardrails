@@ -5,6 +5,7 @@ import {
   type SettingsTheme,
   Wizard,
 } from "@aliou/pi-utils-settings";
+import { truncateToWidth } from "@aliou/pi-utils-ui";
 import {
   type ExtensionAPI,
   getAgentDir,
@@ -14,7 +15,6 @@ import type { Component } from "@earendil-works/pi-tui";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
 import type { GuardrailsConfig } from "../../../../src/shared/config";
 import { configLoader } from "../../../../src/shared/config";
-import { truncateToWidth } from "../../../shared/truncate";
 import {
   appendDangerousPattern,
   appendPolicyRule,
