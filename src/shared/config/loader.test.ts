@@ -486,4 +486,21 @@ describe("delegation resolution", () => {
     });
     expect(config.delegation.timeoutMs).toBe(expected);
   });
+
+  it.each([
+    [undefined, 0],
+    [-1, 0],
+    ["slow", 0],
+    [300000, 300000],
+  ])("resolves prompt timeouts %j to %j", async (promptTimeoutMs, expected) => {
+    const config = await load(
+      `/tmp/pi-agent-prompt-timeout-${String(promptTimeoutMs)}`,
+      {
+        pathAccess: { promptTimeoutMs },
+        permissionGate: { promptTimeoutMs },
+      } as never,
+    );
+    expect(config.pathAccess.promptTimeoutMs).toBe(expected);
+    expect(config.permissionGate.promptTimeoutMs).toBe(expected);
+  });
 });

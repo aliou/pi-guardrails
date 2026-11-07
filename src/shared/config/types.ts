@@ -103,6 +103,8 @@ export interface PathAccessConfig {
   allowedPaths?: AllowedPath[];
   /** Config scope used when the user picks "Allow … always" in the prompt. Default: "local". */
   alwaysScope?: PathAccessAlwaysScope;
+  /** Deny the access prompt after this many milliseconds without an answer. 0 waits forever. Default: 0. */
+  promptTimeoutMs?: number;
 }
 
 export interface DelegationConfig {
@@ -163,6 +165,8 @@ export interface GuardrailsConfig {
     allowedPatterns?: PatternConfig[];
     /** Command patterns that are always blocked without prompting. */
     autoDenyPatterns?: PatternConfig[];
+    /** Deny the confirmation prompt after this many milliseconds without an answer. 0 waits forever. Default: 0. */
+    promptTimeoutMs?: number;
   };
 }
 
@@ -179,6 +183,7 @@ export interface ResolvedConfig {
     applyTo: PathAccessApplyTo;
     allowedPaths: AllowedPath[];
     alwaysScope: PathAccessAlwaysScope;
+    promptTimeoutMs: number;
   };
   delegation: {
     timeoutMs: number;
@@ -191,5 +196,6 @@ export interface ResolvedConfig {
     requireConfirmation: boolean;
     allowedPatterns: PatternConfig[];
     autoDenyPatterns: PatternConfig[];
+    promptTimeoutMs: number;
   };
 }

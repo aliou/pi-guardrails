@@ -178,6 +178,8 @@ export function createPathAccessPromptComponent(
     command?: string;
     dirGrantable?: boolean;
     alwaysEnabled?: boolean;
+    /** Extra footer line, e.g. who else can answer and the timeout. */
+    hint?: string;
   } = {},
 ) {
   return (
@@ -317,7 +319,8 @@ export function createPathAccessPromptComponent(
           .filter((option) => option.key && !option.disabled)
           .map((option) => option.key)
           .join("/");
-        const hints = `↑/↓/Tab · Enter · ${shortcutHint} · Esc deny`;
+        const keys = `↑/↓/Tab · Enter · ${shortcutHint} · Esc deny`;
+        const hints = opts.hint ? `${keys}\n${opts.hint}` : keys;
         footerLine.setText(
           theme.fg(
             "dim",
