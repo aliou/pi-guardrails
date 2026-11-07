@@ -8,6 +8,12 @@ import { configLoader } from "../../src/shared/config";
 import {
   createDelegateRoster,
   delegateDecision,
+  dismissOnAbort,
+  formatDuration,
+  listResponders,
+  type PromptRaceOutcome,
+  promptWaitHint,
+  racePrompt,
   registerDecisionEntryRenderer,
 } from "../../src/shared/delegation";
 import {
@@ -156,10 +162,17 @@ export default async function permissionGate(pi: ExtensionAPI) {
     });
     pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
-    let result: ConfirmResult;
-    try {
+    const responders = listResponders(delegates);
+    const timeoutMs = config.permissionGate.promptTimeoutMs;
+    const askLocally = async (signal: AbortSignal): Promise<ConfirmResult> => {
       const customResult = await ctx.ui.custom<ConfirmResult>(
-        createPermissionGateConfirmComponent(command, safety.reason),
+        dismissOnAbort(
+          createPermissionGateConfirmComponent(command, safety.reason, {
+            hint: promptWaitHint(responders, timeoutMs),
+          }),
+          signal,
+          "deny",
+        ),
         {
           blocked: {
             kind: "permission",
@@ -167,20 +180,42 @@ export default async function permissionGate(pi: ExtensionAPI) {
           },
         },
       );
+      if (customResult !== undefined) return customResult;
+      if (signal.aborted) return "deny";
 
-      if (customResult === undefined) {
-        const indentedCommand = command.replace(/^/gm, "    ");
-        const selection = await ctx.ui.select(
-          `Dangerous command: ${safety.reason}\n\n${indentedCommand}`,
-          ["Allow once", "Allow for session", "Deny", "Decline and stop"],
-        );
-        if (selection === "Allow once") result = "allow";
-        else if (selection === "Allow for session") result = "allow-session";
-        else if (selection === "Decline and stop") result = "stop";
-        else result = "deny";
-      } else {
-        result = customResult;
-      }
+      const indentedCommand = command.replace(/^/gm, "    ");
+      const selection = await ctx.ui.select(
+        `Dangerous command: ${safety.reason}\n\n${indentedCommand}`,
+        ["Allow once", "Allow for session", "Deny", "Decline and stop"],
+        { signal },
+      );
+      if (selection === "Allow once") return "allow";
+      if (selection === "Allow for session") return "allow-session";
+      if (selection === "Decline and stop") return "stop";
+      return "deny";
+    };
+
+    let outcome: PromptRaceOutcome<ConfirmResult>;
+    try {
+      outcome = await racePrompt(
+        responders,
+        {
+          feature: "permissionGate",
+          action: safety.action,
+          reason: safety.reason,
+          metadata: safety.metadata,
+          toolName: "bash",
+          input: event.input,
+          promptId: promptOpened.prompt.id,
+          choices: ["allow", "deny"],
+        },
+        {
+          cwd: ctx.cwd,
+          sessionManager: ctx.sessionManager,
+          modelRegistry: ctx.modelRegistry,
+        },
+        { timeoutMs, local: askLocally },
+      );
     } finally {
       pi.events.emit(
         GUARDRAILS_PROMPT_CLOSED_EVENT,
@@ -188,6 +223,43 @@ export default async function permissionGate(pi: ExtensionAPI) {
       );
     }
 
+    if (outcome.by === "responder") {
+      const { responder, response } = outcome;
+      if (response.choice === "allow") {
+        ctx.ui.notify(
+          `Allowed by ${responder.name}: ${response.reason}`,
+          "info",
+        );
+        return;
+      }
+      const reason = `Denied by ${responder.name}: ${response.reason}`;
+      emitActionBlocked(pi, {
+        feature: "permissionGate",
+        action: safety.action,
+        reason,
+        block: {
+          source: "responder",
+          metadata: { risk: safety.metadata, responder },
+        },
+        context: { toolName: "bash", input: event.input },
+      });
+      return { block: true, reason };
+    }
+
+    if (outcome.by === "timeout") {
+      const reason = `Dangerous command denied: no answer within ${formatDuration(timeoutMs)}`;
+      ctx.ui.notify(reason, "warning");
+      emitActionBlocked(pi, {
+        feature: "permissionGate",
+        action: safety.action,
+        reason,
+        block: { source: "timeout", metadata: safety.metadata },
+        context: { toolName: "bash", input: event.input },
+      });
+      return { block: true, reason };
+    }
+
+    const result = outcome.result;
     if (result === "allow") return;
     if (result === "allow-session") {
       await saveCommandSessionGrant(command);

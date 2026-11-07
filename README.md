@@ -62,6 +62,8 @@ Approval prompts also report `blocked` program status (OSC 7501) natively throug
 
 Before permission-gate or path-access prompts you, other extensions can decide for you. If every registered delegate allows the action, it runs without a prompt; if any blocks it, it is blocked; anything else, including a timeout, falls back to the usual prompt. Each decision shows up under the tool call as a `[guardrails]` line.
 
+Delegates can also answer a prompt while it is open, for example to approve from outside the terminal: the first answer wins, from you at the terminal or from the delegate. Set `permissionGate.promptTimeoutMs` or `pathAccess.promptTimeoutMs` to deny prompts nobody answers in time (off by default).
+
 See [docs/decision-delegation.md](docs/decision-delegation.md) for the rules and how to write a delegate, with runnable examples in `examples/delegates/` — including a classifier-model delegate you can copy and tune for your own policies.
 
 ## Extension events
