@@ -201,7 +201,8 @@ export const COMMAND_EXAMPLES: Array<{
     description:
       "Prompts before force-pushing Git history. Uses regex so the flag is caught regardless of its position in the command (e.g. `git push origin main --force` or `-f` at the end).",
     pattern: {
-      pattern: "git push .*(-f\\b|--force(?!-with-lease)|--force-with-lease)",
+      pattern:
+        "git push .*(-f(?=\\s|$)|--force(?!-with-lease)|--force-with-lease)",
       regex: true,
       description:
         "Git force push (any variant: --force, --force-with-lease, -f)",
