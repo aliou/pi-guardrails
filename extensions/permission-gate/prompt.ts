@@ -98,6 +98,7 @@ function buildRightAlignedBorder(
 export function createPermissionGateConfirmComponent(
   command: string,
   description: string,
+  opts: { hint?: string } = {},
 ) {
   return (
     tui: { terminal: { rows: number; columns: number }; requestRender(): void },
@@ -146,6 +147,9 @@ export function createPermissionGateConfirmComponent(
         0,
       ),
     );
+    if (opts.hint) {
+      container.addChild(new Text(theme.fg("dim", opts.hint), 1, 0));
+    }
     container.addChild(new DynamicBorder(redBorder));
 
     return {

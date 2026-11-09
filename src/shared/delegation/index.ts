@@ -21,6 +21,16 @@ export {
 } from "./entry";
 export { DelegationProgress } from "./progress";
 export {
+  dismissOnAbort,
+  formatDuration,
+  isPromptResponse,
+  listResponders,
+  type PromptRaceOutcome,
+  promptWaitHint,
+  type RacePromptOptions,
+  racePrompt,
+} from "./respond";
+export {
   createDelegateRoster,
   type DelegateRoster,
   registerDelegate,
@@ -33,4 +43,7 @@ export type {
   GuardrailsDelegate,
   GuardrailsDelegateRegisterPayload,
   GuardrailsDelegateRequestPayload,
+  PromptChoice,
+  PromptResponse,
+  PromptResponseRequest,
 } from "./types";

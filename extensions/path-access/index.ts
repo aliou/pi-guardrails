@@ -12,6 +12,12 @@ import { configLoader } from "../../src/shared/config";
 import {
   createDelegateRoster,
   delegateDecision,
+  dismissOnAbort,
+  formatDuration,
+  listResponders,
+  type PromptRaceOutcome,
+  promptWaitHint,
+  racePrompt,
   registerDecisionEntryRenderer,
 } from "../../src/shared/delegation";
 import {
@@ -209,16 +215,26 @@ export default async function pathAccess(pi: ExtensionAPI) {
       });
       pi.events.emit(GUARDRAILS_PROMPT_OPENED_EVENT, promptOpened);
 
-      let result: PromptResult;
-      try {
+      const responders = listResponders(delegates);
+      const timeoutMs = config.pathAccess.promptTimeoutMs;
+      const askLocally = async (signal: AbortSignal): Promise<PromptResult> => {
         const customResult = await ctx.ui.custom<PromptResult>(
-          createPathAccessPromptComponent(
-            event.toolName,
-            safety.metadata.displayPath,
-            normalizeForDisplay(parentDir, ctx.cwd),
-            ctx.cwd,
-            showFileOptions,
-            { command: shellCommand, dirGrantable, alwaysEnabled },
+          dismissOnAbort(
+            createPathAccessPromptComponent(
+              event.toolName,
+              safety.metadata.displayPath,
+              normalizeForDisplay(parentDir, ctx.cwd),
+              ctx.cwd,
+              showFileOptions,
+              {
+                command: shellCommand,
+                dirGrantable,
+                alwaysEnabled,
+                hint: promptWaitHint(responders, timeoutMs),
+              },
+            ),
+            signal,
+            "deny",
           ),
           {
             blocked: {
@@ -227,40 +243,100 @@ export default async function pathAccess(pi: ExtensionAPI) {
             },
           },
         );
+        if (customResult !== undefined) return customResult;
+        if (signal.aborted) return "deny";
 
-        if (customResult === undefined) {
-          // RPC mode has no custom component support; fall back to a plain
-          // select with the same options as the TUI prompt.
-          const options = promptOptions(
-            showFileOptions,
-            dirGrantable,
-            alwaysEnabled,
-          ).filter((option) => !option.disabled);
-          if (!alwaysEnabled) {
-            ctx.ui.notify(
-              '"Always" grants are saved in this project\'s settings, which are ignored because this folder is not trusted. Use /trust and restart Pi to enable them.',
-              "warning",
-            );
-          }
-          const dirNote = showFileOptions
-            ? "\nDirectory grants apply to the parent directory."
-            : "";
-          const selection = await ctx.ui.select(
-            `Allow access to ${safety.metadata.displayPath}? (outside ${ctx.cwd})${dirNote}`,
-            options.map((option) => option.label),
+        // RPC mode has no custom component support; fall back to a plain
+        // select with the same options as the TUI prompt.
+        const options = promptOptions(
+          showFileOptions,
+          dirGrantable,
+          alwaysEnabled,
+        ).filter((option) => !option.disabled);
+        if (!alwaysEnabled) {
+          ctx.ui.notify(
+            '"Always" grants are saved in this project\'s settings, which are ignored because this folder is not trusted. Use /trust and restart Pi to enable them.',
+            "warning",
           );
-          result =
-            options.find((option) => option.label === selection)?.result ??
-            "deny";
-        } else {
-          result = customResult;
         }
+        const dirNote = showFileOptions
+          ? "\nDirectory grants apply to the parent directory."
+          : "";
+        const selection = await ctx.ui.select(
+          `Allow access to ${safety.metadata.displayPath}? (outside ${ctx.cwd})${dirNote}`,
+          options.map((option) => option.label),
+          { signal },
+        );
+        return (
+          options.find((option) => option.label === selection)?.result ?? "deny"
+        );
+      };
+
+      let outcome: PromptRaceOutcome<PromptResult>;
+      try {
+        outcome = await racePrompt(
+          responders,
+          {
+            feature: "pathAccess",
+            action: safety.action,
+            reason: safety.reason,
+            metadata: safety.metadata,
+            toolName: event.toolName,
+            input,
+            promptId: promptOpened.prompt.id,
+            choices: ["allow", "deny"],
+          },
+          {
+            cwd: ctx.cwd,
+            sessionManager: ctx.sessionManager,
+            modelRegistry: ctx.modelRegistry,
+          },
+          { timeoutMs, local: askLocally },
+        );
       } finally {
         pi.events.emit(
           GUARDRAILS_PROMPT_CLOSED_EVENT,
           createPromptClosedPayload(promptOpened),
         );
       }
+
+      if (outcome.by === "responder") {
+        const { responder, response } = outcome;
+        if (response.choice === "allow") {
+          ctx.ui.notify(
+            `Allowed by ${responder.name}: ${response.reason}`,
+            "info",
+          );
+          continue;
+        }
+        const reason = `Denied by ${responder.name}: ${response.reason}`;
+        emitActionBlocked(pi, {
+          feature: "pathAccess",
+          action: safety.action,
+          reason,
+          block: {
+            source: "responder",
+            metadata: { risk: safety.metadata, responder },
+          },
+          context: { toolName: event.toolName, input },
+        });
+        return { block: true, reason };
+      }
+
+      if (outcome.by === "timeout") {
+        const reason = `Access outside working directory denied: no answer within ${formatDuration(timeoutMs)}`;
+        ctx.ui.notify(reason, "warning");
+        emitActionBlocked(pi, {
+          feature: "pathAccess",
+          action: safety.action,
+          reason,
+          block: { source: "timeout", metadata: safety.metadata },
+          context: { toolName: event.toolName, input },
+        });
+        return { block: true, reason };
+      }
+
+      const result = outcome.result;
 
       if (result === "allow-file-once" || result === "allow-dir-once") {
         continue;
