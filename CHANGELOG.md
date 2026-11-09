@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.23.1
+
+### Patch Changes
+
+- b714096: Tighten short force-push flag matching in the command example.
+
 ## 0.23.0
 
 ### Minor Changes
