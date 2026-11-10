@@ -8,7 +8,6 @@ import { configLoader } from "../../src/shared/config";
 import {
   createDelegateRoster,
   delegateDecision,
-  registerDecisionEntryRenderer,
 } from "../../src/shared/delegation";
 import {
   createFeatureRegisterPayload,
@@ -43,7 +42,6 @@ export default async function permissionGate(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "permissionGate");
-  registerDecisionEntryRenderer(pi);
   const delegates = createDelegateRoster(pi);
 
   pi.on("tool_call", async (event, ctx) => {
