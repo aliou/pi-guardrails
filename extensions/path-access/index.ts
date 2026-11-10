@@ -12,7 +12,6 @@ import { configLoader } from "../../src/shared/config";
 import {
   createDelegateRoster,
   delegateDecision,
-  registerDecisionEntryRenderer,
 } from "../../src/shared/delegation";
 import {
   createFeatureRegisterPayload,
@@ -72,7 +71,6 @@ export default async function pathAccess(pi: ExtensionAPI) {
     );
   });
   setupLegacyPromptEventAlias(pi, "pathAccess");
-  registerDecisionEntryRenderer(pi);
   const delegates = createDelegateRoster(pi);
 
   pi.on("tool_call", async (event, ctx) => {

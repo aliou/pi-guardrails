@@ -2,6 +2,7 @@ import { bindProjectConfig } from "@aliou/pi-utils-settings";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { checkAction } from "../../src/core";
 import { configLoader } from "../../src/shared/config";
+import { registerDecisionEntryRenderer } from "../../src/shared/delegation";
 import {
   createFeatureRequestPayload,
   emitActionBlocked,
@@ -87,6 +88,8 @@ export default async function guardrails(pi: ExtensionAPI) {
     registerGuardrailsOnboardingCommand(pi);
   }
   setupPolicyHook(pi);
+
+  registerDecisionEntryRenderer(pi);
 
   pi.on("session_start", (_event, ctx) => {
     loadedFeatures.clear();
