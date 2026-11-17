@@ -487,3 +487,45 @@ describe("delegation resolution", () => {
     expect(config.delegation.timeoutMs).toBe(expected);
   });
 });
+
+describe("prompts resolution", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vol.reset();
+  });
+
+  async function load(dir: string, config?: Record<string, unknown>) {
+    vi.stubEnv("PI_CODING_AGENT_DIR", dir);
+    vol.fromJSON(
+      config
+        ? {
+            [`${dir}/extensions/guardrails.json`]: JSON.stringify({
+              version: pkg.version,
+              ...config,
+            }),
+          }
+        : { [`${dir}/.keep`]: "" },
+    );
+    const configLoader = createGuardrailsConfigLoader();
+    await configLoader.load();
+    return configLoader.getConfig();
+  }
+
+  it("defaults prompts.inputGuardMs to 1000", async () => {
+    const config = await load("/tmp/pi-agent-prompts-defaults");
+    expect(config.prompts.inputGuardMs).toBe(1000);
+  });
+
+  it.each([
+    [-1, 1000],
+    ["slow", 1000],
+    [60000, 10000],
+    [0, 0],
+    [1500, 1500],
+  ])("bounds prompts.inputGuardMs %j to %j", async (inputGuardMs, expected) => {
+    const config = await load(`/tmp/pi-agent-prompts-guard-${expected}`, {
+      prompts: { inputGuardMs },
+    });
+    expect(config.prompts.inputGuardMs).toBe(expected);
+  });
+});

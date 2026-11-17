@@ -22,6 +22,7 @@ vi.mock("../../src/shared/config", () => ({
       enabled: true,
       features: { pathAccess: true },
       delegation: { timeoutMs: 1000 },
+      prompts: { inputGuardMs: 0 },
       pathAccess: {
         mode: state.mode,
         applyTo: "all",

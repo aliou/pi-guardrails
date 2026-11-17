@@ -31,6 +31,7 @@ function makeConfig(overrides: Record<string, unknown> = {}): ResolvedConfig {
     enabled: true,
     features: { permissionGate: true, policies: true, pathAccess: true },
     delegation: { timeoutMs: 1000 },
+    prompts: { inputGuardMs: 0 },
     permissionGate: {
       patterns: [{ pattern: "dangerous-cmd", description: "test danger" }],
       useBuiltinMatchers: false,

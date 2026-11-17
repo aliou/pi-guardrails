@@ -57,6 +57,7 @@ const FEATURE_UI: Record<
 };
 
 const DELEGATION_TIMEOUTS_MS = ["5000", "10000", "20000", "30000"];
+const INPUT_GUARD_MS = ["0", "500", "1000", "2000"];
 
 function createPolicyRuleEditor(options: {
   index: number;
@@ -583,6 +584,22 @@ export function registerGuardrailsSettings(
           ],
         },
         {
+          label: "Prompts",
+          items: [
+            {
+              id: "prompts.inputGuardMs",
+              label: "Input guard (ms)",
+              description:
+                "How long input must be quiet before a prompt accepts an answer (0 disables)",
+              currentValue:
+                scopedConfig.prompts?.inputGuardMs !== undefined
+                  ? String(scopedConfig.prompts.inputGuardMs)
+                  : `inherited: ${resolved.prompts.inputGuardMs}`,
+              values: INPUT_GUARD_MS,
+            },
+          ],
+        },
+        {
           label: "Permission Gate",
           items: [
             {
@@ -653,6 +670,13 @@ export function registerGuardrailsSettings(
         const timeoutMs = Number(newValue);
         if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return null;
         updated.delegation = { ...updated.delegation, timeoutMs };
+        return updated;
+      }
+
+      if (id === "prompts.inputGuardMs") {
+        const inputGuardMs = Number(newValue);
+        if (!Number.isFinite(inputGuardMs) || inputGuardMs < 0) return null;
+        updated.prompts = { ...updated.prompts, inputGuardMs };
         return updated;
       }
 

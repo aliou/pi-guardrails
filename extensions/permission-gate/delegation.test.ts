@@ -28,6 +28,7 @@ vi.mock("../../src/shared/config", () => ({
           enabled: true,
           features: { permissionGate: true },
           delegation: { timeoutMs: 1000 },
+          prompts: { inputGuardMs: 0 },
           permissionGate: {
             patterns: [
               { pattern: "dangerous-cmd", description: "test danger" },

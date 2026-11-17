@@ -79,6 +79,8 @@ Most configuration happens through the interactive settings UI (`/guardrails:set
 
 Project settings apply only after Pi trusts the folder (`/trust`, then restart Pi). Until then, untrusted project files are ignored and left unchanged, while global settings and built-in protections still apply. Set `pathAccess.alwaysScope` to `"global"` to save "always" path grants without trusting the project.
 
+Set `prompts.inputGuardMs` (default `1000`, `0` disables) to control how long input must be quiet before an approval prompt accepts any answer. This keeps keys typed into the editor just before a prompt appears from approving or denying it; every keypress restarts the period.
+
 Saved files include a `$schema` field for editor autocomplete and validation; the schema is committed at [`schema.json`](schema.json).
 
 ## Similar but different

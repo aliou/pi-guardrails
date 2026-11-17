@@ -125,6 +125,10 @@
           "$ref": "#/definitions/DelegationConfig",
           "description": "Settings for delegating would-be prompts to registered decision delegates."
         },
+        "prompts": {
+          "$ref": "#/definitions/PromptsConfig",
+          "description": "Settings for the approval prompts."
+        },
         "permissionGate": {
           "type": "object",
           "properties": {
@@ -351,6 +355,16 @@
         "timeoutMs": {
           "type": "number",
           "description": "How long delegates get to decide before the action escalates to you, in milliseconds. Default: 10000."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PromptsConfig": {
+      "type": "object",
+      "properties": {
+        "inputGuardMs": {
+          "type": "number",
+          "description": "Quiet period in milliseconds before a prompt accepts an answer, so keys typed for the editor cannot approve or deny it. Any keypress restarts the period. 0 disables. Default: 1000."
         }
       },
       "additionalProperties": false

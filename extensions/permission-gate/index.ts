@@ -159,7 +159,11 @@ export default async function permissionGate(pi: ExtensionAPI) {
     let result: ConfirmResult;
     try {
       const customResult = await ctx.ui.custom<ConfirmResult>(
-        createPermissionGateConfirmComponent(command, safety.reason),
+        createPermissionGateConfirmComponent(
+          command,
+          safety.reason,
+          config.prompts.inputGuardMs,
+        ),
         {
           blocked: {
             kind: "permission",

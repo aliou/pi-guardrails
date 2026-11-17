@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPathAccessPromptComponent } from "./prompt";
 
 const theme = {
@@ -32,6 +32,7 @@ function createPrompt(
     showFileOptions?: boolean;
     dirGrantable?: boolean;
     alwaysEnabled?: boolean;
+    inputGuardMs?: number;
   } = {},
 ) {
   const done = vi.fn();
@@ -46,6 +47,7 @@ function createPrompt(
       command,
       dirGrantable: opts.dirGrantable,
       alwaysEnabled: opts.alwaysEnabled,
+      inputGuardMs: opts.inputGuardMs ?? 0,
     },
   );
   const prompt = component(
@@ -322,5 +324,54 @@ describe("createPathAccessPromptComponent", () => {
     prompt.handleInput?.("\r");
 
     expect(done).toHaveBeenCalledWith("deny");
+  });
+
+  describe("input guard", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("ignores approvals until input has been quiet", () => {
+      vi.useFakeTimers();
+      const { done, prompt } = createPrompt(100, undefined, {
+        inputGuardMs: 600,
+      });
+
+      for (const key of ["o", "f", "d", "F", "D", "\r"]) {
+        prompt.handleInput(key);
+      }
+      expect(done).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(600);
+      prompt.handleInput("o");
+      expect(done).toHaveBeenCalledWith("allow-file-once");
+    });
+
+    it("stays locked while keys keep arriving", () => {
+      vi.useFakeTimers();
+      const { done, prompt } = createPrompt(100, undefined, {
+        inputGuardMs: 600,
+      });
+
+      for (let i = 0; i < 20; i++) {
+        vi.advanceTimersByTime(300);
+        prompt.handleInput("d");
+      }
+      expect(done).not.toHaveBeenCalled();
+    });
+
+    it("ignores deny until input has been quiet", () => {
+      vi.useFakeTimers();
+      const { done, prompt } = createPrompt(100, undefined, {
+        inputGuardMs: 600,
+      });
+
+      prompt.handleInput("\x1b");
+      expect(done).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(600);
+      prompt.handleInput("\x1b");
+      expect(done).toHaveBeenCalledWith("deny");
+    });
   });
 });
