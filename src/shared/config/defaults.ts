@@ -13,6 +13,9 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   delegation: {
     timeoutMs: 10000,
   },
+  prompts: {
+    inputGuardMs: 1000,
+  },
   pathAccess: {
     mode: "ask",
     applyTo: "all",

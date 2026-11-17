@@ -134,6 +134,14 @@ export function createGuardrailsConfigLoader(): GuardrailsConfigLoader {
           ? Math.min(timeoutMs, 60_000)
           : DEFAULT_CONFIG.delegation.timeoutMs;
 
+      const inputGuardMs = resolved.prompts.inputGuardMs;
+      resolved.prompts.inputGuardMs =
+        typeof inputGuardMs === "number" &&
+        Number.isFinite(inputGuardMs) &&
+        inputGuardMs >= 0
+          ? Math.min(inputGuardMs, 10_000)
+          : DEFAULT_CONFIG.prompts.inputGuardMs;
+
       return resolved;
     },
   });

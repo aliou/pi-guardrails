@@ -42,6 +42,7 @@ vi.mock("../../src/shared/config", () => ({
       features: { pathAccess: true },
       pathAccess: mockState.pathAccess,
       delegation: { timeoutMs: 1000 },
+      prompts: { inputGuardMs: 0 },
     })),
     getRawConfig: vi.fn(() => null),
     save: vi.fn(async (scope: string, config: Record<string, unknown>) => {

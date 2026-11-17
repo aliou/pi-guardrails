@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NOOP_THEME } from "../../tests/utils/theme";
 import { createPermissionGateConfirmComponent } from "./prompt";
 
 type ConfirmResult = "allow" | "allow-session" | "deny" | "stop";
 
-function mount(command: string, description = "recursive delete") {
+function mount(
+  command: string,
+  description = "recursive delete",
+  inputGuardMs = 0,
+) {
   let captured: ConfirmResult | undefined;
   const done = (result: ConfirmResult) => {
     captured = result;
@@ -15,12 +19,11 @@ function mount(command: string, description = "recursive delete") {
     requestRender: vi.fn(),
   };
 
-  const component = createPermissionGateConfirmComponent(command, description)(
-    tui,
-    NOOP_THEME,
-    {},
-    done,
-  );
+  const component = createPermissionGateConfirmComponent(
+    command,
+    description,
+    inputGuardMs,
+  )(tui, NOOP_THEME, {}, done);
 
   return {
     component,
@@ -81,5 +84,65 @@ describe("createPermissionGateConfirmComponent", () => {
     expect(output).toContain("s: decline &");
     expect(output).toContain("stop");
     expect(output).toContain("n/esc: deny");
+  });
+
+  describe("input guard", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("ignores approvals until input has been quiet", () => {
+      vi.useFakeTimers();
+      const { component, result } = mount("rm -rf /", "recursive delete", 600);
+
+      component.handleInput("y");
+      expect(result()).toBeUndefined();
+
+      vi.advanceTimersByTime(600);
+      component.handleInput("y");
+      expect(result()).toBe("allow");
+    });
+
+    it("stays locked while keys keep arriving", () => {
+      vi.useFakeTimers();
+      const { component, result } = mount("rm -rf /", "recursive delete", 600);
+
+      for (let i = 0; i < 20; i++) {
+        vi.advanceTimersByTime(300);
+        component.handleInput("y");
+      }
+      expect(result()).toBeUndefined();
+    });
+
+    it("ignores deny and stop until input has been quiet", () => {
+      vi.useFakeTimers();
+      for (const [key, expected] of [
+        ["n", "deny"],
+        ["s", "stop"],
+      ] as const) {
+        const { component, result } = mount(
+          "rm -rf /",
+          "recursive delete",
+          600,
+        );
+        component.handleInput(key);
+        expect(result()).toBeUndefined();
+
+        vi.advanceTimersByTime(600);
+        component.handleInput(key);
+        expect(result()).toBe(expected);
+      }
+    });
+
+    it("counts scroll keys as activity", () => {
+      vi.useFakeTimers();
+      const { component, result } = mount("rm -rf /", "recursive delete", 600);
+
+      vi.advanceTimersByTime(500);
+      component.handleInput("j");
+      vi.advanceTimersByTime(500);
+      component.handleInput("y");
+      expect(result()).toBeUndefined();
+    });
   });
 });

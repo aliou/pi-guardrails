@@ -8,6 +8,7 @@ import {
   Text,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { createInputGuard } from "../../src/shared/input-guard";
 
 // Grant result type from the UI prompt
 export type PromptResult =
@@ -178,6 +179,8 @@ export function createPathAccessPromptComponent(
     command?: string;
     dirGrantable?: boolean;
     alwaysEnabled?: boolean;
+    /** Quiet period required before any answer is accepted. 0 disables. */
+    inputGuardMs?: number;
   } = {},
 ) {
   return (
@@ -188,8 +191,16 @@ export function createPathAccessPromptComponent(
       bold(text: string): string;
     },
     _kb: unknown,
-    done: (result: PromptResult) => void,
+    rawDone: (result: PromptResult) => void,
   ) => {
+    // Ignore answers until input has been quiet for a moment so keys typed
+    // for the editor can't answer the prompt (`d`, `o`, enter, ...), whether
+    // approving or denying.
+    const tick = createInputGuard(opts.inputGuardMs);
+    let armed = false;
+    const done = (result: PromptResult) => {
+      if (armed) rawDone(result);
+    };
     const options = promptOptions(
       showFileOptions,
       opts.dirGrantable ?? true,
@@ -338,6 +349,7 @@ export function createPathAccessPromptComponent(
       },
       invalidate: () => container.invalidate(),
       handleInput: (data: string) => {
+        armed = tick();
         if (
           matchesKey(data, Key.up) ||
           matchesKey(data, Key.left) ||

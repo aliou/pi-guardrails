@@ -110,6 +110,11 @@ export interface DelegationConfig {
   timeoutMs?: number;
 }
 
+export interface PromptsConfig {
+  /** Quiet period in milliseconds before a prompt accepts an answer, so keys typed for the editor cannot approve or deny it. Any keypress restarts the period. 0 disables. Default: 1000. */
+  inputGuardMs?: number;
+}
+
 export interface GuardrailsConfig {
   /** JSON Schema URL for editor autocomplete and validation. Added automatically when Guardrails writes the file. */
   $schema?: string;
@@ -151,6 +156,8 @@ export interface GuardrailsConfig {
   };
   /** Settings for delegating would-be prompts to registered decision delegates. */
   delegation?: DelegationConfig;
+  /** Settings for the approval prompts. */
+  prompts?: PromptsConfig;
   /** Dangerous bash command detection and confirmation settings. */
   permissionGate?: {
     /** Additional dangerous command patterns. */
@@ -182,6 +189,9 @@ export interface ResolvedConfig {
   };
   delegation: {
     timeoutMs: number;
+  };
+  prompts: {
+    inputGuardMs: number;
   };
   permissionGate: {
     patterns: DangerousPattern[];

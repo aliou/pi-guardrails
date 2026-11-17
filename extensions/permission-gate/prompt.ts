@@ -9,6 +9,7 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
+import { createInputGuard } from "../../src/shared/input-guard";
 
 interface MinimalTheme {
   fg(color: string, text: string): string;
@@ -98,13 +99,21 @@ function buildRightAlignedBorder(
 export function createPermissionGateConfirmComponent(
   command: string,
   description: string,
+  inputGuardMs?: number,
 ) {
   return (
     tui: { terminal: { rows: number; columns: number }; requestRender(): void },
     theme: MinimalTheme,
     _kb: unknown,
-    done: (result: "allow" | "allow-session" | "deny" | "stop") => void,
+    rawDone: (result: "allow" | "allow-session" | "deny" | "stop") => void,
   ) => {
+    // Ignore answers until input has been quiet for a moment so keys typed
+    // for the editor can't answer the prompt, whether approving or denying.
+    const tick = createInputGuard(inputGuardMs);
+    let armed = false;
+    const done: typeof rawDone = (result) => {
+      if (armed) rawDone(result);
+    };
     const container = new Container();
     const redBorder = (s: string) => theme.fg("error", s);
     const dimBorder = (s: string) => theme.fg("dim", s);
@@ -188,6 +197,7 @@ export function createPermissionGateConfirmComponent(
       },
       invalidate: () => container.invalidate(),
       handleInput: (data: string) => {
+        armed = tick();
         const contentWidth = Math.max(1, tui.terminal.columns - 4);
         const { maxScrollOffset } = getCommandViewportState(
           command,

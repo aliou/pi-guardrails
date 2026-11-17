@@ -218,7 +218,12 @@ export default async function pathAccess(pi: ExtensionAPI) {
             normalizeForDisplay(parentDir, ctx.cwd),
             ctx.cwd,
             showFileOptions,
-            { command: shellCommand, dirGrantable, alwaysEnabled },
+            {
+              command: shellCommand,
+              dirGrantable,
+              alwaysEnabled,
+              inputGuardMs: config.prompts.inputGuardMs,
+            },
           ),
           {
             blocked: {
