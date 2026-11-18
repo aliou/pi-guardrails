@@ -105,14 +105,12 @@ export function createPermissionGateConfirmComponent(
     tui: { terminal: { rows: number; columns: number }; requestRender(): void },
     theme: MinimalTheme,
     _kb: unknown,
-    rawDone: (result: "allow" | "allow-session" | "deny" | "stop") => void,
+    onResult: (result: "allow" | "allow-session" | "deny" | "stop") => void,
   ) => {
-    // Ignore answers until input has been quiet for a moment so keys typed
-    // for the editor can't answer the prompt, whether approving or denying.
     const tick = createInputGuard(inputGuardMs);
     let armed = false;
-    const done: typeof rawDone = (result) => {
-      if (armed) rawDone(result);
+    const done: typeof onResult = (result) => {
+      if (armed) onResult(result);
     };
     const container = new Container();
     const redBorder = (s: string) => theme.fg("error", s);

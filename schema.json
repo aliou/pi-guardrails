@@ -125,10 +125,6 @@
           "$ref": "#/definitions/DelegationConfig",
           "description": "Settings for delegating would-be prompts to registered decision delegates."
         },
-        "prompts": {
-          "$ref": "#/definitions/PromptsConfig",
-          "description": "Settings for the approval prompts."
-        },
         "permissionGate": {
           "type": "object",
           "properties": {
@@ -167,6 +163,10 @@
           },
           "additionalProperties": false,
           "description": "Dangerous bash command detection and confirmation settings."
+        },
+        "prompts": {
+          "$ref": "#/definitions/PromptsConfig",
+          "description": "Settings for the approval prompts."
         }
       },
       "additionalProperties": false
@@ -359,16 +359,6 @@
       },
       "additionalProperties": false
     },
-    "PromptsConfig": {
-      "type": "object",
-      "properties": {
-        "inputGuardMs": {
-          "type": "number",
-          "description": "Quiet period in milliseconds before a prompt accepts an answer, so keys typed for the editor cannot approve or deny it. Any keypress restarts the period. 0 disables. Default: 1000."
-        }
-      },
-      "additionalProperties": false
-    },
     "DangerousPattern": {
       "type": "object",
       "properties": {
@@ -393,6 +383,16 @@
       ],
       "additionalProperties": false,
       "description": "Permission gate pattern. When regex is false (default), the pattern is matched as substring against the raw command string. When regex is true, uses full regex against the raw string."
+    },
+    "PromptsConfig": {
+      "type": "object",
+      "properties": {
+        "inputGuardMs": {
+          "type": "number",
+          "description": "Quiet period in milliseconds before a prompt accepts an answer, so keys typed for the editor cannot approve or deny it. Any keypress restarts the period. 0 disables. Default: 1000."
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

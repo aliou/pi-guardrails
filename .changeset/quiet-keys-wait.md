@@ -1,5 +1,7 @@
 ---
-"@aliou/pi-guardrails": patch
+"@aliou/pi-guardrails": minor
 ---
 
-Ignore keypresses that answer permission-gate and path-access prompts until input has been quiet for 1000ms, so keys typed into the editor just before a prompt appears (`y`, `d`, enter, `n`, ...) cannot approve or deny it. Every keypress restarts the period; scrolling still works. Configure with `prompts.inputGuardMs` (`0` disables).
+- Add a configurable quiet period before permission-gate and path-access prompts accept answers, preventing keys typed for the editor from accidentally approving, denying, or stopping an action.
+- Restart the quiet period on every keypress while keeping prompt scrolling available. The default is 1000 ms; set `prompts.inputGuardMs` to `0` to disable it.
+- Configure `prompts.inputGuardMs` directly in the Guardrails config, or open `/guardrails:settings` and use **Prompts → Input guard (ms)**.
