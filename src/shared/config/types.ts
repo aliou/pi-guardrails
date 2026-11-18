@@ -156,8 +156,6 @@ export interface GuardrailsConfig {
   };
   /** Settings for delegating would-be prompts to registered decision delegates. */
   delegation?: DelegationConfig;
-  /** Settings for the approval prompts. */
-  prompts?: PromptsConfig;
   /** Dangerous bash command detection and confirmation settings. */
   permissionGate?: {
     /** Additional dangerous command patterns. */
@@ -171,6 +169,8 @@ export interface GuardrailsConfig {
     /** Command patterns that are always blocked without prompting. */
     autoDenyPatterns?: PatternConfig[];
   };
+  /** Settings for the approval prompts. */
+  prompts?: PromptsConfig;
 }
 
 export interface ResolvedConfig {

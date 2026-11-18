@@ -179,7 +179,6 @@ export function createPathAccessPromptComponent(
     command?: string;
     dirGrantable?: boolean;
     alwaysEnabled?: boolean;
-    /** Quiet period required before any answer is accepted. 0 disables. */
     inputGuardMs?: number;
   } = {},
 ) {
@@ -191,15 +190,12 @@ export function createPathAccessPromptComponent(
       bold(text: string): string;
     },
     _kb: unknown,
-    rawDone: (result: PromptResult) => void,
+    onResult: (result: PromptResult) => void,
   ) => {
-    // Ignore answers until input has been quiet for a moment so keys typed
-    // for the editor can't answer the prompt (`d`, `o`, enter, ...), whether
-    // approving or denying.
     const tick = createInputGuard(opts.inputGuardMs);
     let armed = false;
     const done = (result: PromptResult) => {
-      if (armed) rawDone(result);
+      if (armed) onResult(result);
     };
     const options = promptOptions(
       showFileOptions,
