@@ -1,5 +1,11 @@
 # @aliou/pi-guardrails
 
+## 0.24.1
+
+### Patch Changes
+
+- 69f9135: Register the `guardrails:decision` entry renderer from the guardrails entry only, instead of from both the path-access and permission-gate entries. Removes the duplicate renderer registration that name-conflict checks flag.
+
 ## 0.24.0
 
 ### Minor Changes
